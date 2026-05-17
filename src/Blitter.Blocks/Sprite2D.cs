@@ -1,115 +1,138 @@
 using System.Numerics;
+
 using Blitter.Bits;
 
 namespace Blitter.Blocks;
 
 /// <summary>
-/// A prop that moves itself.
+/// A self-moving, collidable inhabitant of a <see cref="PlayField2D"/>.
+/// Its collection of behaviors defines its logic: movement, collision response, and so on.
 /// </summary>
-public class Sprite2D : Prop2D
+public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
 {
-    /// <summary>
-    /// The image to render.
-    /// </summary>
-    public Texture2D? Image { get; set; }
+    /// <summary>The image to render.</summary>
+    public SpriteImage2D? Image { get; set; }
 
-    /// <summary>
-    /// The X position of the center of the sprite.
-    /// </summary>    
-    public float CenterX { get; set; }
+    /// <summary>The position of the center of the sprite.</summary>
+    public Vector2 Center { get; set; }
 
-    /// <summary>
-    /// The Y position of the center of the sprite.
-    /// </summary>
-    public float CenterY { get; set; }
-
-    /// <summary>
-    /// The direction of movement.
-    /// </summary>
+    /// <summary>The direction of movement.</summary>
     public float Heading { get; set; }
 
-    /// <summary>
-    /// The speed of the sprite in pixels/units per second along the heading.
-    /// </summary>
+    /// <summary>The speed of the sprite in pixels per second along the heading.</summary>
     public float Speed { get; set; }
 
-    /// <summary>
-    /// The current orientation in degrees.
-    /// </summary>
+    /// <summary>The current orientation in degrees.</summary>
     public float Rotation { get; set; }
 
-    /// <summary>
-    /// How many degrees the sprite rotates in a second.
-    /// </summary>
+    /// <summary>How many degrees the sprite rotates in a second.</summary>
     public float RotationSpeed { get; set; }
 
-    /// <summary>
-    /// The scale factor to apply to the image.
-    /// </summary>
+    /// <summary>The scale factor to apply to the image.</summary>
     public float Scale { get; set; } = 1f;
 
-    /// <summary>
-    /// The flip mode to apply when rendering the image.
-    /// </summary>
+    /// <summary>The flip mode to apply when rendering the image.</summary>
     public FlipMode Flipped = FlipMode.None;
 
     /// <summary>
-    /// Radius around <see cref="CenterX"/>/<see cref="CenterY"/> used
-    /// for collision detection. Zero (the default) means the sprite is
-    /// not collidable.
-    /// </summary>
-    public float HitRadius { get; set; }
-
-    /// <inheritdoc/>
-    public override BoundingCircle? HitCircle =>
-        HitRadius > 0f
-            ? new BoundingCircle(new Vector2(CenterX, CenterY), HitRadius)
-            : null;
-
-    /// <summary>
     /// Behaviors attached to this sprite. Run in list order each tick.
-    /// Typical behaviors mutate the sprite's position, rotation, or
-    /// velocity (see <see cref="Motion2D"/>, <see cref="BounceInBounds2D"/>).
     /// </summary>
     public List<SpriteBehavior2D> Behaviors { get; } = new();
+
+    /// <summary>
+    /// The sprite is active and not about to be culled.
+    /// </summary>
+    public bool IsAlive { get; set; } = true;
+
+    /// <summary>
+    /// The <see cref="PlayField2D"/> this sprite belongs to.
+    /// </summary>
+    public PlayField2D PlayField =>  
+        _playField ?? throw new InvalidOperationException("Sprite is not attached to a PlayField. Access PlayField only while the sprite is a member of one.");
+
+    // PlayField backing field.
+    internal PlayField2D? _playField;
+
+    // Time sprite was added to playfield.
+    internal TimeSpan _spawnedAt;
+
+    /// <summary>
+    /// How long this sprite has been a member of its current <see cref="PlayField"/>.
+    /// </summary>
+    public TimeSpan Age => 
+        _playField is { } p 
+            ? p.Elapsed - _spawnedAt 
+            : TimeSpan.Zero;
+
+    /// <summary>
+    /// The boundary of the sprite for collision purposes.
+    /// By default, a circle centered on the sprite's <see cref="Center"/>
+    /// </summary>
+    public virtual BoundingCircle HitCircle
+    {
+        get
+        {
+            if (Image is null)
+                return new BoundingCircle(Center, 0f);
+            var b = Image.Boundary;
+            if (b.IsEmpty)
+                return new BoundingCircle(Center, 0f);
+            return new BoundingCircle(Center + b.Center * Scale, b.Radius * Scale);
+        }
+    }
 
     public Sprite2D()
     {
     }
 
-    public Sprite2D(Texture2D image, float centerX, float centerY, float scale = 1f)
-    {
-        this.Image = image;
-        this.CenterX = centerX;
-        this.CenterY = centerY;
-        this.Scale = scale;
-    }
-
-    public override bool Update(in UpdateContext2D context)
+    /// <summary>Tick every enabled behavior in order.</summary>
+    public virtual void Update(in UpdateContext2D context)
     {
         foreach (var behavior in this.Behaviors)
         {
             if (behavior.Enabled)
                 behavior.Update(this, in context);
         }
-
-        return true;
     }
 
-    /// <inheritdoc/>
-    public override void OnCollision(Prop2D other, in UpdateContext2D context)
+    /// <summary>
+    /// Called by the owning <see cref="PlayField2D"/> when this
+    /// sprite's <see cref="HitCircle"/> intersects another sprite's.
+    /// Forwards to each enabled behavior.
+    /// </summary>
+    public virtual void OnHitSprite(Sprite2D other, in UpdateContext2D context)
     {
         foreach (var behavior in this.Behaviors)
         {
             if (behavior.Enabled)
-                behavior.OnCollision(this, other, in context);
+                behavior.OnHitSprite(this, other, in context);
         }
     }
 
     /// <summary>
-    /// Get velocity components from speed and heading (degrees).
+    /// Called by the owning <see cref="PlayField2D"/> when this
+    /// sprite's <see cref="HitCircle"/> overlaps a
+    /// <see cref="Barrier2D"/>. Forwards to each enabled behavior.
     /// </summary>
-    public static (float velocityX, float velocityY) GetVelocity(float speed, float heading)
+    public virtual void OnHitBarrier(Barrier2D barrier, in UpdateContext2D context)
+    {
+        foreach (var behavior in this.Behaviors)
+        {
+            if (behavior.Enabled)
+                behavior.OnHitBarrier(this, barrier, in context);
+        }
+    }
+
+    /// <summary>Render the sprite at its current transform.</summary>
+    public virtual void Draw(Renderer2D renderer)
+    {
+        this.Image?.Draw(renderer, this.Center, this.Rotation, this.Scale, this.Flipped);
+    }
+
+    /// <summary>
+    /// Get the velocity vector from speed and heading (degrees).
+    /// </summary>
+    public static Vector2 GetVelocity(float speed, float heading)
     {
         double headingRads = (heading - 90f) * (Math.PI / 180.0);
         var velocityX = speed * (float)Math.Cos(headingRads);
@@ -118,16 +141,16 @@ public class Sprite2D : Prop2D
         var velocityY = speed * (float)Math.Sin(headingRads);
         if (MathF.Abs(velocityY) < 0.0001f)
             velocityY = 0f;
-        return (velocityX, velocityY);
+        return new Vector2(velocityX, velocityY);
     }
 
     /// <summary>
-    /// Gets speed and heading (degrees) from velocity components.
+    /// Gets speed and heading (degrees) from a velocity vector.
     /// </summary>
-    public static (float speed, float heading) GetSpeedAndHeading(float velocityX, float velocityY)
+    public static (float speed, float heading) GetSpeedAndHeading(Vector2 velocity)
     {
-        var speed = (float)Math.Sqrt(velocityX * velocityX + velocityY * velocityY);
-        var heading = (float)(Math.Atan2(velocityY, velocityX) * (180.0 / Math.PI) + 90f);
+        var speed = velocity.Length();
+        var heading = (float)(Math.Atan2(velocity.Y, velocity.X) * (180.0 / Math.PI) + 90f);
         if (heading < 0)
             heading += 360f;
         else if (heading >= 360f)
@@ -135,34 +158,10 @@ public class Sprite2D : Prop2D
         return (speed, heading);
     }
 
-    public void ChangeVelocity(Func<float, float, (float vx, float vy)> fn)
+    public void ChangeVelocity(Func<Vector2, Vector2> fn)
     {
-        var (vx, vy) = GetVelocity(this.Speed, this.Heading);
-        (vx, vy) = fn(vx, vy);
-        (this.Speed, this.Heading) = GetSpeedAndHeading(vx, vy);
-    }
-
-    public override void Draw(Renderer2D renderer)
-    {
-        if (this.Image is { } image)
-        {
-            var size = image.Size;
-            var scaledWidth = size.Width * this.Scale;
-            var scaledHeight = size.Height * this.Scale;
-            var x = this.CenterX - scaledWidth / 2;
-            var y = this.CenterY - scaledHeight / 2;
-            var source = new Rect(0, 0, size.Width, size.Height);
-            var dest = new Rect(x, y, scaledWidth, scaledHeight);
-            var center = new Vector2(scaledWidth / 2f, scaledHeight / 2f);
-
-            if (this.Rotation != 0f || this.Flipped != FlipMode.None)
-            {
-                renderer.DrawImageRotated(image, source, dest, this.Rotation, center, this.Flipped);
-            }
-            else
-            {
-                renderer.DrawImage(image, source, dest);
-            }
-        }
+        var v = GetVelocity(this.Speed, this.Heading);
+        v = fn(v);
+        (this.Speed, this.Heading) = GetSpeedAndHeading(v);
     }
 }

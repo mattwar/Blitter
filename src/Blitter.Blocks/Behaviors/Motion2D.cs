@@ -2,8 +2,8 @@ namespace Blitter.Blocks;
 
 /// <summary>
 /// Integrates a sprite's <see cref="Sprite2D.Speed"/> /
-/// <see cref="Sprite2D.Heading"/> into <see cref="Sprite2D.CenterX"/> /
-/// <see cref="Sprite2D.CenterY"/> and its <see cref="Sprite2D.RotationSpeed"/>
+/// <see cref="Sprite2D.Heading"/> into <see cref="Sprite2D.Center"/>
+/// and its <see cref="Sprite2D.RotationSpeed"/>
 /// into <see cref="Sprite2D.Rotation"/> each tick.
 /// </summary>
 public class Motion2D : SpriteBehavior2D
@@ -40,9 +40,8 @@ public class Motion2D : SpriteBehavior2D
 
         if (target.Speed != 0f)
         {
-            var (vx, vy) = Sprite2D.GetVelocity(target.Speed, target.Heading);
-            target.CenterX += (float)(vx * timeDelta.TotalSeconds);
-            target.CenterY += (float)(vy * timeDelta.TotalSeconds);
+            var v = Sprite2D.GetVelocity(target.Speed, target.Heading);
+            target.Center += v * (float)timeDelta.TotalSeconds;
         }
     }
 }

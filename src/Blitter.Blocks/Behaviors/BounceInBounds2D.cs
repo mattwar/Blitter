@@ -1,5 +1,7 @@
 namespace Blitter.Blocks;
 
+using System.Numerics;
+
 /// <summary>
 /// Reflects a sprite's velocity when its center crosses the edge of the
 /// update context bounds, so the sprite stays inside the playfield.
@@ -17,25 +19,25 @@ public class BounceInBounds2D : SpriteBehavior2D
         var bounds = context.Bounds;
         var bounced = false;
 
-        if (target.CenterX < bounds.X)
+        if (target.Center.X < bounds.X)
         {
-            target.ChangeVelocity((vx, vy) => (Math.Abs(vx), vy));
+            target.ChangeVelocity(v => new Vector2(Math.Abs(v.X), v.Y));
             bounced = true;
         }
-        else if (target.CenterX > bounds.X + bounds.Width)
+        else if (target.Center.X > bounds.X + bounds.Width)
         {
-            target.ChangeVelocity((vx, vy) => (-Math.Abs(vx), vy));
+            target.ChangeVelocity(v => new Vector2(-Math.Abs(v.X), v.Y));
             bounced = true;
         }
 
-        if (target.CenterY < bounds.Y)
+        if (target.Center.Y < bounds.Y)
         {
-            target.ChangeVelocity((vx, vy) => (vx, Math.Abs(vy)));
+            target.ChangeVelocity(v => new Vector2(v.X, Math.Abs(v.Y)));
             bounced = true;
         }
-        else if (target.CenterY > bounds.Y + bounds.Height)
+        else if (target.Center.Y > bounds.Y + bounds.Height)
         {
-            target.ChangeVelocity((vx, vy) => (vx, -Math.Abs(vy)));
+            target.ChangeVelocity(v => new Vector2(v.X, -Math.Abs(v.Y)));
             bounced = true;
         }
 
