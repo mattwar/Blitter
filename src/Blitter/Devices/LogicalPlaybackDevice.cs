@@ -47,36 +47,35 @@ public class LogicalPlaybackDevice : AudioPlaybackDevice
     /// </summary>
     public override Task PlayAsync(Sound data, float volume = 1f)
     {
-        var tcs = new TaskCompletionSource();
-        var stream = CreateStream(data.Spec, (stream, additionalAmount, totalAmount) =>
-        {
-            if (stream.IsDisposed)
-            {
-                if (!tcs.Task.IsCompleted)
-                {
-                    tcs.SetResult();
-                }
-                return;
-            }
-
-            if (stream.QueuedBytes == 0)
-            {
-                if (tcs.Task.IsCompleted)
-                    return;
-                Task.Run(() =>
-                {
-                    stream.Dispose();
-                    tcs.SetResult();
-                });
-            }
-        });
-
-        // Per-stream gain rather than per-device gain so concurrent plays
-        // don't fight over a shared device volume slider.
+        var stream = CreateStream(data.Spec);
         stream.Volume = Math.Clamp(volume, 0f, 1f);
         stream.Queue(data);
         stream.Paused = false;
-        return tcs.Task;
+
+        // SDL's "get more data" callback stops firing once the queue drains,
+        // so we can't reliably observe playback completion through it. Wait
+        // for the known length of the sample instead. A small slack covers
+        // SDL's own device-side buffer that keeps playing after the stream's
+        // queue hits zero.
+        var duration = GetPlaybackDuration(data);
+        var slack = TimeSpan.FromMilliseconds(50);
+        return Task.Delay(duration + slack).ContinueWith(_ =>
+        {
+            if (!stream.IsDisposed)
+                stream.Dispose();
+        }, TaskScheduler.Default);
+    }
+
+    private static TimeSpan GetPlaybackDuration(Sound data)
+    {
+        var spec = data.Spec;
+        // Low byte of the SDL format encodes the bit depth.
+        int bitsPerSample = (int)((uint)spec.Format & 0xFF);
+        int bytesPerFrame = Math.Max(1, (bitsPerSample / 8) * Math.Max(1, spec.Channels));
+        int frames = data.Data.Length / bytesPerFrame;
+        if (spec.Frequency <= 0)
+            return TimeSpan.Zero;
+        return TimeSpan.FromSeconds((double)frames / spec.Frequency);
     }
 
     #region Audio Streams

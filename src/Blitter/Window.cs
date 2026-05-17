@@ -713,11 +713,11 @@ public abstract class Window : IDisposable
 
     /// <summary>
     /// Animates the window by repeatedly calling <paramref name="renderFrame"/> on each frame tick
-    /// until <paramref name="shouldContinue"/> returns false, the window is closed, or <paramref name="cancellationToken"/> fires.
+    /// until <paramref name="shouldExit"/> returns true, the window is closed, or <paramref name="cancellationToken"/> fires.
     /// </summary>
-    public Task RunAsync(Func<bool> shouldContinue, Action renderFrame, CancellationToken cancellationToken = default)
+    public Task RunAsync(Func<bool> shouldExit, Action renderFrame, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(shouldContinue);
+        ArgumentNullException.ThrowIfNull(shouldExit);
         ArgumentNullException.ThrowIfNull(renderFrame);
 
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -725,7 +725,7 @@ public abstract class Window : IDisposable
         {
             try
             {
-                while (!IsClosed && !cancellationToken.IsCancellationRequested && shouldContinue())
+                while (!IsClosed && !cancellationToken.IsCancellationRequested && !shouldExit())
                 {
                     RenderFrame(renderFrame);
                     if (IsClosed || cancellationToken.IsCancellationRequested)
@@ -757,7 +757,7 @@ public abstract class Window : IDisposable
     /// until the window is closed, or <paramref name="cancellationToken"/> fires.
     /// </summary>
     public Task RunAsync(Action renderFrame, CancellationToken cancellationToken = default)
-        => RunAsync(static () => true, renderFrame, cancellationToken);
+        => RunAsync(static () => false, renderFrame, cancellationToken);
 
     /// <summary>
     /// Invokes <paramref name="body"/> in a frame-rendering context:

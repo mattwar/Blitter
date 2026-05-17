@@ -1,18 +1,7 @@
 namespace Blitter.Blocks;
 
 /// <summary>
-/// A behavior for an element of a <see cref="Scene2D"/>
-/// </summary>
-public abstract class Behavior2D
-{
-    /// <summary>
-    /// When false the host skips this behavior's update for the frame.
-    /// </summary>
-    public bool Enabled { get; set; } = true;
-}
-
-/// <summary>
-/// A behavior that controlls a <see cref="Sprite2D"/>.
+/// A behavior that controls a <see cref="Sprite2D"/>.
 /// </summary>
 public abstract class SpriteBehavior2D : Behavior2D
 {
@@ -23,7 +12,7 @@ public abstract class SpriteBehavior2D : Behavior2D
 
     /// <summary>
     /// Invoked when the host sprite's <see cref="Sprite2D.HitCircle"/>
-    /// overlaps another sprite's during the playfield's collision detection. 
+    /// overlaps another sprite's during the playfield's collision detection.
     /// </summary>
     public virtual void OnHitSprite(Sprite2D self, Sprite2D other, in UpdateContext2D context) { }
 

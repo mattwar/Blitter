@@ -56,17 +56,33 @@ var hud = new CustomLayer2D
     OnRender = rd =>
     {
         rd.DrawColor = Color.White;
+        var asteriodCount = playField.Sprites.Count(s => s is Asteroid);
         rd.DrawDebugText(
             0, 10,
-            $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.Center.X:#} y: {rocket.Center.Y:#}",
+            $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.Center.X:#} y: {rocket.Center.Y:#} asteriods: {asteriodCount}",
             scale: 2f);
     }
 };
 
-var scene = new Scene2D(
-    playField,
-    hud
-);
+var scene = new Scene2D(playField, hud)
+{
+    Behaviors =
+    {
+        new CustomSceneBehavior2D()
+        {
+            OnUpdate = (s, in ctx) =>
+            {
+                if (s.RunState != RunState.Running)
+                    return;
+                if (playField.Sprites.Count(s => s is Asteroid) == 0 || window.Input.WasJustPressed(Key.V))
+                {
+                    var task = Audio.PlayAsync(Melodies.LevelUp, volume: .3f);
+                    s.ExitWithDelay((in _ctx) => task.IsCompleted);
+                }
+            }
+        }
+    },
+};
 
 // Run the scene until done
 await scene.RunAsync(window);

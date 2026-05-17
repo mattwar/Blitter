@@ -100,13 +100,13 @@ public class Window2D : Window
 
     /// <summary>
     /// Animates the window by repeatedly calling <paramref name="renderFrame"/> on each frame tick
-    /// until <paramref name="shouldContinue"/> returns false, the window is closed, or <paramref name="cancellationToken"/> fires.
+    /// until <paramref name="shouldExit"/> returns true, the window is closed, or <paramref name="cancellationToken"/> fires.
     /// </summary>
-    public Task RunAsync(Func<bool> shouldContinue, Action<Renderer2D> renderFrame, CancellationToken cancellationToken = default)
+    public Task RunAsync(Func<bool> shouldExit, Action<Renderer2D> renderFrame, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(shouldContinue);
+        ArgumentNullException.ThrowIfNull(shouldExit);
         ArgumentNullException.ThrowIfNull(renderFrame);
-        return RunAsync(shouldContinue, () => renderFrame(this.Renderer), cancellationToken);
+        return RunAsync(shouldExit, () => renderFrame(this.Renderer), cancellationToken);
     }
 
     /// <summary>
@@ -114,7 +114,7 @@ public class Window2D : Window
     /// until the window is closed, or <paramref name="cancellationToken"/> fires.
     /// </summary>
     public Task RunAsync(Action<Renderer2D> renderFrame, CancellationToken cancellationToken = default)
-        => RunAsync(static () => true, renderFrame, cancellationToken);
+        => RunAsync(static () => false, renderFrame, cancellationToken);
 
     /// <summary>
     /// A 2D renderer that draws into a <see cref="Window2D"/>'s swapchain.

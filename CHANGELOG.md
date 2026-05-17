@@ -30,6 +30,12 @@ All notable changes to this project will be documented in this file.
   to the texture's previous mod state after the draw.
 
 ### Fixed
+- `Audio.PlayAsync`: returned task now actually completes when playback
+  finishes. SDL's get-data callback stops firing once the stream
+  drains, so completion is now timed to the sound's known duration.
+- `Melodies` presets are now synthesized lazily on first access rather
+  than eagerly in the type's static constructor. Touching one preset no
+  longer pays the cost of all eight.
 - `Audio.Play` / `Audio.PlayAsync`: reuse a single open SDL audio
   device instead of opening / closing one per play. Rapid overlapping
   plays no longer silently fail or stutter. Per-stream gain replaces
