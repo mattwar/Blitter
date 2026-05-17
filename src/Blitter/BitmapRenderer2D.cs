@@ -241,6 +241,17 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         }
     }
 
+    public override (int Width, int Height) LogicalSize
+    {
+        get
+        {
+            var rep = this.LogicalRepresentation;
+            if (rep.Mode == SDL.RendererLogicalPresentation.Disabled)
+                return (0, 0);
+            return (rep.Width, rep.Height);
+        }
+    }
+
     public override (float ScaleX, float ScaleY) Scale
     {
         get

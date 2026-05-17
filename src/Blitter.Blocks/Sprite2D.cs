@@ -1,4 +1,5 @@
 using System.Numerics;
+using Blitter.Bits;
 
 namespace Blitter.Blocks;
 
@@ -53,17 +54,24 @@ public class Sprite2D : Prop2D
     public FlipMode Flipped = FlipMode.None;
 
     /// <summary>
-    /// Minimum time that must accumulate between successful
-    /// <see cref="Update"/> calls. Updates with smaller deltas
-    /// are buffered and applied later. Prevents motion from
-    /// being lost to per-frame float rounding when the host
-    /// loop runs at very high frame rates.
+    /// Radius around <see cref="CenterX"/>/<see cref="CenterY"/> used
+    /// for collision detection. Zero (the default) means the sprite is
+    /// not collidable.
     /// </summary>
-    public TimeSpan MinUpdateInterval { get; set; } = TimeSpan.FromMilliseconds(1);
+    public float HitRadius { get; set; }
 
-    // Accumulated time from Update calls that did not meet
-    // MinUpdateInterval; carried forward to the next Update.
-    private TimeSpan _pendingDelta;
+    /// <inheritdoc/>
+    public override BoundingCircle? HitCircle =>
+        HitRadius > 0f
+            ? new BoundingCircle(new Vector2(CenterX, CenterY), HitRadius)
+            : null;
+
+    /// <summary>
+    /// Behaviors attached to this sprite. Run in list order each tick.
+    /// Typical behaviors mutate the sprite's position, rotation, or
+    /// velocity (see <see cref="Motion2D"/>, <see cref="BounceInBounds2D"/>).
+    /// </summary>
+    public List<SpriteBehavior2D> Behaviors { get; } = new();
 
     public Sprite2D()
     {
@@ -79,53 +87,23 @@ public class Sprite2D : Prop2D
 
     public override bool Update(in UpdateContext2D context)
     {
-        // First call: nothing has happened yet, so just confirm initial state.
-        if (context.ElapsedSinceLastUpdate == TimeSpan.Zero)
-            return true;
-
-        // Buffer small deltas so motion isn't lost to float rounding when
-        // the host renders far faster than physics needs.
-        _pendingDelta += context.ElapsedSinceLastUpdate;
-        if (_pendingDelta < MinUpdateInterval)
-            return false;
-
-        var timeDelta = _pendingDelta;
-        _pendingDelta = TimeSpan.Zero;
-
-        float newRotation = this.Rotation;
-        if (this.RotationSpeed != 0f)
+        foreach (var behavior in this.Behaviors)
         {
-            var rotationDelta = (float)(this.RotationSpeed * timeDelta.TotalSeconds);
-            newRotation = (this.Rotation + rotationDelta) % 360f;
+            if (behavior.Enabled)
+                behavior.Update(this, in context);
         }
 
-        var speed = this.Speed;
-        float newCenterX = this.CenterX;
-        float newCenterY = this.CenterY;
-        if (speed != 0f)
+        return true;
+    }
+
+    /// <inheritdoc/>
+    public override void OnCollision(Prop2D other, in UpdateContext2D context)
+    {
+        foreach (var behavior in this.Behaviors)
         {
-            (var velocityX, var velocityY) = GetVelocity(speed, Heading);
-
-            var deltaX = (float)(velocityX * timeDelta.TotalSeconds);
-            newCenterX = this.CenterX + deltaX;
-
-            var deltaY = (float)(velocityY * timeDelta.TotalSeconds);
-            newCenterY = this.CenterY + deltaY;
+            if (behavior.Enabled)
+                behavior.OnCollision(this, other, in context);
         }
-
-        var changed = newRotation != this.Rotation
-            || newCenterX != this.CenterX
-            || newCenterY != this.CenterY;
-
-        if (changed)
-        {
-            this.Rotation = newRotation;
-            this.CenterX = newCenterX;
-            this.CenterY = newCenterY;
-            return true;
-        }
-
-        return false;
     }
 
     /// <summary>

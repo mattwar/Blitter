@@ -90,7 +90,13 @@ public abstract class Renderer2D
     /// </summary>
     public UpdateContext2D GetUpdateContext()
     {
-        var (w, h) = OutputSize;
+        // Prefer the logical surface size so update logic that consults
+        // Bounds (layout, edge-bounce, hit tests) stays in the same
+        // coordinate space the renderer is drawing in.
+        var (w, h) = LogicalSize;
+        if (w == 0 || h == 0)
+            (w, h) = OutputSize;
+
         return new UpdateContext2D
         {
             ElapsedSinceStart = ElapsedSinceStart,
@@ -115,6 +121,13 @@ public abstract class Renderer2D
 
     /// <summary>The output size in pixels.</summary>
     public abstract (int Width, int Height) OutputSize { get; }
+
+    /// <summary>
+    /// The logical drawing surface size, if one was configured via
+    /// <see cref="SetLogicalSize"/>. Returns <c>(0, 0)</c> when logical
+    /// presentation is disabled (i.e. draws use raw output pixels).
+    /// </summary>
+    public abstract (int Width, int Height) LogicalSize { get; }
 
     /// <summary>
     /// Output width / height as a single <c>float</c>. Reads

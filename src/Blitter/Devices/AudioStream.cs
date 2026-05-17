@@ -7,6 +7,13 @@ public class AudioStream : IDisposable
     private LogicalPlaybackDevice _device;
     private nint _streamId;
     private readonly AudioDataRequested? _onDataRequested;
+    
+    // Hold the SDL callback delegate in a field so the GC can't collect
+    // it while SDL still holds the raw function pointer. Without this,
+    // a quiet period (no plays for tens of seconds) is enough for the
+    // delegate to be reaped and the next SDL invocation crashes with a
+    // NullReferenceException that has no managed stack.
+    private readonly SDL.AudioStreamCallback _getDataCallback;
 
     internal AudioStream(LogicalPlaybackDevice device, nint streamId, AudioDataRequested? onDataRequested = null)
     {
@@ -14,8 +21,8 @@ public class AudioStream : IDisposable
         _streamId = streamId;
         _onDataRequested = onDataRequested;
 
-        // use callback to maybe determine when nothing is left in the queue
-        SDL.SetAudioStreamGetCallback(_streamId, GetDataCallback, nint.Zero);
+        _getDataCallback = GetDataCallback;
+        SDL.SetAudioStreamGetCallback(_streamId, _getDataCallback, nint.Zero);
     }
 
     private void GetDataCallback(nint userdata, nint stream, int additionalAmount, int totalAmount)

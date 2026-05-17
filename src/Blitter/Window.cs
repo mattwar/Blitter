@@ -740,6 +740,7 @@ public abstract class Window : IDisposable
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[Blitter] Render loop for '{Title}' threw: {ex}");
                 tcs.TrySetException(ex);
             }
         })
@@ -909,7 +910,10 @@ public abstract class Window : IDisposable
     {
         this.KeyDown?.Invoke(window, e);
         if (this.CloseKey != Key.Unknown && e.Key == this.CloseKey && !this.IsClosed)
+        {
+            Console.WriteLine($"[Blitter] CloseKey '{this.CloseKey}' pressed on '{window.Title}'; closing.");
             this.Close();
+        }
     }
 
     public event WindowEventHandler<KeyEventArgs>? KeyUp;
@@ -925,6 +929,7 @@ public abstract class Window : IDisposable
     #region Window Events
     public event WindowEventHandler<WindowCloseRequestedEventArgs>? WindowCloseRequested;
     protected virtual void OnWindowCloseRequested(Window window, WindowCloseRequestedEventArgs e) {
+        Console.WriteLine($"[Blitter] WindowCloseRequested for '{window.Title}'.");
         this.WindowCloseRequested?.Invoke(window, e);
         this.Dispose();
     }

@@ -30,6 +30,12 @@ All notable changes to this project will be documented in this file.
   to the texture's previous mod state after the draw.
 
 ### Fixed
+- `Audio.Play` / `Audio.PlayAsync`: reuse a single open SDL audio
+  device instead of opening / closing one per play. Rapid overlapping
+  plays no longer silently fail or stutter. Per-stream gain replaces
+  per-device gain, so concurrent plays at different volumes don't
+  clobber each other. A 32-stream soft cap drops new plays if too
+  many are already in flight.
 - `Bitmap.Save` with format `bmp`: now routes through SDL's native
   `SDL_SaveBMP_IO` instead of SkiaSharp, whose distributed Skia build
   ships with the BMP encoder disabled and would throw.

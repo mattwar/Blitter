@@ -47,8 +47,6 @@ public class LogicalPlaybackDevice : AudioPlaybackDevice
     /// </summary>
     public override Task PlayAsync(Sound data, float volume = 1f)
     {
-        this.Volume = volume;
-
         var tcs = new TaskCompletionSource();
         var stream = CreateStream(data.Spec, (stream, additionalAmount, totalAmount) =>
         {
@@ -73,6 +71,9 @@ public class LogicalPlaybackDevice : AudioPlaybackDevice
             }
         });
 
+        // Per-stream gain rather than per-device gain so concurrent plays
+        // don't fight over a shared device volume slider.
+        stream.Volume = Math.Clamp(volume, 0f, 1f);
         stream.Queue(data);
         stream.Paused = false;
         return tcs.Task;

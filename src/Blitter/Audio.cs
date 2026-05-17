@@ -34,7 +34,45 @@ public static class Audio
     public static Task PlayAsync(Sound data, float volume = 1f)
     {
         EnsureInit();
-        return AudioPlaybackDevice.Default.PlayAsync(data, volume);
+
+        // Reuse a single open logical device across plays. Opening /
+        // closing a fresh SDL audio device for every fire-and-forget
+        // `Play` call breaks down under load (hundreds of overlapping
+        // sounds per second silently fail or get torn down before SDL
+        // ever renders them). Each play still gets its own AudioStream
+        // which self-disposes when its queue drains, so old plays are
+        // reaped without churning the device handle.
+        var device = GetSharedPlaybackDevice();
+
+        // Soft cap: drop new plays once too many streams are stacked up.
+        // Prevents a runaway sample (collision storm, stuck loop) from
+        // exhausting SDL audio resources.
+        if (device.Streams.Count >= MaxConcurrentPlays)
+            return Task.CompletedTask;
+
+        return device.PlayAsync(data, volume);
+    }
+
+    // Cap matches what real game-audio mixers typically expose.
+    private const int MaxConcurrentPlays = 32;
+
+    private static LogicalPlaybackDevice? _sharedPlaybackDevice;
+    private static readonly object _sharedPlaybackDeviceLock = new();
+
+    private static LogicalPlaybackDevice GetSharedPlaybackDevice()
+    {
+        var device = _sharedPlaybackDevice;
+        if (device != null && !device.IsDisposed)
+            return device;
+
+        lock (_sharedPlaybackDeviceLock)
+        {
+            if (_sharedPlaybackDevice == null || _sharedPlaybackDevice.IsDisposed)
+            {
+                _sharedPlaybackDevice = DefaultPlaybackDevice.Open();
+            }
+            return _sharedPlaybackDevice;
+        }
     }
 
     private static ImmutableList<AudioPlaybackDevice>? _playbackDevices;
