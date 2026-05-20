@@ -34,6 +34,18 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// <summary>The flip mode to apply when rendering the image.</summary>
     public FlipMode Flipped = FlipMode.None;
 
+    /// <summary>Per-channel tint multiplied into the image at draw time.
+    /// Defaults to <see cref="Color.White"/> (no change).</summary>
+    public Color Tint { get; set; } = Color.White;
+
+    /// <summary>
+    /// Whether this sprite participates in the playfield's hit-detection pass.
+    /// Set to <c>false</c> for purely decorative sprites (score popups,
+    /// particles, debris) that should move and render but never trigger
+    /// <see cref="OnHitSprite"/> or <see cref="OnHitBarrier"/>.
+    /// </summary>
+    public bool CanBeHit { get; set; } = true;
+
     /// <summary>
     /// Behaviors attached to this sprite. Run in list order each tick.
     /// </summary>
@@ -126,7 +138,7 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer2D renderer)
     {
-        this.Image?.Draw(renderer, this.Center, this.Rotation, this.Scale, this.Flipped);
+        this.Image?.Draw(renderer, this.Center, this.Rotation, this.Scale, this.Flipped, this.Tint);
     }
 
     /// <summary>

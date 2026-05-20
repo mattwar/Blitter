@@ -231,6 +231,11 @@ public abstract class Renderer2D
     /// <summary>Draws a portion of <paramref name="image"/> rotated about <paramref name="center"/>.</summary>
     public abstract bool DrawImageRotated(Texture2D image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None);
 
+    /// <summary>Draws a portion of <paramref name="image"/> rotated about <paramref name="center"/>,
+    /// multiplied by <paramref name="tint"/> (per-channel). Use <see cref="Color.White"/>
+    /// for untinted output.</summary>
+    public abstract bool DrawImageRotated(Texture2D image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip, Color tint);
+
     /// <summary>Draws the entire <paramref name="image"/> rotated about <paramref name="center"/>.</summary>
     public bool DrawImageRotated(Texture2D image, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None)
     {

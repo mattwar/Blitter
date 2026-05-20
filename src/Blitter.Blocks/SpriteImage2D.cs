@@ -19,13 +19,16 @@ public abstract class SpriteImage2D
     /// </summary>
     public abstract BoundingCircle Boundary { get; }
 
-    /// <summary>Draw this image at the given world transform.</summary>
+    /// <summary>Draw this image at the given world transform, multiplied
+    /// by <paramref name="tint"/> (per-channel). Pass <see cref="Color.White"/>
+    /// for untinted output.</summary>
     public abstract void Draw(
         Renderer2D renderer,
         Vector2 center,
         float rotation,
         float scale,
-        FlipMode flipped);
+        FlipMode flipped,
+        Color tint);
 
     /// <summary>
     /// Implicit wrap of a <see cref="Texture2D"/> in a
@@ -69,22 +72,29 @@ public sealed class TextureSpriteImage2D : SpriteImage2D
         return new BoundingCircle(Vector2.Zero, half.Length());
     }
 
-    public override void Draw(Renderer2D renderer, Vector2 center, float rotation, float scale, FlipMode flipped)
+    public override void Draw(Renderer2D renderer, Vector2 center, float rotation, float scale, FlipMode flipped, Color tint)
     {
         var size = _texture.Size;
         var scaledWidth = size.Width * scale;
         var scaledHeight = size.Height * scale;
         var source = new Rect(0, 0, size.Width, size.Height);
         var dest = new Rect(center.X - scaledWidth / 2f, center.Y - scaledHeight / 2f, scaledWidth, scaledHeight);
+        bool tinted = tint != Color.White;
 
         if (rotation != 0f || flipped != FlipMode.None)
         {
             var rotationCenter = new Vector2(scaledWidth / 2f, scaledHeight / 2f);
-            renderer.DrawImageRotated(_texture, source, dest, rotation, rotationCenter, flipped);
+            if (tinted)
+                renderer.DrawImageRotated(_texture, source, dest, rotation, rotationCenter, flipped, tint);
+            else
+                renderer.DrawImageRotated(_texture, source, dest, rotation, rotationCenter, flipped);
         }
         else
         {
-            renderer.DrawImage(_texture, source, dest);
+            if (tinted)
+                renderer.DrawImage(_texture, source, dest, tint);
+            else
+                renderer.DrawImage(_texture, source, dest);
         }
     }
 

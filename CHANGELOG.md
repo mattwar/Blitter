@@ -19,6 +19,19 @@ All notable changes to this project will be documented in this file.
   other text drawn behind them.
 
 ### Added
+- `Sprite2D.CanBeHit` (default `true`): set to `false` to make a sprite
+  decorative — it updates and draws but is skipped by the playfield's
+  sprite-vs-sprite and sprite-vs-barrier hit-detection passes.
+- `TextSprite2D`: non-interactive sprite that renders a `Font` string,
+  centered on `Center` and colored by `Tint`. Suitable for score
+  popups, floating labels, and damage numbers.
+- `FadeAndExpire2D`: behavior that ramps `Tint.A` to zero over
+  `Duration`, then sets `IsAlive = false`.
+- `Sprite2D.Tint` (default `Color.White`): per-channel tint multiplied
+  into the sprite's image at draw time. `SpriteImage2D.Draw` now takes
+  a `Color tint` parameter.
+- `Renderer2D.DrawImageRotated(..., Color tint)`: tinted rotated variant
+  that mirrors the existing tinted `DrawImage`.
 - `Bitmap.Save(Stream, format, quality)`: encodes the image to a stream
   (PNG/JPEG/WebP/BMP). Pass a `MemoryStream` to get raw encoded bytes.
 - `Bitmap.Load(Stream, mipmaps)`: decodes an image from a stream

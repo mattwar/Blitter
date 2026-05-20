@@ -113,7 +113,7 @@ public class PlayField2D : Layer2D
         for (int i = 0; i < sprites.Count; i++)
         {
             var a = sprites[i];
-            if (!a.IsAlive)
+            if (!a.IsAlive || !a.CanBeHit)
                 continue;
             var ac = a.HitCircle;
             if (ac.Radius <= 0f)
@@ -125,7 +125,7 @@ public class PlayField2D : Layer2D
                     break;
 
                 var b = sprites[j];
-                if (!b.IsAlive)
+                if (!b.IsAlive || !b.CanBeHit)
                     continue;
                 var bc = b.HitCircle;
                 if (bc.Radius <= 0f)
@@ -145,7 +145,7 @@ public class PlayField2D : Layer2D
         {
             foreach (var sprite in sprites)
             {
-                if (!sprite.IsAlive)
+                if (!sprite.IsAlive || !sprite.CanBeHit)
                     continue;
                 var sc = sprite.HitCircle;
                 if (sc.Radius <= 0f)

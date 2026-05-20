@@ -453,6 +453,26 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         return SDL.RenderTextureRotated(_rendererId, texture.Id, source, destination, angle, sdlCenter, (SDL.FlipMode)flip);
     }
 
+    public override bool DrawImageRotated(Texture2D image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip, Color tint)
+    {
+        if (IsDisposed)
+            return false;
+        if (!TryGetOrCreateTexture(image, out var texture))
+            return false;
+        EnsureCleared();
+        var sdlCenter = new SDL.FPoint { X = center.X, Y = center.Y };
+        // Same color/alpha-mod save+restore pattern as the tinted
+        // non-rotated overload.
+        var savedColor = texture.ColorMod;
+        var savedAlpha = texture.AlphaMod;
+        texture.ColorMod = (tint.R, tint.G, tint.B);
+        texture.AlphaMod = tint.A;
+        var ok = SDL.RenderTextureRotated(_rendererId, texture.Id, source, destination, angle, sdlCenter, (SDL.FlipMode)flip);
+        texture.ColorMod = savedColor;
+        texture.AlphaMod = savedAlpha;
+        return ok;
+    }
+
     public override bool DrawFillRect(Rect rect)
     {
         EnsureCleared();

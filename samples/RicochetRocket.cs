@@ -29,15 +29,22 @@ var window = new Window2D(DesignW, DesignH)
 
 window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
+// Font for floating score popups and HUD score readout.
+var scoreFont = new Font(["Consolas", "Menlo"], 48, bold: true);
+
+// Running score: each gold asteroid destroyed pops a value.
+int score = 0;
+
 // create rocket sprite
 var rocketImage = Bitmap.Load(Asset.GetPathRelativeToCaller("rocket.png"));
-rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
+ // make rocket's background transparent
+rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0));
 
 // create meteor field - small static obstacles for the rocket to hit
 var asteroidImage = Bitmap.Load(Asset.GetPathRelativeToCaller("asteroid.png"));
 var asteroids = CreateAsteroidField(14, asteroidImage);
 
-var rocket = new Rocket
+var rocket = new Rocket(scoreFont, () => score, v => score = v)
 {
     Image = rocketImage,
     Center = new Vector2(DesignW / 2, DesignH / 2),
@@ -61,6 +68,7 @@ var hud = new CustomLayer2D
             0, 10,
             $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.Center.X:#} y: {rocket.Center.Y:#} asteriods: {asteriodCount}",
             scale: 2f);
+        scoreFont.DrawText(rd, $"SCORE {score}", new Color(255, 215, 0), 20, 60);
     }
 };
 
@@ -87,6 +95,8 @@ var scene = new Scene2D(playField, hud)
 // Run the scene until done
 await scene.RunAsync(window);
 
+
+//---------------------------------------------------------------------------------------------------------------
 
 static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
 {
@@ -126,8 +136,10 @@ static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
 
 sealed class Rocket : Sprite2D
 {
-    public Rocket()
+    public Rocket(Font scoreFont, Func<int> getScore, Action<int> setScore)
     {
+        var goldTint = new Color(255, 215, 0);
+
         this.Behaviors.AddRange([
             new Motion2D(),  // move with simple 2D physics
             new FaceHeading2D(),  // face the way we're moving
@@ -139,9 +151,9 @@ sealed class Rocket : Sprite2D
                     Audio.Play(Sounds.Boing, volume: .2f);
                 },
             },
-            new HitResponder2D  // smash through meteors
+            new CustomSpriteBehavior2D  // smash through meteors
             {
-                OnHit = (self, other) =>
+                OnSpriteHit = (self, other) =>
                 {
                     // Grace period: ignore freshly-spawned shards so they
                     // can spread out before being hit again. Without this
@@ -159,12 +171,41 @@ sealed class Rocket : Sprite2D
                     self.Heading = (self.Heading + Random.Shared.Next(-15, 15) + 360f) % 360f;
                     Audio.Play(Sounds.Explosion, volume: .3f);
 
+                    // Score & popup for gold ("valuable minerals") asteroids.
+                    bool isGold = asteroid.Tint == goldTint;
+                    if (isGold)
+                    {
+                        // Bigger rocks are worth more; round to tens.
+                        int points = Math.Max(10, (int)Math.Round(asteroid.Scale * 200f / 10f) * 10);
+                        setScore(getScore() + points);
+                        asteroid.PlayField.AddSprite(new TextSprite2D
+                        {
+                            Font = scoreFont,
+                            Text = $"+{points}",
+                            Center = asteroid.Center,
+                            Tint = goldTint,
+                            Heading = 0f,        // up (toward smaller Y)
+                            Speed = 90f,
+                            Behaviors =
+                            {
+                                new Motion2D(),
+                                new FadeAndExpire2D { Duration = TimeSpan.FromSeconds(1.2) },
+                            },
+                        });
+                    }
+
                     // Asteroids-style split: a hit meteor above a
                     // minimum size breaks into a few smaller shards that
                     // drift outward in random directions.
                     if (asteroid.Scale > 0.25f)
                     {
                         var playfield = asteroid.PlayField;
+
+                        // Gold (valuable-minerals) tint: if the parent
+                        // already has one, all children inherit it.
+                        // Otherwise each new shard has a small chance of
+                        // exposing gold hidden inside.
+                        bool parentIsGold = isGold;
 
                         var newScale = asteroid.Scale * 0.5f;
                         var shardCount = Random.Shared.Next(2, 4);
@@ -173,6 +214,9 @@ sealed class Rocket : Sprite2D
                             var shardSpin = Random.Shared.Next(120, 360);
                             if (Random.Shared.Next(2) == 0)
                                 shardSpin = -shardSpin;
+                            var shardTint = parentIsGold || Random.Shared.NextDouble() < 0.15
+                                ? goldTint
+                                : Color.White;
                             var shard = new Asteroid
                             {
                                 Image = asteroid.Image,
@@ -181,7 +225,8 @@ sealed class Rocket : Sprite2D
                                 Rotation = Random.Shared.Next(0, 360),
                                 Heading = Random.Shared.Next(0, 360),
                                 Speed = Random.Shared.Next(80, 180),
-                                RotationSpeed = shardSpin
+                                RotationSpeed = shardSpin,
+                                Tint = shardTint,
                             };
                             playfield.AddSprite(shard);
                         }
