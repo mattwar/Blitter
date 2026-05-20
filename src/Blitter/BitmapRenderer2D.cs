@@ -100,12 +100,16 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
 
     #region Properties
 
-    public override Rect ClipRect
+    public override Rect? ClipRect
     {
         get
         {
             if (IsDisposed)
-                return default;
+                return null;
+            // SDL_GetRenderClipRect always returns a rect (the zero rect when no clip is set), 
+            // so we have to ask SDL whether clipping is actually active.
+            if (!SDL.RenderClipEnabled(_rendererId))
+                return null;
             SDL.GetRenderClipRect(_rendererId, out var rect);
             return rect;
         }
@@ -113,8 +117,16 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         {
             if (IsDisposed)
                 return;
-            SDL.Rect r = value;
-            SDL.SetRenderClipRect(_rendererId, r);
+            if (value is Rect r)
+            {
+                SDL.Rect sr = r;
+                SDL.SetRenderClipRect(_rendererId, sr);
+            }
+            else
+            {
+                // Passing NULL to SDL disables the clip.
+                SDL.SetRenderClipRect(_rendererId, IntPtr.Zero);
+            }
         }
     }
 
@@ -283,12 +295,19 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         }
     }
 
-    public override Rect ViewPort
+    // SDL has no "viewport explicitly set" predicate, so track it ourselves
+    // to distinguish "reset to full target" (null) from "intentionally
+    // covers the whole target right now".
+    private bool _viewportExplicitlySet;
+
+    public override Rect? ViewPort
     {
         get
         {
             if (IsDisposed)
-                return default;
+                return null;
+            if (!_viewportExplicitlySet)
+                return null;
             SDL.GetRenderViewport(_rendererId, out var rect);
             return rect;
         }
@@ -296,8 +315,18 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         {
             if (IsDisposed)
                 return;
-            SDL.Rect r = value;
-            SDL.SetRenderViewport(_rendererId, r);
+            if (value is Rect r)
+            {
+                SDL.Rect sr = r;
+                SDL.SetRenderViewport(_rendererId, sr);
+                _viewportExplicitlySet = true;
+            }
+            else
+            {
+                // Passing NULL to SDL resets the viewport to the full target.
+                SDL.SetRenderViewport(_rendererId, IntPtr.Zero);
+                _viewportExplicitlySet = false;
+            }
         }
     }
 

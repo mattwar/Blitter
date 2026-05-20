@@ -45,17 +45,34 @@ public class PlayField2D : Layer2D
     public ImmutableList<Sprite2D> Sprites => _sprites;
 
     /// <summary>
-    /// Static, non-sprite obstacles in this playfield. Tested against
-    /// every sprite's <see cref="Sprite2D.HitCircle"/> each tick.
+    /// Static, non-sprite obstacles in this playfield. 
+    /// Tested against every sprite's <see cref="Sprite2D.HitCircle"/> each tick.
     /// </summary>
     public ImmutableList<Barrier2D> Barriers => _barriers;
 
     /// <summary>
-    /// Total time accumulated from <see cref="UpdateContext2D"/>
-    /// deltas passed through this playfield's <see cref="Update"/>.
+    /// Total time accumulated from <see cref="UpdateContext2D"/> deltas passed through this playfield's <see cref="Update"/>.
     /// Used as the clock for <see cref="Sprite2D.Age"/>.
     /// </summary>
     public TimeSpan Elapsed { get; private set; }
+
+    /// <summary>
+    /// Optional world rectangle larger (or smaller) than the visible viewport. 
+    /// When set, sprites and behaviors see this rectangle as <see cref="UpdateContext2D.Bounds"/> instead of the renderer's
+    /// viewport — so edge-bounce, spawn placement, etc. operate in world space. 
+    /// When <c>null</c> (the default), the playfield passes the incoming context through unchanged.
+    /// </summary>
+    public Rect? WorldBounds { get; set; }
+
+    /// <summary>
+    /// When true and <see cref="WorldBounds"/> is set, the playfield draws the world boundary.
+    /// </summary>
+    public bool ShowWorldBounds { get; set; }
+
+    /// <summary>
+    /// Color used by <see cref="ShowWorldBounds"/> for the boundary outline.
+    /// </summary>
+    public Color WorldBoundsColor { get; set; } = new Color(0, 200, 255, 255);
 
     public void AddSprite(Sprite2D sprite)
     {
@@ -92,6 +109,13 @@ public class PlayField2D : Layer2D
     {
         Elapsed += context.ElapsedSinceLastUpdate;
 
+        // Substitute world bounds for the viewport when configured so
+        // behaviors that consult context.Bounds (BounceInBounds2D,
+        // edge-spawning, etc.) operate in world space.
+        var spriteContext = WorldBounds is Rect wb
+            ? context with { Bounds = wb }
+            : context;
+
         var sprites = _sprites;
         var removeDead = false;
 
@@ -103,7 +127,7 @@ public class PlayField2D : Layer2D
                 continue;
             }
 
-            sprite.Update(context);
+            sprite.Update(spriteContext);
 
             if (!sprite.IsAlive)
                 removeDead = true;
@@ -133,9 +157,9 @@ public class PlayField2D : Layer2D
                 if (!ac.Intersects(bc))
                     continue;
 
-                a.OnHitSprite(b, context);
+                a.OnHitSprite(b, spriteContext);
                 if (a.IsAlive && b.IsAlive)
-                    b.OnHitSprite(a, context);
+                    b.OnHitSprite(a, spriteContext);
             }
         }
 
@@ -160,7 +184,7 @@ public class PlayField2D : Layer2D
                     if (!barrier.Intersects(sprite.HitCircle))
                         continue;
 
-                    sprite.OnHitBarrier(barrier, context);
+                    sprite.OnHitBarrier(barrier, spriteContext);
                 }
             }
         }
@@ -201,7 +225,37 @@ public class PlayField2D : Layer2D
                 sprite.Draw(renderer);
         }
 
+        if (ShowWorldBounds && WorldBounds is not null)
+            DrawWorldBoundsOutline(renderer);
+
         DrawForeground(renderer);
+    }
+
+    /// <summary>
+    /// Draws the <see cref="WorldBounds"/> overlay. Override to customize
+    /// the style (thicker lines, dashed, animated, etc.). Only called
+    /// when <see cref="WorldBounds"/> is non-null.
+    /// </summary>
+    protected virtual void DrawWorldBoundsOutline(Renderer2D renderer)
+    {
+        if (WorldBounds is not Rect wb)
+            return;
+        // Push/pop so the boundary overlay doesn't leak draw color
+        // into the user's DrawForeground hook.
+        using var _ = renderer.PushState();
+        renderer.DrawColor = WorldBoundsColor;
+        // Inset the right and bottom by one screen pixel (in world units)
+        // so they're not rasterized at the just-outside column/row when the
+        // camera is clamped against the world edge.
+        var inset = 1f / (renderer.Camera?.Zoom ?? 1f);
+        var x0 = wb.X;
+        var y0 = wb.Y;
+        var x1 = wb.X + wb.Width - inset;
+        var y1 = wb.Y + wb.Height - inset;
+        renderer.DrawLine(x0, y0, x1, y0);
+        renderer.DrawLine(x1, y0, x1, y1);
+        renderer.DrawLine(x1, y1, x0, y1);
+        renderer.DrawLine(x0, y1, x0, y0);
     }
 
     /// <summary>Hook to draw before the sprite pass.</summary>

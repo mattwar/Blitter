@@ -8,6 +8,11 @@ namespace Blitter;
 /// </summary>
 public abstract class Renderer2D
 {
+    // Snapshots pushed by PushState() and popped on scope dispose. The
+    // stack is allocated once per renderer and grown lazily, so push/pop
+    // is allocation-free in steady state.
+    private readonly Stack<RendererState> _stateStack = new();
+
     private readonly long _startTs = Stopwatch.GetTimestamp();
     private long _lastRenderTs = Stopwatch.GetTimestamp();
 
@@ -118,8 +123,11 @@ public abstract class Renderer2D
 
     #region State
 
-    /// <summary>Clipping rectangle for subsequent draws.</summary>
-    public abstract Rect ClipRect { get; set; }
+    /// <summary>
+    /// Clipping rectangle for subsequent draws. <c>null</c> disables
+    /// clipping (draws use the full target).
+    /// </summary>
+    public abstract Rect? ClipRect { get; set; }
 
     /// <summary>Per-channel color scale applied to draw colors.</summary>
     public abstract float ColorScale { get; set; }
@@ -157,8 +165,11 @@ public abstract class Renderer2D
     /// <summary>The rendering scale factors.</summary>
     public abstract (float ScaleX, float ScaleY) Scale { get; set; }
 
-    /// <summary>The portion of the rendering target where draws are performed.</summary>
-    public abstract Rect ViewPort { get; set; }
+    /// <summary>
+    /// The portion of the rendering target where draws are performed.
+    /// <c>null</c> means "the entire target" (the renderer's default).
+    /// </summary>
+    public abstract Rect? ViewPort { get; set; }
 
     /// <summary>
     /// Configures a fixed logical drawing surface that the renderer
@@ -289,6 +300,70 @@ public abstract class Renderer2D
 
     /// <summary>Draws a set of points.</summary>
     public abstract bool DrawPoints(ReadOnlySpan<Vector2> points);
+
+    #endregion
+
+    #region State stack
+
+    /// <summary>
+    /// Saves the current renderer state and returns a scope whose
+    /// disposal restores it. Intended for use with a <c>using</c>
+    /// statement so callers can change state for a sub-region of drawing
+    /// without having to remember and reset every property by hand.
+    /// </summary>
+    public StateScope PushState()
+    {
+        _stateStack.Push(new RendererState(Camera, DrawColor, ClipRect, ColorScale, Scale, ViewPort));
+        return new StateScope(this);
+    }
+
+    private void PopState()
+    {
+        var s = _stateStack.Pop();
+        Camera = s.Camera;
+        DrawColor = s.DrawColor;
+        ClipRect = s.ClipRect;
+        ColorScale = s.ColorScale;
+        Scale = s.Scale;
+        ViewPort = s.ViewPort;
+    }
+
+    // Snapshot of every property a PushState/PopState cycle has to save
+    // and restore. Add a field here whenever a new mutable knob is added
+    // to Renderer2D so existing callers that already use PushState don't
+    // have to change.
+    private readonly record struct RendererState(
+        Camera2D? Camera,
+        Color DrawColor,
+        Rect? ClipRect,
+        float ColorScale,
+        (float ScaleX, float ScaleY) Scale,
+        Rect? ViewPort);
+
+    /// <summary>
+    /// A disposable scope returned from <see cref="PushState"/>. Disposing
+    /// it restores the renderer state captured at the matching push. As a
+    /// <c>ref struct</c> it cannot be stored in fields, captured by
+    /// closures, or moved across <c>await</c> boundaries -- the only valid
+    /// use is in a <c>using</c> statement on the same call frame as the
+    /// push.
+    /// </summary>
+    public ref struct StateScope
+    {
+        private Renderer2D? _renderer;
+
+        internal StateScope(Renderer2D renderer)
+        {
+            _renderer = renderer;
+        }
+
+        public void Dispose()
+        {
+            var r = _renderer;
+            _renderer = null;
+            r?.PopState();
+        }
+    }
 
     #endregion
 }

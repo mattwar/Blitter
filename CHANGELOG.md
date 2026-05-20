@@ -46,6 +46,17 @@ All notable changes to this project will be documented in this file.
   When set, world-space draws (`DrawImage`, `DrawImageRotated`,
   `DrawFillRect(s)`, `DrawLine(s)`, `DrawPoint(s)`, `DrawGeometry`)
   are mapped through the camera; `DrawDebugText` is unaffected.
+- `CameraFollow2D`: sprite behavior that scrolls a `Camera2D` to
+  keep its host sprite inside a dead zone of the viewport, optionally
+  clamped to a `WorldBounds` rectangle.
+- `PlayField2D.WorldBounds`: optional world rectangle substituted as
+  `UpdateContext2D.Bounds` for sprites and collision handlers, so
+  `BounceInBounds2D` and similar operate in world space.
+- `PlayField2D.ShowWorldBounds` / `WorldBoundsColor`: debug overlay
+  that outlines `WorldBounds` after the sprite pass.
+- `Renderer2D.PushState`: saves `Camera`, `DrawColor`, `ClipRect`,
+  `ColorScale`, `Scale`, and `ViewPort` and restores them when the
+  returned scope is disposed. Mirrors `Renderer3D.PushState`.
 
 ### Fixed
 - `Audio.PlayAsync`: returned task now actually completes when playback

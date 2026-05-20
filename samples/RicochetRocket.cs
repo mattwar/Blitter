@@ -19,6 +19,12 @@ using Blitter.Blocks;
 const int DesignW = 1920;
 const int DesignH = 1080;
 
+// World is larger than the visible viewport; the camera scrolls to
+// keep the rocket inside a dead zone, and the playfield bounces both
+// the rocket and asteroids off the world's outer wall.
+const int WorldW = 3840;
+const int WorldH = 2160;
+
 var window = new Window2D(DesignW, DesignH)
 {
     Title = "Ricochet Rocket",
@@ -42,26 +48,48 @@ rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0));
 
 // create meteor field - small static obstacles for the rocket to hit
 var asteroidImage = Bitmap.Load(Asset.GetPathRelativeToCaller("asteroid.png"));
-var asteroids = CreateAsteroidField(14, asteroidImage);
+var asteroids = CreateAsteroidField(40, asteroidImage);
 
 var rocket = new Rocket(scoreFont, () => score, v => score = v)
 {
     Image = rocketImage,
-    Center = new Vector2(DesignW / 2, DesignH / 2),
+    Center = new Vector2(WorldW / 2f, WorldH / 2f),
     Scale = 0.1f,
     Speed = 600f,
     Heading = 45f,
     Behaviors = { new RocketController(window.Input) }
 };
 
-// The playfield includes the asteriods and the rocket.
-var playField = new PlayField2D([..asteroids, rocket]);
+// Camera scrolls the world to keep the rocket in view. Start it on
+// the rocket so the first frame isn't a snap from the world origin.
+var camera = new Camera2D { Position = rocket.Center };
+window.Renderer.Camera = camera;
 
-// Heads-up display layer for debug info
+var worldBounds = new Rect(0, 0, WorldW, WorldH);
+rocket.Behaviors.Add(new CameraFollow2D
+{
+    Camera = camera,
+    ViewportSize = new Vector2(DesignW, DesignH),
+    MarginFraction = 0.3f,
+    WorldBounds = worldBounds,
+});
+
+// The playfield includes the asteriods and the rocket.
+var playField = new PlayField2D([..asteroids, rocket])
+{
+    WorldBounds = worldBounds,
+    ShowWorldBounds = true,
+};
+
+// Heads-up display layer for debug info. Detaches the camera while
+// drawing so HUD text stays screen-locked instead of scrolling with
+// the world.
 var hud = new CustomLayer2D
 {
     OnRender = rd =>
     {
+        using var _ = rd.PushState();
+        rd.Camera = null;
         rd.DrawColor = Color.White;
         var asteriodCount = playField.Sprites.Count(s => s is Asteroid);
         rd.DrawDebugText(
@@ -103,16 +131,19 @@ static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
     var asteroids = new List<Asteroid>();
     var rng = Random.Shared;
 
-    for (int i = 0; i < 14; i++)
+    var rocketX = WorldW / 2f;
+    var rocketY = WorldH / 2f;
+
+    for (int i = 0; i < count; i++)
     {
         // keep meteors away from the rocket's starting position
         float x, y;
         do
         {
-            x = rng.Next(80, DesignW - 80);
-            y = rng.Next(80, DesignH - 80);
+            x = rng.Next(80, WorldW - 80);
+            y = rng.Next(80, WorldH - 80);
         }
-        while (MathF.Abs(x - DesignW / 2f) < 200 && MathF.Abs(y - DesignH / 2f) < 200);
+        while (MathF.Abs(x - rocketX) < 200 && MathF.Abs(y - rocketY) < 200);
         var rotation = rng.Next(0, 360);
         var heading = rng.Next(0, 360);
         var scale = rng.Next(2, 10) / 10f;
