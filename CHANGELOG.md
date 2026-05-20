@@ -41,6 +41,11 @@ All notable changes to this project will be documented in this file.
 - `Renderer2D.DrawImage(Image, Rect src, Rect dst, Color tint)`:
   per-channel tint multiplied through SDL texture color-mod, restored
   to the texture's previous mod state after the draw.
+- `Camera2D` and `Renderer2D.Camera`: optional 2D camera with
+  `Position` (world point at viewport center) and uniform `Zoom`.
+  When set, world-space draws (`DrawImage`, `DrawImageRotated`,
+  `DrawFillRect(s)`, `DrawLine(s)`, `DrawPoint(s)`, `DrawGeometry`)
+  are mapped through the camera; `DrawDebugText` is unaffected.
 
 ### Fixed
 - `Audio.PlayAsync`: returned task now actually completes when playback

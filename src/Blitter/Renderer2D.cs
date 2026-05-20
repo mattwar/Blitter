@@ -73,6 +73,17 @@ public abstract class Renderer2D
     internal bool AutoClear { get; set; } = true;
 
     /// <summary>
+    /// Optional 2D camera applied to world-space draws. When set,
+    /// <c>DrawImage</c>, <c>DrawImageRotated</c>, <c>DrawFillRect(s)</c>,
+    /// <c>DrawLine(s)</c>, <c>DrawPoint(s)</c>, and <c>DrawGeometry</c>
+    /// interpret their coordinates as world-space and map them through
+    /// the camera. When <c>null</c> (the default), draws use viewport
+    /// coordinates directly. <c>DrawDebugText</c> always uses viewport
+    /// coordinates regardless of camera.
+    /// </summary>
+    public Camera2D? Camera { get; set; }
+
+    /// <summary>
     /// Resets the <see cref="ElapsedSinceLastRender"/> clock. Concrete
     /// renderers call this from their <c>Render()</c> implementation
     /// after the frame has been submitted.
