@@ -76,6 +76,15 @@ rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0));
 var asteroidImage = Bitmap.Load(Asset.GetPathRelativeToCaller("asteroid.png"));
 var asteroids = CreateAsteroidField(20, asteroidImage);
 
+// Debris bursts when the smallest asteroids are destroyed. Tinted
+// by AsteriodKind so gold and radioactive rocks leave a recognizable
+// colored puff.
+var debrisParticles = new ParticleLayer2D(capacity: 1024)
+{
+    Drag = 1.2f,
+};
+Asteroid.Particles = debrisParticles;
+
 var rocket = new Rocket
 {
     Image = rocketImage,
@@ -264,6 +273,7 @@ var scene = new Scene2D
         starsFar, 
         starsMid, 
         playField,
+        debrisParticles,
         hitDebug,
         popups,
         scoreboard,
@@ -425,6 +435,15 @@ sealed class AsteroidSmasher : SpriteBehavior2D
 {
     private readonly ScoreLayer2D _scoreboard;
 
+    // Combo tracking: each consecutive scoring smash within
+    // ComboWindow multiplies the points awarded. Resets when the
+    // window expires.
+    private TimeSpan _comboExpiresAt = TimeSpan.Zero;
+    private int _comboCount = 0;
+    private static readonly TimeSpan ComboWindow = TimeSpan.FromSeconds(2.0);
+    private const int ComboMaxMultiplier = 8;
+    private static readonly Color _comboTint = new Color(255, 240, 120);
+
     // Slower, more menacing klaxon than the stock Sounds.Klaxon —
     // 0.32 s per beat instead of 0.15 s. Cached so we don't
     // resynthesize the buffer on every collision.
@@ -507,8 +526,30 @@ sealed class AsteroidSmasher : SpriteBehavior2D
         {
             // Bigger rocks are worth more; round to tens.
             int points = Math.Max(10, (int)Math.Round(asteroid.Scale * 200f / 10f) * 10);
-            _scoreboard.Add(points, asteroid.Center);
+
+            // Combo: chain consecutive gold smashes within the
+            // window for an N× multiplier (capped). Each scoring
+            // hit extends the window from itself.
+            if (self.Age < _comboExpiresAt)
+                _comboCount++;
+            else
+                _comboCount = 1;
+            _comboExpiresAt = self.Age + ComboWindow;
+            int multiplier = Math.Min(_comboCount, ComboMaxMultiplier);
+
+            _scoreboard.Add(points * multiplier, asteroid.Center);
             Audio.Play(Sounds.Coin, volume: .1f);
+
+            // Telegraph the multiplier so the player knows the
+            // bonus is in effect (and is worth chasing).
+            if (multiplier > 1 && _scoreboard.Popups is { } pops)
+            {
+                pops.Add(
+                    $"x{multiplier} COMBO!",
+                    asteroid.Center + new Vector2(0f, -60f),
+                    _comboTint,
+                    scale: 1f + 0.08f * (multiplier - 1));
+            }
         }
 
         // Radioactive: stun the rocket. It keeps drifting at its
@@ -518,6 +559,11 @@ sealed class AsteroidSmasher : SpriteBehavior2D
         if (asteroid.Kind == AsteriodKind.Radioactive
             && self is Rocket r)
         {
+            // Radioactive hit breaks any combo streak — no chaining
+            // through a penalty.
+            _comboCount = 0;
+            _comboExpiresAt = TimeSpan.Zero;
+
             var stunDuration = TimeSpan.FromSeconds(4 * asteroid.Scale);
             r.Stun(stunDuration);
             Audio.Play(_radioactiveAlarm, volume: .2f);
@@ -567,6 +613,10 @@ sealed class Asteroid : Sprite2D
     // every frame while the two are still overlapping.
     public TimeSpan HitCooldownUntil { get; set; }
 
+    // Optional debris pool emitted when the smallest asteroids are
+    // destroyed. Set once at startup; null disables the effect.
+    public static ParticleLayer2D? Particles { get; set; }
+
     private static readonly Color _goldTint = new Color(255, 215, 0);
     private static readonly Color _radioactiveTint = new Color(90, 200, 90);
 
@@ -589,8 +639,15 @@ sealed class Asteroid : Sprite2D
 
     public void Smash()
     {
+        // Smallest asteroids vanish in a colored puff instead of
+        // spawning further shards.
+        if (this.Scale <= 0.25f)
+        {
+            EmitDebris();
+            return;
+        }
+
         // only break larger asteroids
-        if (this.Scale > 0.25f)
         {
             var playfield = this.PlayField;
 
@@ -623,6 +680,26 @@ sealed class Asteroid : Sprite2D
                 playfield.AddSprite(shard);
             }           
         }
+    }
+
+    private void EmitDebris()
+    {
+        var particles = Particles;
+        if (particles is null) return;
+        var tint = this.Kind switch
+        {
+            AsteriodKind.Gold => _goldTint,
+            AsteriodKind.Radioactive => _radioactiveTint,
+            _ => new Color(210, 180, 140),
+        };
+        var style = new ParticleStyle
+        {
+            LifetimeRange = new Vector2(0.4f, 0.9f),
+            SpeedRange = new Vector2(120f, 280f),
+            StartTint = tint,
+            EndTint = new Color(tint.R, tint.G, tint.B, 0),
+        };
+        particles.Emit(this.Center, count: 28, style);
     }
 }
 
