@@ -35,6 +35,17 @@ All notable changes to this project will be documented in this file.
   `Layers.Remove` remain for the rare case of dynamic layer changes.
 
 ### Added
+- `WrapInBounds2D`: toroidal sprite wrap across the update bounds.
+- `SeekTarget2D`: steers a sprite toward a `Func<Vector2?>` target with
+  `MaxTurnRate`, `Accel`, `MaxSpeed`, and `ArriveRadius`.
+- `Timer2D`: scene-behavior countdown with `Duration`, `TimeRemaining`,
+  `AutoRestart`, `Paused`, and `OnExpired`.
+- `TriggerOnPredicate2D`: rising-edge `Func<Scene2D,bool>` →
+  `Action<Scene2D>` with optional one-shot mode.
+- `Shake2D`: sprite behavior; trauma² jitter of `Center` with
+  `AddTrauma(float)` and per-second `Decay`. Place after `Motion2D`.
+- `CameraShake2D`: sprite behavior; trauma² jitter of a `Camera2D`
+  position. Place after `CameraFollow2D` on the same sprite.
 - `Spawner2D`: scene behavior that periodically adds sprites to a
   `PlayField2D`. Configurable `Interval`, `Jitter`, `StartDelay`,
   `MaxAlive` (with optional `Filter`), `MaxTotal`, `Paused`, and a

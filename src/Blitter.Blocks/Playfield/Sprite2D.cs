@@ -19,7 +19,7 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// <summary>The direction of movement.</summary>
     public float Heading { get; set; }
 
-    /// <summary>The speed of the sprite in pixels per second along the heading.</summary>
+    /// <summary>The speed of the sprite in world units per second along the heading.</summary>
     public float Speed { get; set; }
 
     /// <summary>The current orientation in degrees.</summary>
