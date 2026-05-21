@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- `LogicalPlaybackDevice`: applies an automatic equal-loudness mix
+  attenuation (`1 / sqrt(activeStreams)`) on top of the user's
+  `Volume` so several overlapping sounds no longer sum to a clipping
+  signal. `Volume` now stores the caller's desired master gain (1.0
+  default) and is no longer round-tripped through SDL on every read.
 - `Image` renamed to `Texture2D` and `CubeTexture` renamed to
   `TextureCube` for symmetry with HLSL/D3D conventions. `Bitmap`,
   `Mipmap`, and `Cubemap` continue to derive from these.
@@ -17,8 +22,31 @@ All notable changes to this project will be documented in this file.
 - `Font.DrawText` (3D) now draws with `DepthMode.Transparent` so
   fully-transparent glyph pixels no longer write depth and occlude
   other text drawn behind them.
+- `Scene2D`: layers are now populated via a
+  `Layers = { ... }` collection initializer rather than constructor
+  arguments. Removes the `Scene2D(params Layer2D[])` /
+  `IEnumerable<Layer2D>` constructors and the `AddLayer`,
+  `InsertLayer`, and `RemoveLayer` methods. `Layers.Add` /
+  `Layers.Remove` remain for the rare case of dynamic layer changes.
 
 ### Added
+- `Sounds.CreateKlaxon` takes a `beatDuration` parameter (default
+  0.15 s) to control the two-tone alternation rate.
+- `Sounds.CreateWarble` takes `vibratoHz` (default 14) and
+  `vibratoDepth` (default 0.18) parameters to control the wobble.
+- `Sprite2D.CanBeHit` (default `true`): set to `false` to make a sprite
+  decorative — it updates and draws but is skipped by the playfield's
+  sprite-vs-sprite and sprite-vs-barrier hit-detection passes.
+- `TextSprite2D`: non-interactive sprite that renders a `Font` string,
+  centered on `Center` and colored by `Tint`. Suitable for score
+  popups, floating labels, and damage numbers.
+- `FadeAndExpire2D`: behavior that ramps `Tint.A` to zero over
+  `Duration`, then sets `IsAlive = false`.
+- `Sprite2D.Tint` (default `Color.White`): per-channel tint multiplied
+  into the sprite's image at draw time. `SpriteImage2D.Draw` now takes
+  a `Color tint` parameter.
+- `Renderer2D.DrawImageRotated(..., Color tint)`: tinted rotated variant
+  that mirrors the existing tinted `DrawImage`.
 - `Bitmap.Save(Stream, format, quality)`: encodes the image to a stream
   (PNG/JPEG/WebP/BMP). Pass a `MemoryStream` to get raw encoded bytes.
 - `Bitmap.Load(Stream, mipmaps)`: decodes an image from a stream
@@ -28,8 +56,84 @@ All notable changes to this project will be documented in this file.
 - `Renderer2D.DrawImage(Image, Rect src, Rect dst, Color tint)`:
   per-channel tint multiplied through SDL texture color-mod, restored
   to the texture's previous mod state after the draw.
+- `Camera2D` and `Renderer2D.Camera`: optional 2D camera with
+  `Position` (world point at viewport center) and uniform `Zoom`.
+  When set, world-space draws (`DrawImage`, `DrawImageRotated`,
+  `DrawFillRect(s)`, `DrawLine(s)`, `DrawPoint(s)`, `DrawGeometry`)
+  are mapped through the camera; `DrawDebugText` is unaffected.
+- `CameraFollow2D`: sprite behavior that scrolls a `Camera2D` to
+  keep its host sprite inside a dead zone of the viewport, optionally
+  clamped to a `WorldBounds` rectangle.
+- `PlayField2D.WorldBounds`: optional world rectangle substituted as
+  `UpdateContext2D.Bounds` for sprites and collision handlers, so
+  `BounceInBounds2D` and similar operate in world space.
+- `PlayField2D.ShowWorldBounds` / `WorldBoundsColor`: debug overlay
+  that outlines `WorldBounds` after the sprite pass.
+- `Renderer2D.PushState`: saves `Camera`, `DrawColor`, `ClipRect`,
+  `ColorScale`, `Scale`, and `ViewPort` and restores them when the
+  returned scope is disposed. Mirrors `Renderer3D.PushState`.
+- `Layer2D.ParallaxFactor` (default `(1, 1)`): per-axis scale applied
+  to the active camera when the layer draws, enabling parallax
+  backgrounds. `(0, 0)` is screen-locked; values &lt; 1 drift slowly;
+  &gt; 1 moves faster than the foreground.
+- `Layer2D.DrawContent`: subclasses now override this instead of
+  `Draw`. The base `Draw` is non-virtual and applies parallax before
+  delegating to `DrawContent`.
+- `StarField2D`: layer that scatters single-pixel stars across a
+  rectangle, batched by brightness. Defaults to a screen-locked
+  parallax factor for use as a space backdrop.
 
 ### Fixed
+- `Audio.GetSharedPlaybackDevice` / `Audio.PlayAsync` recovery: also
+  flush the cached `Audio.PlaybackDevices` enumeration when the shared
+  device gets torn down, and retry once if the very first `Open()`
+  fails. Cached physical-device ids from an earlier
+  `SDL_GetAudioPlaybackDevices` call can become stale across an OS
+  audio-endpoint swap and cause `SDL_OpenAudioDevice` to fail with
+  "Invalid audio device instance ID".
+- `AudioStream`: no longer registers a managed SDL pull-callback when
+  none was requested. `Audio.PlayAsync` pre-queues data so the
+  callback was a no-op anyway, but it still meant every play crossed
+  back into managed code from SDL's audio thread on every buffer
+  refill. Removed that surface entirely and unhook the callback (when
+  one was set) before destroying the stream. Eliminates a class of
+  native crashes that left no managed exception.
+- `AudioStream`: streams now register with their owning
+  `LogicalPlaybackDevice` on construction. They were never tracked,
+  which (a) silently disabled the `MaxConcurrentPlays` soft cap in
+  `Audio.PlayAsync`, and (b) meant device teardown couldn't dispose
+  in-flight streams before `SDL_CloseAudioDevice` invalidated their
+  ids — the delayed cleanup then called `SDL_DestroyAudioStream`
+  on a stale id and crashed the CLR with `ExecutionEngineException`.
+- `LogicalPlaybackDevice.CreateStream`: when `SDL_BindAudioStream`
+  fails (almost always because SDL has invalidated the underlying
+  device), orphan every tracked `AudioStream` in place — zeroing
+  their ids without any SDL call — instead of running them through
+  the normal Dispose path. Their stream ids were already stale, so
+  calling `SDL_DestroyAudioStream` on them crashed the CLR with
+  `ExecutionEngineException`. The new path also skips
+  `SDL_CloseAudioDevice` on the dead device id.
+- `Audio.PlayAsync`: recover from the shared SDL audio device becoming
+  stale (e.g. after an OS endpoint change) by reopening it once on
+  `SDL_BindAudioStream` failure instead of crashing every subsequent
+  play. The orphan stream from the failed bind is now destroyed.
+- `AudioDevice.Spec` / `SampleFrames`: cache the device's format on
+  first read instead of re-querying SDL on every access. A transient
+  `SDL_GetAudioDeviceFormat` failure would otherwise surface as an
+  empty spec and crash subsequent `Audio.Play` calls with
+  `Parameter 'dst_spec->format' is invalid`.
+- `Audio.PlayAsync`: returned task now actually completes when playback
+  finishes. SDL's get-data callback stops firing once the stream
+  drains, so completion is now timed to the sound's known duration.
+- `Melodies` presets are now synthesized lazily on first access rather
+  than eagerly in the type's static constructor. Touching one preset no
+  longer pays the cost of all eight.
+- `Audio.Play` / `Audio.PlayAsync`: reuse a single open SDL audio
+  device instead of opening / closing one per play. Rapid overlapping
+  plays no longer silently fail or stutter. Per-stream gain replaces
+  per-device gain, so concurrent plays at different volumes don't
+  clobber each other. A 32-stream soft cap drops new plays if too
+  many are already in flight.
 - `Bitmap.Save` with format `bmp`: now routes through SDL's native
   `SDL_SaveBMP_IO` instead of SkiaSharp, whose distributed Skia build
   ships with the BMP encoder disabled and would throw.

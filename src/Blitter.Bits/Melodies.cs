@@ -12,29 +12,33 @@ namespace Blitter.Bits;
 /// </remarks>
 public static class Melodies
 {
+    // Each preset is synthesized on first access and cached. Avoids paying
+    // the cost of every preset just because one was touched.
+    private static Sound? _spooky, _haunting, _mystery, _sunny, _happy, _victory, _defeat, _levelUp;
+
     /// <summary>Low minor line with a tritone — creepy, restless.</summary>
-    public static Sound Spooky { get; } = CreateSpooky();
+    public static Sound Spooky => _spooky ??= CreateSpooky();
 
     /// <summary>Very low, slow minor sigh — eerie, mournful.</summary>
-    public static Sound Haunting { get; } = CreateHaunting();
+    public static Sound Haunting => _haunting ??= CreateHaunting();
 
     /// <summary>Whole-tone zig-zag ending on a held high note — questioning, suspenseful.</summary>
-    public static Sound Mystery { get; } = CreateMystery();
+    public static Sound Mystery => _mystery ??= CreateMystery();
 
     /// <summary>C major arpeggio rising and returning — bright and open.</summary>
-    public static Sound Sunny { get; } = CreateSunny();
+    public static Sound Sunny => _sunny ??= CreateSunny();
 
     /// <summary>Bouncy major triad jig — cheerful and light.</summary>
-    public static Sound Happy { get; } = CreateHappy();
+    public static Sound Happy => _happy ??= CreateHappy();
 
     /// <summary>Ascending V-I fanfare — triumphant.</summary>
-    public static Sound Victory { get; } = CreateVictory();
+    public static Sound Victory => _victory ??= CreateVictory();
 
     /// <summary>Classic descending "wah-wah" cadence — sad / game over.</summary>
-    public static Sound Defeat { get; } = CreateDefeat();
+    public static Sound Defeat => _defeat ??= CreateDefeat();
 
     /// <summary>Quick ascending major arpeggio with octave leap — power-up / level cleared.</summary>
-    public static Sound LevelUp { get; } = CreateLevelUp();
+    public static Sound LevelUp => _levelUp ??= CreateLevelUp();
 
     // -------------------- Factories --------------------
 

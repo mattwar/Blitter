@@ -8,6 +8,11 @@ namespace Blitter;
 /// </summary>
 public abstract class Renderer2D
 {
+    // Snapshots pushed by PushState() and popped on scope dispose. The
+    // stack is allocated once per renderer and grown lazily, so push/pop
+    // is allocation-free in steady state.
+    private readonly Stack<RendererState> _stateStack = new();
+
     private readonly long _startTs = Stopwatch.GetTimestamp();
     private long _lastRenderTs = Stopwatch.GetTimestamp();
 
@@ -73,6 +78,17 @@ public abstract class Renderer2D
     internal bool AutoClear { get; set; } = true;
 
     /// <summary>
+    /// Optional 2D camera applied to world-space draws. When set,
+    /// <c>DrawImage</c>, <c>DrawImageRotated</c>, <c>DrawFillRect(s)</c>,
+    /// <c>DrawLine(s)</c>, <c>DrawPoint(s)</c>, and <c>DrawGeometry</c>
+    /// interpret their coordinates as world-space and map them through
+    /// the camera. When <c>null</c> (the default), draws use viewport
+    /// coordinates directly. <c>DrawDebugText</c> always uses viewport
+    /// coordinates regardless of camera.
+    /// </summary>
+    public Camera2D? Camera { get; set; }
+
+    /// <summary>
     /// Resets the <see cref="ElapsedSinceLastRender"/> clock. Concrete
     /// renderers call this from their <c>Render()</c> implementation
     /// after the frame has been submitted.
@@ -90,7 +106,13 @@ public abstract class Renderer2D
     /// </summary>
     public UpdateContext2D GetUpdateContext()
     {
-        var (w, h) = OutputSize;
+        // Prefer the logical surface size so update logic that consults
+        // Bounds (layout, edge-bounce, hit tests) stays in the same
+        // coordinate space the renderer is drawing in.
+        var (w, h) = LogicalSize;
+        if (w == 0 || h == 0)
+            (w, h) = OutputSize;
+
         return new UpdateContext2D
         {
             ElapsedSinceStart = ElapsedSinceStart,
@@ -101,8 +123,11 @@ public abstract class Renderer2D
 
     #region State
 
-    /// <summary>Clipping rectangle for subsequent draws.</summary>
-    public abstract Rect ClipRect { get; set; }
+    /// <summary>
+    /// Clipping rectangle for subsequent draws. <c>null</c> disables
+    /// clipping (draws use the full target).
+    /// </summary>
+    public abstract Rect? ClipRect { get; set; }
 
     /// <summary>Per-channel color scale applied to draw colors.</summary>
     public abstract float ColorScale { get; set; }
@@ -115,6 +140,13 @@ public abstract class Renderer2D
 
     /// <summary>The output size in pixels.</summary>
     public abstract (int Width, int Height) OutputSize { get; }
+
+    /// <summary>
+    /// The logical drawing surface size, if one was configured via
+    /// <see cref="SetLogicalSize"/>. Returns <c>(0, 0)</c> when logical
+    /// presentation is disabled (i.e. draws use raw output pixels).
+    /// </summary>
+    public abstract (int Width, int Height) LogicalSize { get; }
 
     /// <summary>
     /// Output width / height as a single <c>float</c>. Reads
@@ -133,8 +165,11 @@ public abstract class Renderer2D
     /// <summary>The rendering scale factors.</summary>
     public abstract (float ScaleX, float ScaleY) Scale { get; set; }
 
-    /// <summary>The portion of the rendering target where draws are performed.</summary>
-    public abstract Rect ViewPort { get; set; }
+    /// <summary>
+    /// The portion of the rendering target where draws are performed.
+    /// <c>null</c> means "the entire target" (the renderer's default).
+    /// </summary>
+    public abstract Rect? ViewPort { get; set; }
 
     /// <summary>
     /// Configures a fixed logical drawing surface that the renderer
@@ -218,6 +253,11 @@ public abstract class Renderer2D
     /// <summary>Draws a portion of <paramref name="image"/> rotated about <paramref name="center"/>.</summary>
     public abstract bool DrawImageRotated(Texture2D image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None);
 
+    /// <summary>Draws a portion of <paramref name="image"/> rotated about <paramref name="center"/>,
+    /// multiplied by <paramref name="tint"/> (per-channel). Use <see cref="Color.White"/>
+    /// for untinted output.</summary>
+    public abstract bool DrawImageRotated(Texture2D image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip, Color tint);
+
     /// <summary>Draws the entire <paramref name="image"/> rotated about <paramref name="center"/>.</summary>
     public bool DrawImageRotated(Texture2D image, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None)
     {
@@ -260,6 +300,70 @@ public abstract class Renderer2D
 
     /// <summary>Draws a set of points.</summary>
     public abstract bool DrawPoints(ReadOnlySpan<Vector2> points);
+
+    #endregion
+
+    #region State stack
+
+    /// <summary>
+    /// Saves the current renderer state and returns a scope whose
+    /// disposal restores it. Intended for use with a <c>using</c>
+    /// statement so callers can change state for a sub-region of drawing
+    /// without having to remember and reset every property by hand.
+    /// </summary>
+    public StateScope PushState()
+    {
+        _stateStack.Push(new RendererState(Camera, DrawColor, ClipRect, ColorScale, Scale, ViewPort));
+        return new StateScope(this);
+    }
+
+    private void PopState()
+    {
+        var s = _stateStack.Pop();
+        Camera = s.Camera;
+        DrawColor = s.DrawColor;
+        ClipRect = s.ClipRect;
+        ColorScale = s.ColorScale;
+        Scale = s.Scale;
+        ViewPort = s.ViewPort;
+    }
+
+    // Snapshot of every property a PushState/PopState cycle has to save
+    // and restore. Add a field here whenever a new mutable knob is added
+    // to Renderer2D so existing callers that already use PushState don't
+    // have to change.
+    private readonly record struct RendererState(
+        Camera2D? Camera,
+        Color DrawColor,
+        Rect? ClipRect,
+        float ColorScale,
+        (float ScaleX, float ScaleY) Scale,
+        Rect? ViewPort);
+
+    /// <summary>
+    /// A disposable scope returned from <see cref="PushState"/>. Disposing
+    /// it restores the renderer state captured at the matching push. As a
+    /// <c>ref struct</c> it cannot be stored in fields, captured by
+    /// closures, or moved across <c>await</c> boundaries -- the only valid
+    /// use is in a <c>using</c> statement on the same call frame as the
+    /// push.
+    /// </summary>
+    public ref struct StateScope
+    {
+        private Renderer2D? _renderer;
+
+        internal StateScope(Renderer2D renderer)
+        {
+            _renderer = renderer;
+        }
+
+        public void Dispose()
+        {
+            var r = _renderer;
+            _renderer = null;
+            r?.PopState();
+        }
+    }
 
     #endregion
 }

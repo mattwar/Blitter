@@ -15,6 +15,20 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
     private nint _rendererId;
     private ImmutableList<IDisposable> _resources = ImmutableList<IDisposable>.Empty;
 
+    // Grow-on-demand scratch buffers used to project spans through the
+    // camera transform. Reused across calls; the renderer is driven on
+    // the application thread so no synchronization is needed.
+    private Vertex2D[] _vertexScratch = [];
+    private Rect[] _rectScratch = [];
+    private Vector2[] _pointScratch = [];
+
+    private static Span<T> EnsureScratchSize<T>(ref T[] buffer, int length)
+    {
+        if (buffer.Length < length)
+            buffer = new T[Math.Max(length, buffer.Length == 0 ? 16 : buffer.Length * 2)];
+        return buffer.AsSpan(0, length);
+    }
+
     private protected BitmapRenderer2D(nint rendererId)
     {
         _rendererId = rendererId;
@@ -86,12 +100,16 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
 
     #region Properties
 
-    public override Rect ClipRect
+    public override Rect? ClipRect
     {
         get
         {
             if (IsDisposed)
-                return default;
+                return null;
+            // SDL_GetRenderClipRect always returns a rect (the zero rect when no clip is set), 
+            // so we have to ask SDL whether clipping is actually active.
+            if (!SDL.RenderClipEnabled(_rendererId))
+                return null;
             SDL.GetRenderClipRect(_rendererId, out var rect);
             return rect;
         }
@@ -99,8 +117,16 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         {
             if (IsDisposed)
                 return;
-            SDL.Rect r = value;
-            SDL.SetRenderClipRect(_rendererId, r);
+            if (value is Rect r)
+            {
+                SDL.Rect sr = r;
+                SDL.SetRenderClipRect(_rendererId, sr);
+            }
+            else
+            {
+                // Passing NULL to SDL disables the clip.
+                SDL.SetRenderClipRect(_rendererId, IntPtr.Zero);
+            }
         }
     }
 
@@ -241,6 +267,17 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         }
     }
 
+    public override (int Width, int Height) LogicalSize
+    {
+        get
+        {
+            var rep = this.LogicalRepresentation;
+            if (rep.Mode == SDL.RendererLogicalPresentation.Disabled)
+                return (0, 0);
+            return (rep.Width, rep.Height);
+        }
+    }
+
     public override (float ScaleX, float ScaleY) Scale
     {
         get
@@ -258,12 +295,19 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         }
     }
 
-    public override Rect ViewPort
+    // SDL has no "viewport explicitly set" predicate, so track it ourselves
+    // to distinguish "reset to full target" (null) from "intentionally
+    // covers the whole target right now".
+    private bool _viewportExplicitlySet;
+
+    public override Rect? ViewPort
     {
         get
         {
             if (IsDisposed)
-                return default;
+                return null;
+            if (!_viewportExplicitlySet)
+                return null;
             SDL.GetRenderViewport(_rendererId, out var rect);
             return rect;
         }
@@ -271,8 +315,18 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         {
             if (IsDisposed)
                 return;
-            SDL.Rect r = value;
-            SDL.SetRenderViewport(_rendererId, r);
+            if (value is Rect r)
+            {
+                SDL.Rect sr = r;
+                SDL.SetRenderViewport(_rendererId, sr);
+                _viewportExplicitlySet = true;
+            }
+            else
+            {
+                // Passing NULL to SDL resets the viewport to the full target.
+                SDL.SetRenderViewport(_rendererId, IntPtr.Zero);
+                _viewportExplicitlySet = false;
+            }
         }
     }
 
@@ -401,6 +455,61 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         }
     }
 
+    /// <summary>
+    /// Snapshot of the active <see cref="Renderer2D.Camera"/> against
+    /// the current viewport. Built once per draw call and applied to
+    /// world-space coordinates before they reach SDL. Disabled when no
+    /// camera is set, in which case <see cref="Apply(Rect)"/> and
+    /// friends pass values through unchanged.
+    /// </summary>
+    private readonly struct CameraTransform
+    {
+        public readonly bool Enabled;
+        private readonly float _offsetX;
+        private readonly float _offsetY;
+        private readonly float _zoom;
+
+        public CameraTransform(Camera2D? camera, int viewportW, int viewportH)
+        {
+            if (camera is null)
+            {
+                Enabled = false;
+                _offsetX = _offsetY = 0f;
+                _zoom = 1f;
+                return;
+            }
+            Enabled = true;
+            _zoom = camera.Zoom;
+            _offsetX = viewportW * 0.5f - camera.Position.X * _zoom;
+            _offsetY = viewportH * 0.5f - camera.Position.Y * _zoom;
+        }
+
+        public float Zoom => _zoom;
+
+        public Rect Apply(Rect r) => Enabled
+            ? new Rect(r.X * _zoom + _offsetX, r.Y * _zoom + _offsetY, r.Width * _zoom, r.Height * _zoom)
+            : r;
+
+        public (float X, float Y) Apply(float x, float y) => Enabled
+            ? (x * _zoom + _offsetX, y * _zoom + _offsetY)
+            : (x, y);
+
+        public Vector2 Apply(Vector2 p) => Enabled
+            ? new Vector2(p.X * _zoom + _offsetX, p.Y * _zoom + _offsetY)
+            : p;
+    }
+
+    private CameraTransform GetCameraTransform()
+    {
+        var cam = Camera;
+        if (cam is null)
+            return default; // Enabled = false
+        var (w, h) = LogicalSize;
+        if (w == 0 || h == 0)
+            (w, h) = OutputSize;
+        return new CameraTransform(cam, w, h);
+    }
+
     public override bool DrawImage(Texture2D image, Rect source, Rect destination)
     {
         if (IsDisposed)
@@ -408,7 +517,8 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         if (!TryGetOrCreateTexture(image, out var texture))
             return false;
         EnsureCleared();
-        return SDL.RenderTexture(_rendererId, texture.Id, source, destination);
+        var dst = GetCameraTransform().Apply(destination);
+        return SDL.RenderTexture(_rendererId, texture.Id, source, dst);
     }
 
     public override bool DrawImage(Texture2D image, Rect source, Rect destination, Color tint)
@@ -418,6 +528,7 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         if (!TryGetOrCreateTexture(image, out var texture))
             return false;
         EnsureCleared();
+        var dst = GetCameraTransform().Apply(destination);
         // SDL texture color/alpha-mod is persistent state; save and
         // restore so this draw doesn't bleed into subsequent untinted
         // ones using the same texture.
@@ -425,7 +536,7 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         var savedAlpha = texture.AlphaMod;
         texture.ColorMod = (tint.R, tint.G, tint.B);
         texture.AlphaMod = tint.A;
-        var ok = SDL.RenderTexture(_rendererId, texture.Id, source, destination);
+        var ok = SDL.RenderTexture(_rendererId, texture.Id, source, dst);
         texture.ColorMod = savedColor;
         texture.AlphaMod = savedAlpha;
         return ok;
@@ -438,24 +549,67 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         if (!TryGetOrCreateTexture(image, out var texture))
             return false;
         EnsureCleared();
-        var sdlCenter = new SDL.FPoint { X = center.X, Y = center.Y };
-        return SDL.RenderTextureRotated(_rendererId, texture.Id, source, destination, angle, sdlCenter, (SDL.FlipMode)flip);
+        var t = GetCameraTransform();
+        var dst = t.Apply(destination);
+        // center is rect-local; scale it by Zoom so the pivot stays at
+        // the same fraction of the (now-zoomed) destination.
+        var c = t.Enabled ? center * t.Zoom : center;
+        var sdlCenter = new SDL.FPoint { X = c.X, Y = c.Y };
+        return SDL.RenderTextureRotated(_rendererId, texture.Id, source, dst, angle, sdlCenter, (SDL.FlipMode)flip);
+    }
+
+    public override bool DrawImageRotated(Texture2D image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip, Color tint)
+    {
+        if (IsDisposed)
+            return false;
+        if (!TryGetOrCreateTexture(image, out var texture))
+            return false;
+        EnsureCleared();
+        var t = GetCameraTransform();
+        var dst = t.Apply(destination);
+        var c = t.Enabled ? center * t.Zoom : center;
+        var sdlCenter = new SDL.FPoint { X = c.X, Y = c.Y };
+        // Same color/alpha-mod save+restore pattern as the tinted
+        // non-rotated overload.
+        var savedColor = texture.ColorMod;
+        var savedAlpha = texture.AlphaMod;
+        texture.ColorMod = (tint.R, tint.G, tint.B);
+        texture.AlphaMod = tint.A;
+        var ok = SDL.RenderTextureRotated(_rendererId, texture.Id, source, dst, angle, sdlCenter, (SDL.FlipMode)flip);
+        texture.ColorMod = savedColor;
+        texture.AlphaMod = savedAlpha;
+        return ok;
     }
 
     public override bool DrawFillRect(Rect rect)
     {
         EnsureCleared();
-        SDL.FRect r = rect;
+        SDL.FRect r = GetCameraTransform().Apply(rect);
         return SDL.RenderFillRect(_rendererId, r);
     }
 
     public override bool DrawFillRects(ReadOnlySpan<Rect> rects)
     {
         EnsureCleared();
+        var t = GetCameraTransform();
+        if (!t.Enabled)
+        {
+            unsafe
+            {
+                fixed (Rect* p = rects)
+                    return SDL3Native.SDL_RenderFillRects(_rendererId, p, rects.Length);
+            }
+        }
+        // Camera active: project into a scratch buffer and submit that.
+        Span<Rect> scratch = rects.Length <= 64
+            ? stackalloc Rect[rects.Length]
+            : EnsureScratchSize(ref _rectScratch, rects.Length);
+        for (int i = 0; i < rects.Length; i++)
+            scratch[i] = t.Apply(rects[i]);
         unsafe
         {
-            fixed (Rect* p = rects)
-                return SDL3Native.SDL_RenderFillRects(_rendererId, p, rects.Length);
+            fixed (Rect* p = scratch)
+                return SDL3Native.SDL_RenderFillRects(_rendererId, p, scratch.Length);
         }
     }
 
@@ -466,15 +620,41 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
             : null;
 
         EnsureCleared();
+        var t = GetCameraTransform();
+        if (!t.Enabled)
+        {
+            unsafe
+            {
+                fixed (Vertex2D* pVertices = vertices)
+                fixed (int* pIndices = indices)
+                {
+                    return SDL3Native.SDL_RenderGeometry(
+                        _rendererId,
+                        texture != null ? texture.Id : 0,
+                        pVertices, vertices.Length,
+                        pIndices, indices.Length);
+                }
+            }
+        }
+        // Camera active: project each vertex's Position into a scratch
+        // buffer, preserving Color and TexCoord.
+        Span<Vertex2D> scratch = vertices.Length <= 64
+            ? stackalloc Vertex2D[vertices.Length]
+            : EnsureScratchSize(ref _vertexScratch, vertices.Length);
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            var v = vertices[i];
+            scratch[i] = new Vertex2D(t.Apply(v.Position), v.Color, v.TexCoord);
+        }
         unsafe
         {
-            fixed (Vertex2D* pVertices = vertices)
+            fixed (Vertex2D* pVertices = scratch)
             fixed (int* pIndices = indices)
             {
                 return SDL3Native.SDL_RenderGeometry(
                     _rendererId,
                     texture != null ? texture.Id : 0,
-                    pVertices, vertices.Length,
+                    pVertices, scratch.Length,
                     pIndices, indices.Length);
             }
         }
@@ -483,32 +663,64 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
     public override bool DrawLine(float x1, float y1, float x2, float y2)
     {
         EnsureCleared();
-        return SDL.RenderLine(_rendererId, x1, y1, x2, y2);
+        var t = GetCameraTransform();
+        var (sx1, sy1) = t.Apply(x1, y1);
+        var (sx2, sy2) = t.Apply(x2, y2);
+        return SDL.RenderLine(_rendererId, sx1, sy1, sx2, sy2);
     }
 
     public override bool DrawLines(ReadOnlySpan<Vector2> points)
     {
         EnsureCleared();
+        var t = GetCameraTransform();
+        if (!t.Enabled)
+        {
+            unsafe
+            {
+                fixed (Vector2* p = points)
+                    return SDL3Native.SDL_RenderLines(_rendererId, p, points.Length);
+            }
+        }
+        Span<Vector2> scratch = points.Length <= 128
+            ? stackalloc Vector2[points.Length]
+            : EnsureScratchSize(ref _pointScratch, points.Length);
+        for (int i = 0; i < points.Length; i++)
+            scratch[i] = t.Apply(points[i]);
         unsafe
         {
-            fixed (Vector2* p = points)
-                return SDL3Native.SDL_RenderLines(_rendererId, p, points.Length);
+            fixed (Vector2* p = scratch)
+                return SDL3Native.SDL_RenderLines(_rendererId, p, scratch.Length);
         }
     }
 
     public override bool DrawPoint(float x, float y)
     {
         EnsureCleared();
-        return SDL.RenderPoint(_rendererId, x, y);
+        var (sx, sy) = GetCameraTransform().Apply(x, y);
+        return SDL.RenderPoint(_rendererId, sx, sy);
     }
 
     public override bool DrawPoints(ReadOnlySpan<Vector2> points)
     {
         EnsureCleared();
+        var t = GetCameraTransform();
+        if (!t.Enabled)
+        {
+            unsafe
+            {
+                fixed (Vector2* p = points)
+                    return SDL3Native.SDL_RenderPoints(_rendererId, p, points.Length);
+            }
+        }
+        Span<Vector2> scratch = points.Length <= 128
+            ? stackalloc Vector2[points.Length]
+            : EnsureScratchSize(ref _pointScratch, points.Length);
+        for (int i = 0; i < points.Length; i++)
+            scratch[i] = t.Apply(points[i]);
         unsafe
         {
-            fixed (Vector2* p = points)
-                return SDL3Native.SDL_RenderPoints(_rendererId, p, points.Length);
+            fixed (Vector2* p = scratch)
+                return SDL3Native.SDL_RenderPoints(_rendererId, p, scratch.Length);
         }
     }
 

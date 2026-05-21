@@ -713,11 +713,11 @@ public abstract class Window : IDisposable
 
     /// <summary>
     /// Animates the window by repeatedly calling <paramref name="renderFrame"/> on each frame tick
-    /// until <paramref name="shouldContinue"/> returns false, the window is closed, or <paramref name="cancellationToken"/> fires.
+    /// until <paramref name="shouldExit"/> returns true, the window is closed, or <paramref name="cancellationToken"/> fires.
     /// </summary>
-    public Task RunAsync(Func<bool> shouldContinue, Action renderFrame, CancellationToken cancellationToken = default)
+    public Task RunAsync(Func<bool> shouldExit, Action renderFrame, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(shouldContinue);
+        ArgumentNullException.ThrowIfNull(shouldExit);
         ArgumentNullException.ThrowIfNull(renderFrame);
 
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -725,7 +725,7 @@ public abstract class Window : IDisposable
         {
             try
             {
-                while (!IsClosed && !cancellationToken.IsCancellationRequested && shouldContinue())
+                while (!IsClosed && !cancellationToken.IsCancellationRequested && !shouldExit())
                 {
                     RenderFrame(renderFrame);
                     if (IsClosed || cancellationToken.IsCancellationRequested)
@@ -740,6 +740,7 @@ public abstract class Window : IDisposable
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[Blitter] Render loop for '{Title}' threw: {ex}");
                 tcs.TrySetException(ex);
             }
         })
@@ -756,7 +757,7 @@ public abstract class Window : IDisposable
     /// until the window is closed, or <paramref name="cancellationToken"/> fires.
     /// </summary>
     public Task RunAsync(Action renderFrame, CancellationToken cancellationToken = default)
-        => RunAsync(static () => true, renderFrame, cancellationToken);
+        => RunAsync(static () => false, renderFrame, cancellationToken);
 
     /// <summary>
     /// Invokes <paramref name="body"/> in a frame-rendering context:
@@ -909,7 +910,10 @@ public abstract class Window : IDisposable
     {
         this.KeyDown?.Invoke(window, e);
         if (this.CloseKey != Key.Unknown && e.Key == this.CloseKey && !this.IsClosed)
+        {
+            Console.WriteLine($"[Blitter] CloseKey '{this.CloseKey}' pressed on '{window.Title}'; closing.");
             this.Close();
+        }
     }
 
     public event WindowEventHandler<KeyEventArgs>? KeyUp;
@@ -925,6 +929,7 @@ public abstract class Window : IDisposable
     #region Window Events
     public event WindowEventHandler<WindowCloseRequestedEventArgs>? WindowCloseRequested;
     protected virtual void OnWindowCloseRequested(Window window, WindowCloseRequestedEventArgs e) {
+        Console.WriteLine($"[Blitter] WindowCloseRequested for '{window.Title}'.");
         this.WindowCloseRequested?.Invoke(window, e);
         this.Dispose();
     }

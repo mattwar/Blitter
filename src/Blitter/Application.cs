@@ -137,7 +137,10 @@ public class Application : IDisposable
         // Callers that want a headless application should create the
         // Application explicitly and call Dispose() themselves.
         if (_windows.IsEmpty)
+        {
+            Console.WriteLine($"[Blitter] Last window removed ({window.Title}); requesting quit.");
             _quitRequested = true;
+        }
     }
 
     private volatile bool _quitRequested;
@@ -326,7 +329,10 @@ public class Application : IDisposable
             while (SDL.PollEvent(out var e))
             {
                 if (e.Type == (uint)SDL.EventType.Quit)
+                {
+                    Console.WriteLine("[Blitter] SDL.EventType.Quit received; ending event loop.");
                     return;
+                }
 
                 DispatchEvent(e);
             }

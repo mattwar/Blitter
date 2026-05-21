@@ -144,13 +144,13 @@ public class Window3D : Window
 
     /// <summary>
     /// Animates the window by repeatedly calling <paramref name="renderFrame"/> on each frame tick
-    /// until <paramref name="shouldContinue"/> returns false, the window is closed, or <paramref name="cancellationToken"/> fires.
+    /// until <paramref name="shouldExit"/> returns true, the window is closed, or <paramref name="cancellationToken"/> fires.
     /// </summary>
-    public Task RunAsync(Func<bool> shouldContinue, Action<Renderer3D> renderFrame, CancellationToken cancellationToken = default)
+    public Task RunAsync(Func<bool> shouldExit, Action<Renderer3D> renderFrame, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(shouldContinue);
+        ArgumentNullException.ThrowIfNull(shouldExit);
         ArgumentNullException.ThrowIfNull(renderFrame);
-        return RunAsync(shouldContinue, () => renderFrame(this.Renderer), cancellationToken);
+        return RunAsync(shouldExit, () => renderFrame(this.Renderer), cancellationToken);
     }
 
     /// <summary>
@@ -158,7 +158,7 @@ public class Window3D : Window
     /// until the window is closed, or <paramref name="cancellationToken"/> fires.
     /// </summary>
     public Task RunAsync(Action<Renderer3D> renderFrame, CancellationToken cancellationToken = default)
-        => RunAsync(static () => true, renderFrame, cancellationToken);
+        => RunAsync(static () => false, renderFrame, cancellationToken);
 
     private bool TryGetRenderer([NotNullWhen(true)] out GpuRenderer? renderer)
     {

@@ -17,7 +17,16 @@
             "cwd": "${fileDirname}",
             "console": "integratedTerminal",
             "stopAtEntry": false,
-            "justMyCode": false
+            "justMyCode": false,
+            // Write a full minidump (type 2) to C:\temp on any unhandled
+            // native fault (e.g. SDL access violations) so we can post-mortem
+            // open it in Visual Studio / WinDbg.
+            "env": {
+                "DOTNET_DbgEnableMiniDump": "1",
+                "DOTNET_DbgMiniDumpType": "2",
+                "DOTNET_DbgMiniDumpName": "C:\\temp\\rocket.%d.dmp",
+                "DOTNET_EnableCrashReport": "1"
+            }
         }
     ]
 }
