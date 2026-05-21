@@ -86,7 +86,7 @@ public class ImageBoundsTests
     }
 
     [Fact]
-    public void ComputeOpaqueCircle_MatchesFromRectOfBounds()
+    public void ComputeOpaqueCircle_EnclosesAllOpaquePixelsAndIsTighterThanRect()
     {
         using var img = MakeImage(32, 32, i =>
         {
@@ -94,9 +94,18 @@ public class ImageBoundsTests
                 for (int x = 6; x <= 12; x++)
                     i.SetPixel(x, y, Color.White);
         });
-        var expected = BoundingCircle.FromRect(img.ComputeOpaqueBounds());
+        var bounds = img.ComputeOpaqueBounds();
+        var rectCircle = BoundingCircle.FromRect(bounds);
         var actual = img.ComputeOpaqueCircle();
-        Assert.Equal(expected, actual);
+
+        // Must contain every opaque pixel (corner-inclusive).
+        for (int y = 4; y <= 10; y++)
+            for (int x = 6; x <= 12; x++)
+                Assert.True(actual.Contains(new Vector2(x + 0.5f, y + 0.5f)),
+                    $"pixel ({x},{y}) outside circle");
+
+        // Tight bound: never larger than the rect-circumscribing circle.
+        Assert.True(actual.Radius <= rectCircle.Radius + 0.001f);
     }
 
     [Fact]

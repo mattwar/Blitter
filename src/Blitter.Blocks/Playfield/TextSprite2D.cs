@@ -31,8 +31,6 @@ public class TextSprite2D : Sprite2D
         CanBeHit = false;
     }
 
-    public override BoundingCircle HitCircle => new(Center, 0f);
-
     public override void Draw(Renderer2D renderer)
     {
         if (Font is null || Text.Length == 0)

@@ -77,21 +77,21 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
             : TimeSpan.Zero;
 
     /// <summary>
-    /// The boundary of the sprite for collision purposes.
-    /// By default, a circle centered on the sprite's <see cref="Center"/>
+    /// The collision boundary of the sprite. Default is a single
+    /// circle covering the sprite's image. Override to return a
+    /// shape with tighter or multi-primitive geometry (e.g. for
+    /// an elongated rocket).
     /// </summary>
-    public virtual BoundingCircle HitCircle
-    {
-        get
-        {
-            if (Image is null)
-                return new BoundingCircle(Center, 0f);
-            var b = Image.Boundary;
-            if (b.IsEmpty)
-                return new BoundingCircle(Center, 0f);
-            return new BoundingCircle(Center + b.Center * Scale, b.Radius * Scale);
-        }
-    }
+    public virtual HitShape HitShape => _hitShape ??= new CircleHitShape(this);
+    private HitShape? _hitShape;
+
+    /// <summary>
+    /// Broad-phase bounding circle of the sprite for collision
+    /// purposes; equivalent to <see cref="HitShape"/>'s
+    /// <see cref="HitShape.BroadCircle"/>. Kept as a convenience
+    /// for legacy callers and for the broad-phase reject path.
+    /// </summary>
+    public BoundingCircle HitCircle => HitShape.BroadCircle;
 
     public Sprite2D()
     {

@@ -20,7 +20,7 @@ const int DesignW = 1920;
 const int DesignH = 1080;
 
 // World is larger than the visible viewport; the camera scrolls to
-// keep the rocket inside a dead zone, and the playfield bounces both
+// keep the rocket inside a visible zone, and the playfield bounces both
 // the rocket and asteroids off the world's outer wall.
 const int WorldW = 3840;
 const int WorldH = 2160;
@@ -152,6 +152,22 @@ var hud = new CustomLayer2D
         using var _ = rd.PushState();
         rd.Camera = null;
 
+        // Speed readout under the score. The delegate runs every
+        // frame, so just reading rocket.Speed here keeps the HUD
+        // live — no separate update step needed. Below the smash
+        // threshold the readout flashes to nag the player.
+        const float SmashSpeed = 500f;
+        bool tooSlow = rocket.Speed < SmashSpeed;
+        bool flashOn = !tooSlow
+            || ((int)(Environment.TickCount / 250) & 1) == 0;
+        if (flashOn)
+        {
+            var speedColor = tooSlow
+                ? new Color(255, 140, 80)  // orange = too slow
+                : new Color(120, 255, 120); // green = smashing speed
+            scoreFont.DrawText(rd, $"SPEED {rocket.Speed:0}", speedColor, 20f, 120f);
+        }
+
 #if false
         rd.DrawColor = Color.White;
         var asteriodCount = playField.Sprites.Count(s => s is Asteroid);
@@ -206,6 +222,41 @@ var minimap = new MinimapLayer2D
     },
 };
 
+// Debug overlay: outlines the rocket's HitShape in world space so
+// we can see exactly where collisions register. Toggle with H.
+bool showHitShape = false;
+var hitDebug = new CustomLayer2D
+{
+    OnUpdate = ctx =>
+    {
+        if (window.Input.WasJustPressed(Key.H))
+            showHitShape = !showHitShape;
+    },
+    OnRender = rd =>
+    {
+        if (!showHitShape) return;
+        using var _ = rd.PushState();
+        rd.DrawColor = new Color(0, 255, 120, 220);
+        rocket.HitShape.Visit(HitShapeDebug.Draw(rd));
+        // Also outline the broad-phase circle in a dimmer color
+        // so we can see when the cheap reject would skip.
+        rd.DrawColor = new Color(0, 200, 255, 90);
+        HitShapeDebug.DrawCircleOutline(rd, rocket.HitShape.BroadCircle.Center, rocket.HitShape.BroadCircle.Radius);
+
+        // Same treatment for every asteroid currently on the field:
+        // magenta hit shape outline + dim broad circle.
+        var hitVisitor = HitShapeDebug.Draw(rd);
+        foreach (var sprite in playField.Sprites)
+        {
+            if (sprite is not Asteroid asteroid) continue;
+            rd.DrawColor = new Color(255, 80, 200, 220);
+            asteroid.HitShape.Visit(hitVisitor);
+            rd.DrawColor = new Color(255, 120, 220, 70);
+            HitShapeDebug.DrawCircleOutline(rd, asteroid.HitShape.BroadCircle.Center, asteroid.HitShape.BroadCircle.Radius);
+        }
+    },
+};
+
 var scene = new Scene2D
 {
     Layers = 
@@ -213,6 +264,7 @@ var scene = new Scene2D
         starsFar, 
         starsMid, 
         playField,
+        hitDebug,
         popups,
         scoreboard,
         hud,
@@ -292,6 +344,47 @@ sealed class Rocket : Sprite2D
     public TimeSpan StunUntil { get; set; }
     public bool IsStunned => Age < StunUntil;
 
+    // Cached capsule shape oriented along the rocket body. Lazy
+    // because Image isn't set in the ctor.
+    private HitShape? _rocketHitShape;
+
+    /// <summary>
+    /// Tight capsule along the rocket body, oriented by sprite
+    /// <see cref="Sprite2D.Rotation"/> and sized from the image's
+    /// opaque-pixel bounding rectangle.
+    /// </summary>
+    public override HitShape HitShape => _rocketHitShape ??= BuildHitShape();
+
+    private HitShape BuildHitShape()
+    {
+        // Pull the axis-aligned opaque bounds of the image. The
+        // largest capsule inscribed in that rectangle has body
+        // radius = half the short side and length-between-endpoints
+        // = long side - 2·radius; both cap-circles end up tangent
+        // to the short edges of the box.
+        if (Image is not TextureSpriteImage2D tsi || tsi.Texture is not Bitmap bmp)
+            return new CircleHitShape(this);
+        var bounds = bmp.ComputeOpaqueBounds();
+        if (bounds.IsEmpty)
+            return new CircleHitShape(this);
+
+        // ComputeOpaqueBounds is in image-pixel space (origin
+        // top-left); sprite-local has origin at the image center.
+        var (w, h) = bmp.Size;
+        var localCenter = bounds.Center - new Vector2(w / 2f, h / 2f);
+        var size = bounds.Size;
+        bool tall = size.Y >= size.X;
+        var bodyRadius = (tall ? size.X : size.Y) * 0.5f;
+        var halfLen = (tall ? size.Y : size.X) * 0.5f - bodyRadius;
+        var axis = tall ? new Vector2(0f, 1f) : new Vector2(1f, 0f);
+        return new CapsuleHitShape(
+            this,
+            localCenter - axis * halfLen,
+            localCenter + axis * halfLen,
+            bodyRadius
+            );
+    }
+    
     public Rocket()
     {
         this.Behaviors.AddRange([
@@ -355,6 +448,25 @@ sealed class AsteroidSmasher : SpriteBehavior2D
         if (other is not Asteroid asteroid)
             return;
 
+        // Cooldown after a deflect so we don't re-trigger every
+        // frame while the rocket is still overlapping this rock.
+        if (asteroid.Age < asteroid.HitCooldownUntil)
+            return;
+
+        // Capture impact speed before applying momentum loss so the
+        // smash-threshold check reflects how fast the player was
+        // actually going at the moment of contact.
+        float impactSpeed = self is Rocket r0 ? r0.Speed : 0f;
+
+        // Any hit costs momentum — scaled by the asteroid's mass so
+        // the big rocks really pull you up short. Player has to lean
+        // on the thrusters to recover.
+        if (self is Rocket hitRocket)
+        {
+            var loss = 50f * asteroid.Scale;
+            hitRocket.Speed = Math.Max(0f, hitRocket.Speed - loss);
+        }
+
         // Stunned rocket can't smash — it caroms off instead, and
         // shoves the asteroid the other way. No score, no shards.
         if (self is Rocket { IsStunned: true })
@@ -363,7 +475,24 @@ sealed class AsteroidSmasher : SpriteBehavior2D
             var awayFromAsteroid = MathF.Atan2(delta.Y, delta.X) * 180f / MathF.PI + 90f;
             self.Heading = (awayFromAsteroid + 360f) % 360f;
             asteroid.Heading = (awayFromAsteroid + 180f) % 360f;
+            asteroid.HitCooldownUntil = asteroid.Age + TimeSpan.FromMilliseconds(400);
             Audio.Play(Sounds.Boing, volume: .2f);
+            return;
+        }
+
+        // Not going fast enough to smash through — deflect off
+        // instead. Nudge each heading partway toward the
+        // away-from-impact direction (shortest arc) so the rocket
+        // visibly veers without flipping all the way around.
+        const float SmashSpeed = 500f;
+        if (impactSpeed < SmashSpeed)
+        {
+            var delta = self.Center - asteroid.Center;
+            var awayFromAsteroid = MathF.Atan2(delta.Y, delta.X) * 180f / MathF.PI + 90f;
+            self.Heading = NudgeToward(self.Heading, awayFromAsteroid, fraction: 0.35f, jitterDeg: 5f, maxDeg: 20f);
+            asteroid.Heading = NudgeToward(asteroid.Heading, awayFromAsteroid + 180f, fraction: 0.5f, jitterDeg: 8f, maxDeg: 25f);
+            asteroid.HitCooldownUntil = asteroid.Age + TimeSpan.FromMilliseconds(400);
+            Audio.Play(Sounds.Hurt, volume: .1f);
             return;
         }
 
@@ -406,6 +535,17 @@ sealed class AsteroidSmasher : SpriteBehavior2D
         asteroid.Smash();
         asteroid.IsAlive = false;
     }
+
+    private static float NudgeToward(float current, float target, float fraction, float jitterDeg, float maxDeg)
+    {
+        // Shortest-arc delta in [-180, 180], move part of the way,
+        // then clamp the signed step so a head-on impact still only
+        // produces a gentle deflection.
+        var delta = ((target - current + 540f) % 360f) - 180f;
+        var step = Math.Clamp(delta * fraction, -maxDeg, maxDeg);
+        var jitter = (float)(Random.Shared.NextDouble() * 2 - 1) * jitterDeg;
+        return (current + step + jitter + 360f) % 360f;
+    }
 }
 
 enum AsteriodKind
@@ -421,6 +561,11 @@ sealed class Asteroid : Sprite2D
     public static readonly float RadioactiveRarity = 0.1f; // 10% of asteroid shards are radioactive
 
     public AsteriodKind Kind { get; }
+
+    // While Age < HitCooldownUntil this asteroid ignores rocket
+    // contacts — used after a deflect so we don't keep colliding
+    // every frame while the two are still overlapping.
+    public TimeSpan HitCooldownUntil { get; set; }
 
     private static readonly Color _goldTint = new Color(255, 215, 0);
     private static readonly Color _radioactiveTint = new Color(90, 200, 90);
@@ -509,5 +654,83 @@ sealed class RocketController : SpriteBehavior2D
             rocket.Speed = Math.Clamp(rocket.Speed - 50f, 0f, 1000f);
             Audio.Play(Sounds.RoarDown, volume: .25f);
         }
+    }
+}
+
+/// <summary>
+/// Tiny helper that turns a HitShape's live primitives into Renderer2D
+/// line draws. Lives in the sample so the engine doesn't pull in a
+/// rendering dependency for collision debug.
+/// </summary>
+static class HitShapeDebug
+{
+    // Build a visitor that draws each primitive. Returned delegate is
+    // fresh each call but a debug overlay isn't on the hot path.
+    public static HitShapeVisitor Draw(Renderer2D rd) => prims =>
+    {
+        for (int i = 0; i < prims.Length; i++)
+        {
+            var p = prims[i];
+            switch (p.Kind)
+            {
+                case HitKind.Circle:
+                    DrawCircleOutline(rd, p.P0, p.R);
+                    break;
+                case HitKind.Capsule:
+                    DrawCapsuleOutline(rd, p.P0, p.P1, p.R);
+                    break;
+            }
+        }
+    };
+
+    public static void DrawCircleOutline(Renderer2D rd, Vector2 center, float radius, int segments = 32)
+    {
+        Span<Vector2> pts = stackalloc Vector2[segments + 1];
+        var step = MathF.Tau / segments;
+        for (int i = 0; i <= segments; i++)
+        {
+            var a = i * step;
+            pts[i] = new Vector2(center.X + MathF.Cos(a) * radius, center.Y + MathF.Sin(a) * radius);
+        }
+        rd.DrawLines(pts);
+    }
+
+    public static void DrawCapsuleOutline(Renderer2D rd, Vector2 a, Vector2 b, float radius, int capSegments = 12)
+    {
+        var axis = b - a;
+        var len = axis.Length();
+        // Degenerate capsule: just a circle.
+        if (len <= float.Epsilon)
+        {
+            DrawCircleOutline(rd, a, radius, capSegments * 2);
+            return;
+        }
+        var d = axis / len;
+        var n = new Vector2(-d.Y, d.X) * radius;
+
+        // Outline: side1 (A+n → B+n), B-cap arc, side2 (B-n → A-n),
+        // A-cap arc, close. Drawn as one connected polyline.
+        var totalPts = 1 + 1 + (capSegments + 1) + 1 + (capSegments + 1);
+        Span<Vector2> pts = stackalloc Vector2[totalPts];
+        int k = 0;
+        pts[k++] = a + n;
+        pts[k++] = b + n;
+        // Cap at B: rotate +n around B by π in the +d half-plane.
+        var startB = MathF.Atan2(n.Y, n.X);
+        for (int i = 1; i <= capSegments + 1; i++)
+        {
+            var ang = startB - MathF.PI * i / capSegments;
+            pts[k++] = b + new Vector2(MathF.Cos(ang), MathF.Sin(ang)) * radius;
+        }
+        // Now at b - n; walk back to a - n.
+        pts[k++] = a - n;
+        // Cap at A: continue the rotation another π so we land back at a + n.
+        var startA = MathF.Atan2(-n.Y, -n.X);
+        for (int i = 1; i <= capSegments + 1; i++)
+        {
+            var ang = startA - MathF.PI * i / capSegments;
+            pts[k++] = a + new Vector2(MathF.Cos(ang), MathF.Sin(ang)) * radius;
+        }
+        rd.DrawLines(pts[..k]);
     }
 }

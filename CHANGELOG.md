@@ -37,7 +37,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 - `WrapInBounds2D`: toroidal sprite wrap across the update bounds.
 - `SeekTarget2D`: steers a sprite toward a `Func<Vector2?>` target with
-  `MaxTurnRate`, `Accel`, `MaxSpeed`, and `ArriveRadius`.
+  `MaxTurnRate`, `Acceleration`, `MaxSpeed`, and `ArriveRadius`.
 - `Timer2D`: scene-behavior countdown with `Duration`, `TimeRemaining`,
   `AutoRestart`, `Paused`, and `OnExpired`.
 - `TriggerOnPredicate2D`: rising-edge `Func<Scene2D,bool>` →
@@ -46,6 +46,10 @@ All notable changes to this project will be documented in this file.
   `AddTrauma(float)` and per-second `Decay`. Place after `Motion2D`.
 - `CameraShake2D`: sprite behavior; trauma² jitter of a `Camera2D`
   position. Place after `CameraFollow2D` on the same sprite.
+- `ParticleLayer2D`: fixed-capacity CPU particle pool drawn as
+  single-pixel points. Burst `Emit` with Point/Disk/Cone/Box emitter
+  shapes, two-stop or `Gradient` color-over-life, `Acceleration` and
+  exponential `Drag`. Recycles the oldest particle when full.
 - `Spawner2D`: scene behavior that periodically adds sprites to a
   `PlayField2D`. Configurable `Interval`, `Jitter`, `StartDelay`,
   `MaxAlive` (with optional `Filter`), `MaxTotal`, `Paused`, and a

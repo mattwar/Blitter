@@ -54,7 +54,7 @@ public class BehaviorTests
         var sprite = new Sprite2D
         {
             Center = Vector2.Zero,
-            Behaviors = { new SeekTarget2D { Target = () => new Vector2(0, -100), Accel = 50, MaxSpeed = 80, MaxTurnRate = 360 } },
+            Behaviors = { new SeekTarget2D { Target = () => new Vector2(0, -100), Acceleration = 50, MaxSpeed = 80, MaxTurnRate = 360 } },
         };
         sprite.Update(Context(1.0));
         Assert.Equal(50f, sprite.Speed, 3);
@@ -83,7 +83,7 @@ public class BehaviorTests
         {
             Speed = 10,
             Heading = 45,
-            Behaviors = { new SeekTarget2D { Target = () => null, Accel = 100 } },
+            Behaviors = { new SeekTarget2D { Target = () => null, Acceleration = 100 } },
         };
         sprite.Update(Context(1.0));
         Assert.Equal(10f, sprite.Speed);
@@ -96,7 +96,7 @@ public class BehaviorTests
         var sprite = new Sprite2D
         {
             Center = Vector2.Zero,
-            Behaviors = { new SeekTarget2D { Target = () => new Vector2(5, 0), Accel = 100, ArriveRadius = 10 } },
+            Behaviors = { new SeekTarget2D { Target = () => new Vector2(5, 0), Acceleration = 100, ArriveRadius = 10 } },
         };
         sprite.Update(Context(1.0));
         Assert.Equal(0f, sprite.Speed);
