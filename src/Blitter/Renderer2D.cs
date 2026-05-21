@@ -132,6 +132,12 @@ public abstract class Renderer2D
     /// <summary>Per-channel color scale applied to draw colors.</summary>
     public abstract float ColorScale { get; set; }
 
+    /// <summary>
+    /// The blend mode used for drawing. 
+    /// Defaults to <see cref="Blitter.BlendMode.Alpha"/>, allowing transparency with the color alpha channel.
+    /// </summary>
+    public abstract BlendMode BlendMode { get; set; }
+
     /// <summary>The current draw color.</summary>
     public abstract Color DrawColor { get; set; }
 
@@ -313,7 +319,7 @@ public abstract class Renderer2D
     /// </summary>
     public StateScope PushState()
     {
-        _stateStack.Push(new RendererState(Camera, DrawColor, ClipRect, ColorScale, Scale, ViewPort));
+        _stateStack.Push(new RendererState(Camera, DrawColor, ClipRect, ColorScale, Scale, ViewPort, BlendMode));
         return new StateScope(this);
     }
 
@@ -326,6 +332,7 @@ public abstract class Renderer2D
         ColorScale = s.ColorScale;
         Scale = s.Scale;
         ViewPort = s.ViewPort;
+        BlendMode = s.BlendMode;
     }
 
     // Snapshot of every property a PushState/PopState cycle has to save
@@ -338,7 +345,8 @@ public abstract class Renderer2D
         Rect? ClipRect,
         float ColorScale,
         (float ScaleX, float ScaleY) Scale,
-        Rect? ViewPort);
+        Rect? ViewPort,
+        BlendMode BlendMode);
 
     /// <summary>
     /// A disposable scope returned from <see cref="PushState"/>. Disposing

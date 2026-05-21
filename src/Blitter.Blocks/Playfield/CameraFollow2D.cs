@@ -1,0 +1,88 @@
+namespace Blitter.Blocks;
+
+using System.Numerics;
+
+/// <summary>
+/// Scrolls a <see cref="Camera2D"/> to keep a target sprite inside a
+/// configurable margin of the viewport. The camera holds still while
+/// the target stays within the central dead zone; once the target
+/// enters the margin, the camera shifts just enough to push the
+/// target back to the dead-zone edge. Optionally clamped so the
+/// viewport never extends outside <see cref="WorldBounds"/>.
+/// </summary>
+public class CameraFollow2D : SpriteBehavior2D
+{
+    /// <summary>
+    /// The camera being driven. If <c>null</c>, the behavior does
+    /// nothing — set this to the same <see cref="Camera2D"/> assigned
+    /// to <see cref="Renderer2D.Camera"/>.
+    /// </summary>
+    public Camera2D? Camera { get; set; }
+
+    /// <summary>
+    /// Viewport size in viewport pixels (typically the renderer's
+    /// logical size). Divided by <see cref="Camera2D.Zoom"/> to get
+    /// the visible region in world units.
+    /// </summary>
+    public Vector2 ViewportSize { get; set; }
+
+    /// <summary>
+    /// Fraction of the viewport on each edge (per axis) inside which
+    /// the target triggers scrolling. <c>0.3</c> means the target may
+    /// roam freely in the central 40% of the viewport; once it enters
+    /// the outer 30% on either side, the camera scrolls to keep it on
+    /// the dead-zone edge. Clamped to <c>[0, 0.5]</c>; <c>0.5</c>
+    /// locks the target dead-center.
+    /// </summary>
+    public float MarginFraction { get; set; } = 0.3f;
+
+    /// <summary>
+    /// Optional world rectangle the visible viewport is clamped
+    /// inside. When set, the camera will not scroll past the world
+    /// edges; if an axis of the world is smaller than the viewport,
+    /// the camera centers on that axis.
+    /// </summary>
+    public Rect? WorldBounds { get; set; }
+
+    public override void Apply(Sprite2D target, in UpdateContext2D context)
+    {
+        var cam = Camera;
+        if (cam is null)
+            return;
+
+        var zoom = cam.Zoom > 0f ? cam.Zoom : 1f;
+        var viewWorld = ViewportSize / zoom;
+        if (viewWorld.X <= 0f || viewWorld.Y <= 0f)
+            return;
+
+        var margin = Math.Clamp(MarginFraction, 0f, 0.5f);
+        var halfDead = viewWorld * (0.5f - margin);
+
+        var t = target.Center;
+        var p = cam.Position;
+
+        // Push the camera just enough to put the target back on the
+        // dead-zone edge — no easing in v1.
+        if (t.X < p.X - halfDead.X) p.X = t.X + halfDead.X;
+        else if (t.X > p.X + halfDead.X) p.X = t.X - halfDead.X;
+
+        if (t.Y < p.Y - halfDead.Y) p.Y = t.Y + halfDead.Y;
+        else if (t.Y > p.Y + halfDead.Y) p.Y = t.Y - halfDead.Y;
+
+        // Clamp so the viewport never shows outside the world. If an
+        // axis of the world is smaller than the viewport, center on it
+        // instead of clamping (would otherwise produce an empty range).
+        if (WorldBounds is Rect wb)
+        {
+            var halfView = viewWorld * 0.5f;
+            p.X = wb.Width <= viewWorld.X
+                ? wb.X + wb.Width * 0.5f
+                : Math.Clamp(p.X, wb.X + halfView.X, wb.X + wb.Width - halfView.X);
+            p.Y = wb.Height <= viewWorld.Y
+                ? wb.Y + wb.Height * 0.5f
+                : Math.Clamp(p.Y, wb.Y + halfView.Y, wb.Y + wb.Height - halfView.Y);
+        }
+
+        cam.Position = p;
+    }
+}

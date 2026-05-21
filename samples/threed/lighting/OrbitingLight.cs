@@ -1,0 +1,97 @@
+#:package Blitter@*-*
+
+// Run this file directly with .NET 10 or later:
+//
+//     dotnet run OrbitingLight.cs
+//
+// While Blitter is unpublished, build a local copy first:
+//
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
+
+// A small spinning cube sits at the origin while a bright marker cube
+// orbits around it, representing the directional light's position. 
+// The big cube's lit faces always face the marker -- as the marker swings
+// around, you can watch the bright spot crawl across the cube.
+
+using System.Numerics;
+using Blitter;
+using Blitter.Bits;
+
+// Big lit cube: per-face normals so each face shades uniformly under the directional light.
+var bigCube = Meshes.Cube(new Color(220, 100, 80), size: new Vector3(2f));
+
+// Small unlit white marker cube to show the light's position.
+var markerVerts = new ColorVertex3D[]
+{
+    new(new Vertex3D(-1f, -1f, -1f), Color.White),
+    new(new Vertex3D( 1f, -1f, -1f), Color.White),
+    new(new Vertex3D( 1f,  1f, -1f), Color.White),
+    new(new Vertex3D(-1f,  1f, -1f), Color.White),
+    new(new Vertex3D(-1f, -1f,  1f), Color.White),
+    new(new Vertex3D( 1f, -1f,  1f), Color.White),
+    new(new Vertex3D( 1f,  1f,  1f), Color.White),
+    new(new Vertex3D(-1f,  1f,  1f), Color.White),
+};
+
+var markerIdx = new uint[]
+{
+    4, 5, 6,   4, 6, 7,   1, 0, 3,   1, 3, 2,
+    0, 4, 7,   0, 7, 3,   5, 1, 2,   5, 2, 6,
+    7, 6, 2,   7, 2, 3,   0, 1, 5,   0, 5, 4,
+};
+
+var marker = Mesh.Create(markerVerts, markerIdx);
+
+var window = new Window3D
+{
+    Title = "Orbiting light around a small lit cube",
+    BackgroundColor = new Color(8, 8, 24),
+    FullScreen = true,
+    CloseKey = Key.Escape,
+};
+
+var camera = new PerspectiveCamera
+{
+    Position = new Vector3(0f, 1f, 4f),
+};
+
+await window.RunAsync(rd =>
+{
+    rd.Camera = camera;
+    rd.AmbientLight = new Color(30, 30, 50);
+
+    var t = rd.ElapsedSecondsSinceStart;
+
+    // The light "lives" at this orbit position. Direction to feed the
+    // shader is from the cube (origin) toward this point, so the lit
+    // face is the one pointing at the marker.
+    var lightPos = MathG.Orbit(t, radius: 2.5f, speed: 0.6f)
+        + Vector3.UnitY * (MathF.Sin(t * 0.4f) * 0.8f + 1.2f);
+    rd.DirectionalLight = new DirectionalLight(
+        Vector3.Normalize(lightPos),
+        Color.White);
+
+    // Big cube: small (~0.6 unit half-extent) and gently spinning.
+    var bigModel = Matrix4x4
+        .CreateScale(0.6f)
+        .RotateY(t * 0.5f)
+        .RotateX(t * 0.25f);
+
+    using (rd.PushState())
+    {
+        rd.CullMode = CullMode.Back;
+        rd.DrawMesh(bigCube, Shaders.LitColor, new LitArgs(bigModel));
+    }
+
+    // Marker: small unlit white cube parked at the light's orbit position.
+    // Uses the unlit transform shader -- it ignores ambient and directional state entirely.
+    var markerModel = Matrix4x4
+        .CreateScale(0.08f)
+        .Translate(lightPos);
+
+    using (rd.PushState())
+    {
+        rd.CullMode = CullMode.Back;
+        rd.DrawMesh(marker, Shaders.PositionColorWithTransform, markerModel);
+    }
+});

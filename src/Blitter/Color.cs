@@ -96,11 +96,8 @@ public readonly struct Color : IEquatable<Color>
     }
 
     /// <summary>
-    /// Linear interpolation between <paramref name="a"/> and
-    /// <paramref name="b"/> per channel (RGB and alpha) at parameter
-    /// <paramref name="t"/>. <paramref name="t"/> is clamped to [0, 1].
-    /// Interpolation happens in 8-bit sRGB space; for perceptually
-    /// uniform blending, convert to HSV first.
+    /// Linear interpolate the color between <paramref name="a"/> and <paramref name="b"/> 
+    /// per channel (R,G,B,A) independently using <paramref name="t"/> as percentage.
     /// </summary>
     public static Color Lerp(Color a, Color b, float t)
     {

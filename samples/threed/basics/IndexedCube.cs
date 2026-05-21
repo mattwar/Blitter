@@ -1,0 +1,108 @@
+#:package Blitter@*-*
+
+// Run this file directly with .NET 10 or later:
+//
+//     dotnet run IndexedCube.cs
+//
+// While Blitter is unpublished, build a local copy first:
+//
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
+
+// A spinning cube built from an indexed mesh: 8 unique vertices reused
+// across 12 triangles via 36 indices. Without indices the same geometry
+// would need 36 vertices -- one full copy of position + color for every
+// triangle corner, even though every vertex is shared by three faces.
+
+using System.Numerics;
+using Blitter;
+using Blitter.Bits;
+
+// 8 unique corners of a unit cube centred on the origin. Each gets its
+// own color so face interpolation makes the cube's structure obvious.
+//
+//        v3---------v2
+//       /|         /|
+//      v7---------v6|
+//      | |        | |
+//      | v0-------|v1
+//      |/         |/
+//      v4---------v5
+//
+var vertices = new ColorVertex3D[]
+{
+    new(new Vertex3D(-1f, -1f, -1f), new Color(40,  40, 200)),  // 0: back-bottom-left
+    new(new Vertex3D( 1f, -1f, -1f), new Color(200, 40,  40)),  // 1: back-bottom-right
+    new(new Vertex3D( 1f,  1f, -1f), new Color(200, 200, 40)),  // 2: back-top-right
+    new(new Vertex3D(-1f,  1f, -1f), new Color(40,  200, 40)),  // 3: back-top-left
+    new(new Vertex3D(-1f, -1f,  1f), new Color(40,  200, 200)), // 4: front-bottom-left
+    new(new Vertex3D( 1f, -1f,  1f), new Color(200, 40,  200)), // 5: front-bottom-right
+    new(new Vertex3D( 1f,  1f,  1f), new Color(255, 255, 255)), // 6: front-top-right
+    new(new Vertex3D(-1f,  1f,  1f), new Color(80,  80,  80)),  // 7: front-top-left
+};
+
+// 12 triangles, 3 indices each. Each face's triangles are wound
+// counter-clockwise when viewed from outside the cube so the GPU
+// classifies them as front-facing under the default right-hand rule.
+var indices = new uint[]
+{
+    // Front face (+Z): looking from +Z, CCW
+    4, 5, 6,   4, 6, 7,
+    // Back face (-Z): looking from -Z, CCW (so reversed from +Z view)
+    1, 0, 3,   1, 3, 2,
+    // Left face (-X): looking from -X, CCW
+    0, 4, 7,   0, 7, 3,
+    // Right face (+X): looking from +X, CCW
+    5, 1, 2,   5, 2, 6,
+    // Top face (+Y): looking from +Y, CCW
+    7, 6, 2,   7, 2, 3,
+    // Bottom face (-Y): looking from -Y, CCW
+    0, 1, 5,   0, 5, 4,
+};
+
+var cube = Mesh.Create(vertices, indices);
+
+var window = new Window3D
+{
+    Title = "Indexed cube: 8 vertices, 36 indices",
+    BackgroundColor = new Color(8, 8, 24),
+    FullScreen = true,
+    CloseKey = Key.Escape,
+};
+
+var camera = new PerspectiveCamera
+{
+    Position = new Vector3(0f, 1.5f, 5f),
+};
+
+await window.RunAsync(rd =>
+{
+    rd.Camera = camera;
+
+    var t = rd.ElapsedSecondsSinceStart;
+
+    // rotate the cube over time
+    var transform = Matrix4x4.CreateRotationY(t * 0.7f).RotateX(t * 0.4f);
+    using (rd.PushState())
+    {
+        rd.CullMode = CullMode.Back;
+        rd.DrawMesh(cube, Shaders.PositionColorWithTransform, transform);
+    }
+
+    var viewProjection = camera.GetViewProjection(rd);
+    using (rd.PushState())
+    {
+        rd.DepthMode = DepthMode.Overlay;
+        rd.CullMode = CullMode.None;
+
+        DrawLabel(rd, "8 vertices, 36 indices (vs 36 vertices unindexed)", yOffset: -1.6f, viewProjection);
+    }
+});
+
+static void DrawLabel(Renderer3D renderer, string text, float yOffset, Matrix4x4 viewProjection)
+{
+    const float scale = 0.08f;
+    var transform = Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f)
+        .Scale(scale)
+        .Translate(0f, yOffset, 0f);
+    renderer.DrawDebugText(text, transform * viewProjection);
+}

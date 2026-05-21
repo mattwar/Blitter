@@ -24,16 +24,12 @@ public class Scene2D
 
     public Scene2D()
     {
-        Layers = new LayerCollection(this);
     }
 
     /// <summary>
-    /// The layers in this scene, back-to-front. Populate using a
-    /// collection initializer (e.g.
-    /// <c>new Scene2D { Layers = { backgroundLayer, playField, hud } }</c>).
-    /// Layers are intended to be configured at scene construction.
+    /// The layers in this scene, back-to-front.
     /// </summary>
-    public LayerCollection Layers { get; }
+    public List<Layer2D> Layers { get; } = new();
 
     /// <summary>
     /// Scene-wide behaviors that run each tick before layers update.
@@ -49,7 +45,7 @@ public class Scene2D
         foreach (var behavior in Behaviors)
         {
             if (behavior.Enabled)
-                behavior.Update(this, in context);
+                behavior.Apply(this, in context);
         }
 
         foreach (var layer in Layers)

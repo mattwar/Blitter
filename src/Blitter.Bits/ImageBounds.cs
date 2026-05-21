@@ -44,10 +44,74 @@ public static class ImageBounds
     }
 
     /// <summary>
-    /// Gets the minimal axis-aligned bounding circle that contains every pixel.
+    /// Gets a tight bounding circle for the opaque pixels using
+    /// Ritter's algorithm. Handles off-center / asymmetric shapes
+    /// far better than the rect-circumscribing circle.
     /// </summary>
-    public static BoundingCircle ComputeOpaqueCircle(this Bitmap image, byte alphaThreshold = 0) =>
-        BoundingCircle.FromRect(image.ComputeOpaqueBounds(alphaThreshold));
+    public static BoundingCircle ComputeOpaqueCircle(this Bitmap image, byte alphaThreshold = 0)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        var bounds = image.ComputeOpaqueBounds(alphaThreshold);
+        if (bounds.IsEmpty) return BoundingCircle.Empty;
+
+        int xMin = (int)bounds.Min.X;
+        int yMin = (int)bounds.Min.Y;
+        int xMax = (int)bounds.Max.X;
+        int yMax = (int)bounds.Max.Y;
+
+        // Pass 1: find P1, the farthest opaque pixel from the rect
+        // center. This becomes one end of the seed diameter.
+        var seed = bounds.Center;
+        Vector2 p1 = seed;
+        float maxSq = -1f;
+        for (int y = yMin; y < yMax; y++)
+        {
+            for (int x = xMin; x < xMax; x++)
+            {
+                if (image.GetPixel(x, y).A <= alphaThreshold) continue;
+                var p = new Vector2(x + 0.5f, y + 0.5f);
+                var sq = Vector2.DistanceSquared(seed, p);
+                if (sq > maxSq) { maxSq = sq; p1 = p; }
+            }
+        }
+
+        // Pass 2: find P2, the farthest opaque pixel from P1. The
+        // segment P1-P2 is the seed diameter for the bounding circle.
+        Vector2 p2 = p1;
+        maxSq = -1f;
+        for (int y = yMin; y < yMax; y++)
+        {
+            for (int x = xMin; x < xMax; x++)
+            {
+                if (image.GetPixel(x, y).A <= alphaThreshold) continue;
+                var p = new Vector2(x + 0.5f, y + 0.5f);
+                var sq = Vector2.DistanceSquared(p1, p);
+                if (sq > maxSq) { maxSq = sq; p2 = p; }
+            }
+        }
+        var center = (p1 + p2) * 0.5f;
+        var radius = MathF.Sqrt(maxSq) * 0.5f;
+
+        // Pass 3: Ritter expansion on pixel centers. For any pixel
+        // still outside the current circle, grow + shift to include
+        // it. After the loop, pad the radius by a half-pixel diagonal
+        // so the full pixel (not just its center) is enclosed.
+        for (int y = yMin; y < yMax; y++)
+        {
+            for (int x = xMin; x < xMax; x++)
+            {
+                if (image.GetPixel(x, y).A <= alphaThreshold) continue;
+                var p = new Vector2(x + 0.5f, y + 0.5f);
+                var d = Vector2.Distance(center, p);
+                if (d <= radius) continue;
+                var newRadius = (radius + d) * 0.5f;
+                center += (d - radius) / (2f * d) * (p - center);
+                radius = newRadius;
+            }
+        }
+        radius += MathF.Sqrt(0.5f);
+        return new BoundingCircle(center, radius);
+    }
 
     /// <summary>
     /// Computes a nominal set of axis-aligned bounding rectangles that cover every pixel.

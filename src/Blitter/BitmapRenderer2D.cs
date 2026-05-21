@@ -33,6 +33,11 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
     {
         _rendererId = rendererId;
         ApplySyncMode(base.SyncMode);
+        // SDL defaults primitive draws to BLENDMODE_NONE, which writes
+        // the source RGB ignoring its alpha. Switch to standard alpha
+        // blending so colors with A < 255 are translucent as expected
+        // (panels, overlays, HUDs, particles).
+        SDL.SetRenderDrawBlendMode(_rendererId, SDL.BlendMode.Blend);
     }
 
     internal nint RendererId => _rendererId;
@@ -164,21 +169,34 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         }
     }
 
-    /// <summary>The current blend mode used for drawing operations.</summary>
-    internal SDL.BlendMode BlendMode
+    /// <inheritdoc/>
+    public override BlendMode BlendMode
     {
         get
         {
             if (IsDisposed)
-                return default;
+                return BlendMode.Alpha;
             SDL.GetRenderDrawBlendMode(_rendererId, out var mode);
-            return mode;
+            return mode switch
+            {
+                SDL.BlendMode.None => BlendMode.Opaque,
+                SDL.BlendMode.Add => BlendMode.Additive,
+                SDL.BlendMode.Mul => BlendMode.Multiply,
+                _ => BlendMode.Alpha,
+            };
         }
         set
         {
             if (IsDisposed)
                 return;
-            SDL.SetRenderDrawBlendMode(_rendererId, value);
+            var sdlMode = value switch
+            {
+                BlendMode.Opaque => SDL.BlendMode.None,
+                BlendMode.Additive => SDL.BlendMode.Add,
+                BlendMode.Multiply => SDL.BlendMode.Mul,
+                _ => SDL.BlendMode.Blend,
+            };
+            SDL.SetRenderDrawBlendMode(_rendererId, sdlMode);
         }
     }
 
