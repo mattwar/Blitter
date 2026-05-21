@@ -2,7 +2,7 @@
 
 // Run this file directly with .NET 10 or later:
 //
-//     dotnet run samples/SpinningTexturedTriangle.cs
+//     dotnet run SpinningTexturedTriangle.cs
 //
 // While Blitter is unpublished, build a local copy first:
 //

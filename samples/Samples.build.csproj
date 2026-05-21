@@ -45,7 +45,8 @@
           Outputs="$(IntermediateOutputPath)samples.verified.stamp">
 
     <ItemGroup>
-      <SampleFile Include="$(MSBuildThisFileDirectory)*.cs" />
+      <SampleFile Include="$(MSBuildThisFileDirectory)**\*.cs"
+                  Exclude="$(MSBuildThisFileDirectory)**\bin\**;$(MSBuildThisFileDirectory)**\obj\**" />
       <BlitterSource Include="$(MSBuildThisFileDirectory)..\src\**\*.cs"
                    Exclude="$(MSBuildThisFileDirectory)..\src\**\bin\**;$(MSBuildThisFileDirectory)..\src\**\obj\**" />
     </ItemGroup>

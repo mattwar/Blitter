@@ -2,7 +2,7 @@
 
 // Run this file directly with .NET 10 or later:
 //
-//     dotnet run samples/FallingBlocks.cs
+//     dotnet run FallingBlocks.cs
 //
 // While Blitter is unpublished, build a local copy first:
 //

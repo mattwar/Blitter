@@ -1,8 +1,8 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
-//     dotnet run samples/RenderToImage.cs
+//     dotnet run RenderToImage.cs
 
 // Renders a 3D scene into a CPU-resident Texture2D and saves it as a .bmp file, no window required.
 

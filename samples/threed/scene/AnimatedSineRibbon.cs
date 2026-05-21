@@ -2,7 +2,7 @@
 
 // Run this file directly with .NET 10 or later:
 //
-//     dotnet run samples/AnimatedSineRibbon.cs
+//     dotnet run AnimatedSineRibbon.cs
 //
 // While Blitter is unpublished, build a local copy first:
 //
