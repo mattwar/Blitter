@@ -4,10 +4,8 @@ using System.Numerics;
 namespace Blitter.Blocks;
 
 /// <summary>
-/// Scene layer that draws short-lived drifting text labels — score
-/// popups, damage numbers, pickup names, status callouts. Items
-/// added via <see cref="Add"/> drift along their velocity, fade out
-/// over their lifetime, and self-remove when expired.
+/// Scene layer that draws short-lived drifting text labels.
+/// Use for score popups, damage numbers, pickup names, status callouts.
 /// </summary>
 public sealed class FloatingTextLayer2D : Layer2D
 {
@@ -15,22 +13,24 @@ public sealed class FloatingTextLayer2D : Layer2D
     public required Font Font { get; init; }
 
     /// <summary>
-    /// When true, popups are screen-locked: the layer detaches the
-    /// camera while drawing. When false (default), popups live in
-    /// world space and scroll with the camera.
+    /// When true, popups are screen-locked: the layer detaches the camera while drawing. 
+    /// When false (default), popups live in world space and scroll with the camera.
     /// </summary>
     public bool ScreenSpace { get; init; }
 
-    /// <summary>Default drift velocity when callers omit it. Pixels/sec.</summary>
+    /// <summary>
+    /// Default drift velocity when callers omit it. Pixels/sec.
+    /// </summary>
     public Vector2 DefaultVelocity { get; set; } = new(0f, -90f);
 
-    /// <summary>Default lifetime when callers omit it.</summary>
+    /// <summary>
+    /// Default lifetime of floating items, when callers omit it.
+    /// </summary>
     public TimeSpan DefaultLifetime { get; set; } = TimeSpan.FromSeconds(1.2);
 
     /// <summary>
-    /// Hard cap on simultaneously-active popups. Oldest are dropped
-    /// when this is reached; keeps a runaway spawner from unbounded
-    /// growth.
+    /// Hard cap on simultaneously-active popups. 
+    /// Oldest are dropped in favor of the newer ones.
     /// </summary>
     public int MaxItems { get; set; } = 256;
 
@@ -48,8 +48,8 @@ public sealed class FloatingTextLayer2D : Layer2D
     }
 
     /// <summary>
-    /// Spawns a popup. <paramref name="position"/> is world-space when
-    /// <see cref="ScreenSpace"/> is false, otherwise screen-space.
+    /// Spawns a popup floating popup.
+    /// The <paramref name="position"/> is world-space when <see cref="ScreenSpace"/> is false, otherwise screen-space.
     /// </summary>
     public void Add(
         string text,
@@ -74,10 +74,14 @@ public sealed class FloatingTextLayer2D : Layer2D
         });
     }
 
-    /// <summary>Drops every active popup.</summary>
+    /// <summary>
+    /// Clears all floating texts.
+    /// </summary>
     public void Clear() => _items.Clear();
 
-    /// <summary>Currently-active popup count.</summary>
+    /// <summary>
+    /// The number of active floating texts.
+    /// </summary>
     public int Count => _items.Count;
 
     public override void Update(in UpdateContext2D context)
