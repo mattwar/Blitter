@@ -15,7 +15,7 @@ public sealed class CustomLayer2D : Layer2D
         OnUpdate?.Invoke(context);
     }
 
-    public override void Draw(Renderer2D renderer)
+    protected override void DrawContent(Renderer2D renderer)
     {
         OnRender?.Invoke(renderer);
     }

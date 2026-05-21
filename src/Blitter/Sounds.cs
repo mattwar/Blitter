@@ -115,9 +115,13 @@ public static class Sounds
             vibratoDepth: 0.45f);
 
     /// <summary>Alternating two-tone alarm. Lower note is a perfect fourth below <paramref name="rootNote"/>.</summary>
-    public static Sound CreateKlaxon(float duration = 1.0f, float rootNote = Notes.A4, float volume = 0.5f)
+    public static Sound CreateKlaxon(
+        float duration = 1.0f,
+        float rootNote = Notes.A4,
+        float volume = 0.5f,
+        float beatDuration = 0.15f)
     {
-        const float beat = 0.15f;
+        float beat = MathF.Max(0.02f, beatDuration);
         int beats = Math.Max(2, (int)MathF.Round(duration / beat));
         float lowNote = rootNote / PerfectFourth;
         var parts = new Sound[beats];
@@ -130,14 +134,19 @@ public static class Sounds
     }
 
     /// <summary>Fast vibrato centered on <paramref name="centerNote"/> — wobbly UFO.</summary>
-    public static Sound CreateWarble(float duration = 0.8f, float centerNote = Notes.G5, float volume = 0.4f) =>
+    public static Sound CreateWarble(
+        float duration = 0.8f,
+        float centerNote = Notes.G5,
+        float volume = 0.4f,
+        float vibratoHz = 14f,
+        float vibratoDepth = 0.18f) =>
         Sound.Tone(
             frequency: centerNote,
             duration: duration,
             wave: Waveform.Square,
             volume: volume,
-            vibratoHz: 14f,
-            vibratoDepth: 0.18f);
+            vibratoHz: vibratoHz,
+            vibratoDepth: vibratoDepth);
 
     /// <summary>Short downward chirp sweeping an octave below <paramref name="startNote"/>.</summary>
     public static Sound CreateBounce(float startNote = Notes.F5, float volume = 0.5f) =>

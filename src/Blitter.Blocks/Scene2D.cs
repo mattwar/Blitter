@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+using System.Collections;
 
 namespace Blitter.Blocks;
 
@@ -20,74 +20,20 @@ public enum RunState
 /// </summary>
 public class Scene2D
 {
-    private ImmutableList<Layer2D> _layers;
     private Window2D? _window;
 
     public Scene2D()
     {
-        _layers = ImmutableList<Layer2D>.Empty;
-    }
-
-    public Scene2D(IEnumerable<Layer2D> layers)
-    {
-        _layers = AdoptAll(layers);
-    }
-
-    public Scene2D(params Layer2D[] layers)
-    {
-        _layers = AdoptAll(layers);
-    }
-
-    private ImmutableList<Layer2D> AdoptAll(IEnumerable<Layer2D> layers)
-    {
-        var list = layers.ToImmutableList();
-        foreach (var layer in list)
-        {
-            layer._scene?.RemoveLayer(layer);
-            layer._scene = this;
-        }
-        return list;
-    }
-
-    /// <summary>The layers in this scene, back-to-front.</summary>
-    public ImmutableList<Layer2D> Layers => _layers;
-
-    /// <summary>
-    /// Add a new layer to the scene.
-    /// This new layer becomes the topmost layer.
-    /// </summary>
-    public void AddLayer(Layer2D layer)
-    {
-        var existing = layer._scene;
-        if (existing == this)
-            return;
-        existing?.RemoveLayer(layer);
-        ImmutableInterlocked.Update(ref _layers, (list, l) => list.Add(l), layer);
-        layer._scene = this;
+        Layers = new LayerCollection(this);
     }
 
     /// <summary>
-    /// Inserts <paramref name="layer"/> at <paramref name="index"/>.
-    /// Lower indexes render first (further back).
+    /// The layers in this scene, back-to-front. Populate using a
+    /// collection initializer (e.g.
+    /// <c>new Scene2D { Layers = { backgroundLayer, playField, hud } }</c>).
+    /// Layers are intended to be configured at scene construction.
     /// </summary>
-    public void InsertLayer(int index, Layer2D layer)
-    {
-        var existing = layer._scene;
-        if (existing != null && existing != this)
-            existing.RemoveLayer(layer);
-        ImmutableInterlocked.Update(ref _layers, (list, args) => list.Insert(args.index, args.layer), (index, layer));
-        layer._scene = this;
-    }
-
-    /// <summary>
-    /// Removes a layer from the scene.
-    /// </summary>
-    public void RemoveLayer(Layer2D layer)
-    {
-        ImmutableInterlocked.Update(ref _layers, (list, l) => list.Remove(l), layer);
-        if (layer._scene == this)
-            layer._scene = null;
-    }
+    public LayerCollection Layers { get; }
 
     /// <summary>
     /// Scene-wide behaviors that run each tick before layers update.
@@ -106,8 +52,7 @@ public class Scene2D
                 behavior.Update(this, in context);
         }
 
-        var layers = _layers;
-        foreach (var layer in layers)
+        foreach (var layer in Layers)
         {
             if (layer.Enabled)
                 layer.Update(in context);
@@ -132,8 +77,7 @@ public class Scene2D
     /// </summary>
     internal void Draw(Renderer2D renderer)
     {
-        var layers = _layers;
-        foreach (var layer in layers)
+        foreach (var layer in Layers)
         {
             if (layer.Visible)
                 layer.Draw(renderer);

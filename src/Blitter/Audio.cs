@@ -50,7 +50,31 @@ public static class Audio
         if (device.Streams.Count >= MaxConcurrentPlays)
             return Task.CompletedTask;
 
-        return device.PlayAsync(data, volume);
+        try
+        {
+            return device.PlayAsync(data, volume);
+        }
+        catch (InvalidOperationException) when (device.IsDisposed)
+        {
+            // The shared device invalidated itself mid-call (e.g. the
+            // OS swapped audio endpoints). Open a fresh one and retry
+            // once so a transient SDL hiccup doesn't kill audio for the
+            // rest of the process. Flush the cached physical-device
+            // enumeration too — those handles are produced by SDL at
+            // enumeration time and can become stale across an endpoint
+            // change, so reusing them just causes SDL_OpenAudioDevice
+            // to fail with "Invalid audio device instance ID".
+            lock (_sharedPlaybackDeviceLock)
+            {
+                if (_sharedPlaybackDevice == device)
+                    _sharedPlaybackDevice = null;
+                _playbackDevices = null;
+            }
+            var fresh = GetSharedPlaybackDevice();
+            if (fresh.Streams.Count >= MaxConcurrentPlays)
+                return Task.CompletedTask;
+            return fresh.PlayAsync(data, volume);
+        }
     }
 
     // Cap matches what real game-audio mixers typically expose.
@@ -69,7 +93,20 @@ public static class Audio
         {
             if (_sharedPlaybackDevice == null || _sharedPlaybackDevice.IsDisposed)
             {
-                _sharedPlaybackDevice = DefaultPlaybackDevice.Open();
+                try
+                {
+                    _sharedPlaybackDevice = DefaultPlaybackDevice.Open();
+                }
+                catch (InvalidOperationException)
+                {
+                    // The cached physical-device id from the last
+                    // SDL_GetAudioPlaybackDevices enumeration may have
+                    // gone stale (e.g. the OS swapped endpoints while
+                    // audio was idle). Flush the enumeration and retry
+                    // once against the freshly-queried default device.
+                    _playbackDevices = null;
+                    _sharedPlaybackDevice = DefaultPlaybackDevice.Open();
+                }
             }
             return _sharedPlaybackDevice;
         }

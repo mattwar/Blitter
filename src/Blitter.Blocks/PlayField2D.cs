@@ -214,7 +214,7 @@ public class PlayField2D : Layer2D
         }
     }
 
-    public override void Draw(Renderer2D renderer)
+    protected override void DrawContent(Renderer2D renderer)
     {
         DrawBackground(renderer);
 

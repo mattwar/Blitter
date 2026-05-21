@@ -12,7 +12,7 @@ public class SceneTests
             UpdateCount++;
         }
 
-        public override void Draw(Renderer2D renderer)
+        protected override void DrawContent(Renderer2D renderer)
         {
             RenderCount++;
         }
@@ -23,7 +23,7 @@ public class SceneTests
     {
         var a = new FakeLayer();
         var b = new FakeLayer();
-        var scene = new Scene2D(a, b);
+        var scene = new Scene2D { Layers = { a, b } };
 
         scene.Update(new UpdateContext2D());
 
@@ -36,7 +36,7 @@ public class SceneTests
     {
         var a = new FakeLayer { Enabled = false };
         var b = new FakeLayer();
-        var scene = new Scene2D(a, b);
+        var scene = new Scene2D { Layers = { a, b } };
 
         scene.Update(new UpdateContext2D());
 
@@ -45,13 +45,13 @@ public class SceneTests
     }
 
     [Fact]
-    public void AddLayer_ExposesAddedLayerToFutureUpdates()
+    public void Layers_AddAfterConstructionTicksTheLayer()
     {
         var initial = new FakeLayer();
-        var scene = new Scene2D(initial);
+        var scene = new Scene2D { Layers = { initial } };
 
         var added = new FakeLayer();
-        scene.AddLayer(added);
+        scene.Layers.Add(added);
 
         scene.Update(new UpdateContext2D());
 
@@ -60,13 +60,13 @@ public class SceneTests
     }
 
     [Fact]
-    public void RemoveLayer_StopsTickingRemovedLayer()
+    public void Layers_RemoveStopsTickingTheLayer()
     {
         var a = new FakeLayer();
         var b = new FakeLayer();
-        var scene = new Scene2D(a, b);
+        var scene = new Scene2D { Layers = { a, b } };
 
-        scene.RemoveLayer(a);
+        Assert.True(scene.Layers.Remove(a));
         scene.Update(new UpdateContext2D());
 
         Assert.Equal(0, a.UpdateCount);
