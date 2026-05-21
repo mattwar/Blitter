@@ -14,7 +14,7 @@ public class BounceInBounds2D : SpriteBehavior2D
     /// </summary>
     public Action<Sprite2D>? OnBounce { get; set; }
 
-    public override void Update(Sprite2D target, in UpdateContext2D context)
+    public override void Apply(Sprite2D target, in UpdateContext2D context)
     {
         var bounds = context.Bounds;
         var bounced = false;

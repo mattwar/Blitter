@@ -6,9 +6,9 @@ namespace Blitter.Blocks;
 public abstract class SpriteBehavior2D : Behavior2D
 {
     /// <summary>
-    /// Advance the target sprite by one tick.
+    /// Apply this behavior to <paramref name="target"/> for one frame.
     /// </summary>
-    public virtual void Update(Sprite2D target, in UpdateContext2D context) {}
+    public virtual void Apply(Sprite2D target, in UpdateContext2D context) {}
 
     /// <summary>
     /// Invoked when the host sprite's <see cref="Sprite2D.HitCircle"/>

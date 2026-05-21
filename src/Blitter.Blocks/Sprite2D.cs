@@ -97,13 +97,13 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     {
     }
 
-    /// <summary>Tick every enabled behavior in order.</summary>
+    /// <summary>Apply every enabled behavior in order.</summary>
     public virtual void Update(in UpdateContext2D context)
     {
         foreach (var behavior in this.Behaviors)
         {
             if (behavior.Enabled)
-                behavior.Update(this, in context);
+                behavior.Apply(this, in context);
         }
     }
 

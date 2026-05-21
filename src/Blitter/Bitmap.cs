@@ -142,7 +142,7 @@ public sealed class Bitmap : Texture2D
             renderer.AutoClear = false;
             var savedBlend = renderer.BlendMode;
             var savedColor = renderer.DrawColor;
-            renderer.BlendMode = SDL.BlendMode.Blend;
+            renderer.BlendMode = BlendMode.Alpha;
             renderer.DrawColor = backgroundColor;
             var (w, h) = Size;
             renderer.DrawFillRect(new Rect(0, 0, w, h));

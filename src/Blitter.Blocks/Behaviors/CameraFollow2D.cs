@@ -44,7 +44,7 @@ public class CameraFollow2D : SpriteBehavior2D
     /// </summary>
     public Rect? WorldBounds { get; set; }
 
-    public override void Update(Sprite2D target, in UpdateContext2D context)
+    public override void Apply(Sprite2D target, in UpdateContext2D context)
     {
         var cam = Camera;
         if (cam is null)

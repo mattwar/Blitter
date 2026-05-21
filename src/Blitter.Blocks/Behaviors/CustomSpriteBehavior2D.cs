@@ -3,7 +3,7 @@ namespace Blitter.Blocks;
 /// <summary>
 /// Per-frame callback for a <see cref="CustomSpriteBehavior2D"/>.
 /// </summary>
-public delegate void SpriteUpdater(Sprite2D target, in UpdateContext2D context);
+public delegate void SpriteApplier(Sprite2D target, in UpdateContext2D context);
 
 /// <summary>
 /// A <see cref="SpriteBehavior2D"/> that delegates its per-frame work to supplied callbacks.
@@ -14,7 +14,7 @@ public sealed class CustomSpriteBehavior2D : SpriteBehavior2D
     {
     }
 
-    public SpriteUpdater? OnUpdate { get; set; }
+    public SpriteApplier? OnApply { get; set; }
 
     /// <summary>Invoked for each sprite the host overlaps this frame.</summary>
     public Action<Sprite2D, Sprite2D>? OnSpriteHit { get; set; }
@@ -22,8 +22,8 @@ public sealed class CustomSpriteBehavior2D : SpriteBehavior2D
     /// <summary>Invoked for each barrier the host overlaps this frame.</summary>
     public Action<Sprite2D, Barrier2D>? OnBarrierHit { get; set; }
 
-    public override void Update(Sprite2D target, in UpdateContext2D context)
-        => OnUpdate?.Invoke(target, in context);
+    public override void Apply(Sprite2D target, in UpdateContext2D context)
+        => OnApply?.Invoke(target, in context);
 
     public override void OnHitSprite(Sprite2D self, Sprite2D other, in UpdateContext2D context)
         => OnSpriteHit?.Invoke(self, other);

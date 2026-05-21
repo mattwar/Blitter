@@ -18,7 +18,7 @@ public class Motion2D : SpriteBehavior2D
     // MinUpdateInterval; carried forward to the next Update.
     private TimeSpan _pendingDelta;
 
-    public override void Update(Sprite2D target, in UpdateContext2D context)
+    public override void Apply(Sprite2D target, in UpdateContext2D context)
     {
         if (context.ElapsedSinceLastUpdate == TimeSpan.Zero)
             return;

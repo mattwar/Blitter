@@ -49,7 +49,7 @@ public class Scene2D
         foreach (var behavior in Behaviors)
         {
             if (behavior.Enabled)
-                behavior.Update(this, in context);
+                behavior.Apply(this, in context);
         }
 
         foreach (var layer in Layers)

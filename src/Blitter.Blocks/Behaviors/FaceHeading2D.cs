@@ -14,7 +14,7 @@ public class FaceHeading2D : SpriteBehavior2D
     /// </summary>
     public float RotationOffset { get; set; }
 
-    public override void Update(Sprite2D target, in UpdateContext2D context)
+    public override void Apply(Sprite2D target, in UpdateContext2D context)
     {
         target.Rotation = target.Heading + RotationOffset;
     }

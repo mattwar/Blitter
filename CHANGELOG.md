@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- `SpriteBehavior2D.Update` and `SceneBehavior2D.Update` renamed to
+  `Apply` to reflect that a behavior mutates someone else's state.
+- `CustomSpriteBehavior2D.OnUpdate` / `CustomSceneBehavior2D.OnUpdate`
+  renamed to `OnApply`; delegates `SpriteUpdater` / `SceneUpdater`
+  renamed to `SpriteApplier` / `SceneApplier`.
 - `LogicalPlaybackDevice`: applies an automatic equal-loudness mix
   attenuation (`1 / sqrt(activeStreams)`) on top of the user's
   `Volume` so several overlapping sounds no longer sum to a clipping
@@ -30,6 +35,22 @@ All notable changes to this project will be documented in this file.
   `Layers.Remove` remain for the rare case of dynamic layer changes.
 
 ### Added
+- `Spawner2D`: scene behavior that periodically adds sprites to a
+  `PlayField2D`. Configurable `Interval`, `Jitter`, `StartDelay`,
+  `MaxAlive` (with optional `Filter`), `MaxTotal`, `Paused`, and a
+  `Burst(count)` method. Raises `Spawned` after each add.
+- `PulseTint2D`: sprite behavior that sine-cycles `Sprite2D.Tint`
+  between `Low` and `High` over `Period`, keyed off sprite age.
+- `FloatingTextLayer2D`: scene layer for drift-and-fade text popups
+  (score deltas, damage numbers, callouts). World- or screen-space,
+  per-popup color / scale / velocity / lifetime.
+- `ScoreLayer2D`: anchored HUD score readout. Owns the running
+  `Score`, pulses on change, and (optionally) forwards "+N" / "-N"
+  popups to a paired `FloatingTextLayer2D`.
+- `HudAnchor`: enum for the nine common HUD anchor points
+  (TopLeft .. BottomRight) used by `ScoreLayer2D`.
+- `FallingBlocks` sample: minimal showcase of `Spawner2D` — colored
+  squares rain from the top of the window; Space pauses, Escape exits.
 - `Sounds.CreateKlaxon` takes a `beatDuration` parameter (default
   0.15 s) to control the two-tone alternation rate.
 - `Sounds.CreateWarble` takes `vibratoHz` (default 14) and
@@ -84,6 +105,11 @@ All notable changes to this project will be documented in this file.
   parallax factor for use as a space backdrop.
 
 ### Fixed
+- `BitmapRenderer2D` now enables alpha blending at construction so
+  primitive draws (`DrawFillRect`, `DrawGeometry`, `DrawLine`) honor
+  source alpha instead of writing opaque RGB. Blend mode is also now
+  a public `BlendMode` property on `Renderer2D` and is saved /
+  restored by `PushState`.
 - `Audio.GetSharedPlaybackDevice` / `Audio.PlayAsync` recovery: also
   flush the cached `Audio.PlaybackDevices` enumeration when the shared
   device gets torn down, and retry once if the very first `Open()`

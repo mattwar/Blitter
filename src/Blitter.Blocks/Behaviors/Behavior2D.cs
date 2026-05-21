@@ -6,7 +6,7 @@ namespace Blitter.Blocks;
 public abstract class Behavior2D
 {
     /// <summary>
-    /// When false the host skips this behavior's update for the frame.
+    /// When false the host skips this behavior for the frame.
     /// </summary>
     public bool Enabled { get; set; } = true;
 }

@@ -9,9 +9,9 @@ namespace Blitter.Blocks;
 /// </summary>
 public abstract class SceneBehavior2D
 {
-    /// <summary>When false the scene skips this behavior's update.</summary>
+    /// <summary>When false the scene skips this behavior.</summary>
     public bool Enabled { get; set; } = true;
 
-    /// <summary>Run this behavior for one tick of <paramref name="scene"/>.</summary>
-    public abstract void Update(Scene2D scene, in UpdateContext2D context);
+    /// <summary>Apply this behavior to <paramref name="scene"/> for one frame.</summary>
+    public abstract void Apply(Scene2D scene, in UpdateContext2D context);
 }

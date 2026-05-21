@@ -43,8 +43,24 @@ var scoreTint = new Color(255, 215, 0); // gold
 // Big font for the end-of-game banner.
 var bannerFont = new Font(["Consolas", "Menlo"], 160, bold: true);
 
-// Running score: each gold asteroid destroyed pops a value.
-int score = 0;
+// HUD score readout + drift-and-fade popups for points awarded.
+var popups = new FloatingTextLayer2D
+{
+    Font = scoreFont,
+    DefaultLifetime = TimeSpan.FromSeconds(1.2),
+    DefaultVelocity = new Vector2(0f, -90f),
+};
+
+var scoreboard = new ScoreLayer2D
+{
+    Font = scoreFont,
+    Anchor = HudAnchor.TopLeft,
+    Offset = new Vector2(20f, 60f),
+    Color = scoreTint,
+    Popups = popups,
+    PositivePopupColor = scoreTint,
+    NegativePopupColor = new Color(120, 255, 120),
+};
 
 // Set by the exit behavior when the run ends. The HUD layer reads
 // this to draw a "GAME OVER" banner during the exit-delay window.
@@ -58,7 +74,7 @@ rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0));
 
 // create meteor field - small static obstacles for the rocket to hit
 var asteroidImage = Bitmap.Load(Asset.GetPathRelativeToCaller("asteroid.png"));
-var asteroids = CreateAsteroidField(40, asteroidImage);
+var asteroids = CreateAsteroidField(20, asteroidImage);
 
 var rocket = new Rocket
 {
@@ -70,7 +86,7 @@ var rocket = new Rocket
     Behaviors = 
     { 
         new RocketController(window.Input),
-        new AsteroidSmasher(scoreFont, scoreTint, () => score, v => score = v),
+        new AsteroidSmasher(scoreboard),
     }
 };
 
@@ -135,13 +151,15 @@ var hud = new CustomLayer2D
     {
         using var _ = rd.PushState();
         rd.Camera = null;
+
+#if false
         rd.DrawColor = Color.White;
         var asteriodCount = playField.Sprites.Count(s => s is Asteroid);
         rd.DrawDebugText(
             0, 10,
             $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.Center.X:#} y: {rocket.Center.Y:#} asteriods: {asteriodCount}",
             scale: 2f);
-        scoreFont.DrawText(rd, $"SCORE {score}", new Color(255, 215, 0), 20, 60);
+#endif
 
         if (gameOverAt is not null)
         {
@@ -154,20 +172,57 @@ var hud = new CustomLayer2D
     }
 };
 
+// Overhead minimap so the player can see asteroids beyond the
+// viewport. Sized to the upper-right corner; markers are scaled
+// by asteroid size and colored by kind.
+var minimap = new MinimapLayer2D
+{
+    Source = playField,
+    // 16:9 to match the world (3840x2160) so the viewport overlay
+    // and asteroid positions aren't stretched.
+    ScreenRect = new Rect(DesignW - 340, 20, 320, 180),
+    // Slightly translucent so asteroids passing behind the minimap
+    // are still readable through the panel.
+    BackgroundColor = new Color(0, 0, 0, 100),
+    ViewportCamera = camera,
+    ViewportSize = new Vector2(DesignW, DesignH),
+    ViewportColor = new Color(0,0,0,0), // no outline
+    MarkerSelector = s => s switch
+    {
+        Rocket r => new MinimapMarker(
+            Color.Red,
+            Radius: 6f,
+            Shape: MinimapShape.Triangle,
+            // Use Rotation (not Heading) so the marker spins with the
+            // rocket during stun, when the two diverge.
+            Rotation: r.Rotation),
+        Asteroid { Kind: AsteriodKind.Gold } g =>
+            new MinimapMarker(new Color(255, 215, 0), Radius: 2f + g.Scale * 4f, Shape: MinimapShape.Circle),
+        Asteroid { Kind: AsteriodKind.Radioactive } x =>
+            new MinimapMarker(new Color(120, 255, 120), Radius: 2f + x.Scale * 4f, Shape: MinimapShape.Square, Rotation: 45f),
+        Asteroid a =>
+            new MinimapMarker(new Color(210, 180, 140), Radius: 1.5f + a.Scale * 3.5f, Shape: MinimapShape.Circle),
+        _ => null,
+    },
+};
+
 var scene = new Scene2D
 {
     Layers = 
     { 
         starsFar, 
         starsMid, 
-        playField, 
-        hud 
+        playField,
+        popups,
+        scoreboard,
+        hud,
+        minimap,
     },
     Behaviors =
     {
         new CustomSceneBehavior2D()
         {
-            OnUpdate = (s, in ctx) =>
+            OnApply = (s, in ctx) =>
             {
                 if (s.RunState != RunState.Running)
                     return;
@@ -186,7 +241,7 @@ var scene = new Scene2D
 // Run the scene until done
 await scene.RunAsync(window);
 
-Console.WriteLine($"Final Score: {score}");
+Console.WriteLine($"Final Score: {scoreboard.Score}");
 
 //---------------------------------------------------------------------------------------------------------------
 
@@ -245,7 +300,7 @@ sealed class Rocket : Sprite2D
             // let RotationSpeed drive the spin freely.
             new CustomSpriteBehavior2D
             {
-                OnUpdate = (s, in _) =>
+                OnApply = (s, in _) =>
                 {
                     if (s is Rocket { IsStunned: true })
                         return;
@@ -275,10 +330,7 @@ sealed class Rocket : Sprite2D
 
 sealed class AsteroidSmasher : SpriteBehavior2D
 {
-    private readonly Font _scoreFont;
-    private readonly Color _scoreTint;
-    private readonly Func<int> _getScore;
-    private readonly Action<int> _setScore;
+    private readonly ScoreLayer2D _scoreboard;
 
     // Slower, more menacing klaxon than the stock Sounds.Klaxon —
     // 0.32 s per beat instead of 0.15 s. Cached so we don't
@@ -286,16 +338,9 @@ sealed class AsteroidSmasher : SpriteBehavior2D
     private static readonly Sound _radioactiveAlarm =
         Sounds.CreateKlaxon(duration: 1.6f, beatDuration: 0.32f);
 
-    public AsteroidSmasher(
-        Font scoreFont, 
-        Color scoreTint,
-        Func<int> getScore, 
-        Action<int> setScore)
+    public AsteroidSmasher(ScoreLayer2D scoreboard)
     {
-        _scoreFont = scoreFont;
-        _scoreTint = scoreTint;
-        _getScore = getScore;
-        _setScore = setScore;
+        _scoreboard = scoreboard;
     }
 
     public override void OnHitSprite(Sprite2D self, Sprite2D other, in UpdateContext2D context)
@@ -333,22 +378,7 @@ sealed class AsteroidSmasher : SpriteBehavior2D
         {
             // Bigger rocks are worth more; round to tens.
             int points = Math.Max(10, (int)Math.Round(asteroid.Scale * 200f / 10f) * 10);
-            _setScore(_getScore() + points);
-            asteroid.PlayField.AddSprite(
-                new TextSprite2D
-                {
-                    Font = _scoreFont,
-                    Text = $"+{points}",
-                    Center = asteroid.Center,
-                    Tint = _scoreTint,
-                    Heading = 0f,        // up (toward smaller Y)
-                    Speed = 90f,
-                    Behaviors =
-                    {
-                        new Motion2D(),
-                        new FadeAndExpire2D { Duration = TimeSpan.FromSeconds(1.2) },
-                    },
-                });
+            _scoreboard.Add(points, asteroid.Center);
             Audio.Play(Sounds.Coin, volume: .1f);
         }
 
@@ -367,28 +397,9 @@ sealed class AsteroidSmasher : SpriteBehavior2D
             // the gold reward formula.
             int penalty = Math.Max(10, (int)Math.Round(asteroid.Scale * 200f / 10f) * 10);
             // Clamp at zero — negative scores aren't fun.
-            var current = _getScore();
-            var deducted = Math.Min(current, penalty);
+            var deducted = (int)Math.Min(_scoreboard.Score, penalty);
             if (deducted > 0)
-            {
-                _setScore(current - deducted);
-
-                asteroid.PlayField.AddSprite(
-                    new TextSprite2D
-                    {
-                        Font = _scoreFont,
-                        Text = $"-{deducted}",
-                        Center = asteroid.Center,
-                        Tint = new Color(120, 255, 120),
-                        Heading = 0f,
-                        Speed = 90f,
-                        Behaviors =
-                        {
-                            new Motion2D(),
-                            new FadeAndExpire2D { Duration = TimeSpan.FromSeconds(1.2) },
-                        },
-                    });
-            }
+                _scoreboard.Add(-deducted, asteroid.Center);
         }
 
         // split the asteroid into shards
@@ -407,32 +418,28 @@ enum AsteriodKind
 sealed class Asteroid : Sprite2D
 {
     public static readonly float GoldRarity = 0.25f; // 25% of asteroid shards are gold
+    public static readonly float RadioactiveRarity = 0.1f; // 10% of asteroid shards are radioactive
 
     public AsteriodKind Kind { get; }
 
-    private static readonly Color goldTint = new Color(255, 215, 0);
-    private static readonly Color radioactiveTint = new Color(0, 255, 0);
+    private static readonly Color _goldTint = new Color(255, 215, 0);
+    private static readonly Color _radioactiveTint = new Color(90, 200, 90);
 
     public Asteroid(AsteriodKind kind = AsteriodKind.Regular)
     {
         this.Kind = kind;
         if (kind == AsteriodKind.Gold)
-            this.Tint = goldTint;
+        {
+            this.Tint = _goldTint;
+        }
         else if (kind == AsteriodKind.Radioactive)
         {
-            this.Tint = radioactiveTint;
-            this.Behaviors.Add(
-                new PulseTintBehavior(
-                    low: new Color(60, 125, 60),
-                    high: new Color(120, 255, 120),
-                    period: TimeSpan.FromSeconds(0.6)
-                ));
+            this.Tint = _radioactiveTint;
+            this.Behaviors.Add(PulseTint2D.FromBrightness(_radioactiveTint, amount: 0.5f, period: TimeSpan.FromSeconds(0.6)));
         }
 
-        this.Behaviors.AddRange([
-            new Motion2D(),
-            new BounceInBounds2D()
-        ]);
+        this.Behaviors.Add(new Motion2D());
+        this.Behaviors.Add(new BounceInBounds2D());
     }
 
     public void Smash()
@@ -449,10 +456,13 @@ sealed class Asteroid : Sprite2D
                 var shardSpin = Random.Shared.Next(120, 360);
                 if (Random.Shared.Next(2) == 0)
                     shardSpin = -shardSpin;
+                var rnd = Random.Shared.NextDouble();
                 var childKind = 
-                    this.Kind == AsteriodKind.Gold || Random.Shared.NextDouble() < GoldRarity ? AsteriodKind.Gold :
-                    this.Kind == AsteriodKind.Radioactive || Random.Shared.NextDouble() < 0.1 ? AsteriodKind.Radioactive :
-                    AsteriodKind.Regular;
+                    (this.Kind == AsteriodKind.Gold || rnd < Asteroid.GoldRarity)
+                        ? AsteriodKind.Gold 
+                    : (this.Kind == AsteriodKind.Radioactive || rnd < Asteroid.GoldRarity + Asteroid.RadioactiveRarity)
+                        ? AsteriodKind.Radioactive 
+                    : AsteriodKind.Regular;
 
                 var shard = new Asteroid(childKind)
                 {
@@ -477,7 +487,7 @@ sealed class RocketController : SpriteBehavior2D
 
     public RocketController(FrameInput input) => _input = input;
 
-    public override void Update(Sprite2D rocket, in UpdateContext2D context)
+    public override void Apply(Sprite2D rocket, in UpdateContext2D context)
     {
         // No control input during stun.
         if (rocket is Rocket { IsStunned: true })
@@ -499,31 +509,5 @@ sealed class RocketController : SpriteBehavior2D
             rocket.Speed = Math.Clamp(rocket.Speed - 50f, 0f, 1000f);
             Audio.Play(Sounds.RoarDown, volume: .25f);
         }
-    }
-}
-
-sealed class PulseTintBehavior : SpriteBehavior2D
-{
-    private readonly Color _low;
-    private readonly Color _high;
-    private readonly double _period;
-
-    public PulseTintBehavior(Color low, Color high, TimeSpan period)
-    {
-        _low = low;
-        _high = high;
-        _period = period.TotalSeconds;
-    }
-
-    public override void Update(Sprite2D target, in UpdateContext2D context)
-    {
-        // 0..1 triangle wave from a sine, driven by the sprite's own age.
-        var phase = target.Age.TotalSeconds / _period;
-        var t = 0.5f + 0.5f * MathF.Sin((float)(phase * Math.Tau));
-        target.Tint = new Color(
-            (byte)(_low.R + (_high.R - _low.R) * t),
-            (byte)(_low.G + (_high.G - _low.G) * t),
-            (byte)(_low.B + (_high.B - _low.B) * t),
-            (byte)(_low.A + (_high.A - _low.A) * t));
     }
 }
