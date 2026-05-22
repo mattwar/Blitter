@@ -116,11 +116,11 @@ public class SpriteTests
     }
 
     [Fact]
-    public void ChangeVelocity_AppliesTransform()
+    public void GetSpeedAndHeading_RoundTripsNegatedVelocity()
     {
         var sprite = new Sprite2D { Heading = 90f, Speed = 10f };
-        // Negate velocity → reversed heading, same speed.
-        sprite.ChangeVelocity(v => -v);
+        var v = -Sprite2D.GetVelocity(sprite.Speed, sprite.Heading);
+        (sprite.Speed, sprite.Heading) = Sprite2D.GetSpeedAndHeading(v);
         Assert.Equal(10f, sprite.Speed, 2);
         Assert.Equal(270f, sprite.Heading, 2);
     }

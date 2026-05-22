@@ -170,10 +170,4 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
         return (speed, heading);
     }
 
-    public void ChangeVelocity(Func<Vector2, Vector2> fn)
-    {
-        var v = GetVelocity(this.Speed, this.Heading);
-        v = fn(v);
-        (this.Speed, this.Heading) = GetSpeedAndHeading(v);
-    }
 }
