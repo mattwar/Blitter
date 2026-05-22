@@ -28,10 +28,19 @@ public abstract class SpriteImage2D
     /// </summary>
     public HitShape HitShape
     {
-        get => _hitShape ??= new CircleHitShape(Boundary.Center, Boundary.Radius);
+        get => _hitShape ??= DeriveHitShape();
         set => _hitShape = value;
     }
     private HitShape? _hitShape;
+
+    /// <summary>
+    /// Produces the default <see cref="HitShape"/> when none has been
+    /// explicitly set. The base implementation returns a circle from
+    /// <see cref="Boundary"/>; subclasses with pixel access can fit a
+    /// tighter shape.
+    /// </summary>
+    protected virtual HitShape DeriveHitShape() =>
+        new CircleHitShape(Boundary.Center, Boundary.Radius);
 
     /// <summary>Draw this image at the given world transform, multiplied
     /// by <paramref name="tint"/> (per-channel). Pass <see cref="Color.White"/>
@@ -119,4 +128,19 @@ public sealed class TextureSpriteImage2D : SpriteImage2D
         c.IsEmpty
             ? c
             : new BoundingCircle(c.Center - new Vector2(size.Width / 2f, size.Height / 2f), c.Radius);
+
+    protected override HitShape DeriveHitShape()
+    {
+        if (_texture is not Bitmap bmp) return base.DeriveHitShape();
+        var shape = bmp.ComputeOpaqueHitShape();
+        var size = _texture.Size;
+        var offset = new Vector2(size.Width / 2f, size.Height / 2f);
+        return shape switch
+        {
+            CircleHitShape c => new CircleHitShape(c.LocalCenter - offset, c.LocalRadius),
+            CapsuleHitShape c => new CapsuleHitShape(
+                c.LocalEndA - offset, c.LocalEndB - offset, c.LocalRadius),
+            _ => shape,
+        };
+    }
 }

@@ -151,15 +151,13 @@ var playField = new PlayField2D([..asteroids, rocket])
     ShowWorldBounds = true,
 };
 
-// Heads-up display layer for debug info. Detaches the camera while
-// drawing so HUD text stays screen-locked instead of scrolling with
-// the world.
+// HUD layer for overlay text
 var hud = new CustomLayer2D
 {
     OnRender = rd =>
     {
         using var _ = rd.PushState();
-        rd.Camera = null;
+        rd.Camera = null; // detach camera so HUD is screen-locked
 
         // Speed readout under the score. The delegate runs every
         // frame, so just reading rocket.Speed here keeps the HUD
@@ -354,48 +352,6 @@ sealed class Rocket : Sprite2D
     public TimeSpan StunUntil { get; set; }
     public bool IsStunned => Age < StunUntil;
 
-    // Cached image-local capsule shape along the rocket body. Lazy
-    // because Image isn't set in the ctor; pose is applied per access
-    // via PosedHitShape.
-    private HitShape? _rocketHitShape;
-
-    /// <summary>
-    /// Tight capsule along the rocket body, oriented by sprite
-    /// <see cref="Sprite2D.Rotation"/> and sized from the image's
-    /// opaque-pixel bounding rectangle.
-    /// </summary>
-    public override PosedHitShape HitShape =>
-        new(_rocketHitShape ??= BuildHitShape(), Center, Rotation, Scale);
-
-    private HitShape BuildHitShape()
-    {
-        // Pull the axis-aligned opaque bounds of the image. The
-        // largest capsule inscribed in that rectangle has body
-        // radius = half the short side and length-between-endpoints
-        // = long side - 2·radius; both cap-circles end up tangent
-        // to the short edges of the box.
-        if (Image is not TextureSpriteImage2D tsi || tsi.Texture is not Bitmap bmp)
-            return Blitter.Bits.HitShape.None;
-        var bounds = bmp.ComputeOpaqueBounds();
-        if (bounds.IsEmpty)
-            return Blitter.Bits.HitShape.None;
-
-        // ComputeOpaqueBounds is in image-pixel space (origin
-        // top-left); sprite-local has origin at the image center.
-        var (w, h) = bmp.Size;
-        var localCenter = bounds.Center - new Vector2(w / 2f, h / 2f);
-        var size = bounds.Size;
-        bool tall = size.Y >= size.X;
-        var bodyRadius = (tall ? size.X : size.Y) * 0.5f;
-        var halfLen = (tall ? size.Y : size.X) * 0.5f - bodyRadius;
-        var axis = tall ? new Vector2(0f, 1f) : new Vector2(1f, 0f);
-        return new CapsuleHitShape(
-            localCenter - axis * halfLen,
-            localCenter + axis * halfLen,
-            bodyRadius
-            );
-    }
-    
     public Rocket()
     {
         this.Behaviors.AddRange([

@@ -3,25 +3,16 @@ using System.Numerics;
 namespace Blitter.Bits;
 
 /// <summary>
-/// Callback for <see cref="PosedHitShape.Visit"/>. Receives the live
-/// stack-allocated primitives of a posed shape; the span is valid only
-/// for the duration of the call.
+/// Callback for <see cref="PosedHitShape.Visit"/>. 
+/// Receives the live stack-allocated primitives of a posed shape; 
+/// the span is valid only/ for the duration of the call.
 /// </summary>
 public delegate void HitShapeVisitor(ReadOnlySpan<HitPrimitive> primitives);
 
 /// <summary>
-/// Pose-free description of a collision boundary, in image-local
-/// coordinates (origin at sprite center, unrotated, unscaled).
-/// One <see cref="HitShape"/> can be shared across many sprites and
-/// across animation frames. Combine with a pose to get a
-/// <see cref="PosedHitShape"/> for collision queries.
+/// An abstraction of a collision boundary, 
+/// in image-local coordinates (origin at sprite center, unrotated, unscaled).
 /// </summary>
-/// <remarks>
-/// Subclasses own their primitive layout. On dispatch they
-/// <c>stackalloc</c> a span sized for their own primitives, fill it
-/// using the supplied pose, and hand it to the <see cref="Hitter"/> /
-/// <see cref="HitShapeVisitor"/>. The size never escapes the subclass.
-/// </remarks>
 public abstract class HitShape
 {
     /// <summary>
@@ -33,8 +24,8 @@ public abstract class HitShape
     /// Stage 1 of double dispatch. This shape, posed by
     /// <paramref name="mine"/>, places its world-space primitives on
     /// the stack and hands them to <paramref name="hitter"/> along
-    /// with the still-posed <paramref name="other"/>; the hitter
-    /// expands <paramref name="other"/> for stage 2.
+    /// with the still-posed <paramref name="other"/>; 
+    /// the hitter expands <paramref name="other"/> for stage 2.
     /// </summary>
     public abstract bool TestHit(in PosedHitShape mine, in PosedHitShape other, Hitter hitter);
 

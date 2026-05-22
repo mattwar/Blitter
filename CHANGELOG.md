@@ -35,6 +35,10 @@ All notable changes to this project will be documented in this file.
   `Layers.Remove` remain for the rare case of dynamic layer changes.
 
 ### Added
+- `Bitmap.ComputeOpaqueHitShape()`: fits a circle or capsule to the
+  opaque pixels and picks whichever covers them with less area.
+- `TextureSpriteImage2D` now uses the fit shape as its default
+  `HitShape`, so elongated sprites get a tight capsule for free.
 - `WrapInBounds2D`: toroidal sprite wrap across the update bounds.
 - `SeekTarget2D`: steers a sprite toward a `Func<Vector2?>` target with
   `MaxTurnRate`, `Acceleration`, `MaxSpeed`, and `ArriveRadius`.
