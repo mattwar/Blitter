@@ -10,10 +10,10 @@ public static class ImageBounds
     /// <summary>
     /// Gets the minimum axis-aligned bounding rectangle that contains every pixel.
     /// </summary>
-    public static BoundingRect ComputeOpaqueBounds(this Bitmap image, byte alphaThreshold = 0)
+    public static BoundingRect ComputeOpaqueBounds(this IReadableTexture2D image, byte alphaThreshold = 0)
     {
         ArgumentNullException.ThrowIfNull(image);
-        var (w, h) = image.Size;
+        int w = image.Width, h = image.Height;
         if (w <= 0 || h <= 0) return BoundingRect.Empty;
 
         int minX = int.MaxValue, minY = int.MaxValue;
@@ -48,7 +48,7 @@ public static class ImageBounds
     /// Ritter's algorithm. Handles off-center / asymmetric shapes
     /// far better than the rect-circumscribing circle.
     /// </summary>
-    public static BoundingCircle ComputeOpaqueCircle(this Bitmap image, byte alphaThreshold = 0)
+    public static BoundingCircle ComputeOpaqueCircle(this IReadableTexture2D image, byte alphaThreshold = 0)
     {
         ArgumentNullException.ThrowIfNull(image);
         var bounds = image.ComputeOpaqueBounds(alphaThreshold);
@@ -117,14 +117,14 @@ public static class ImageBounds
     /// Computes a nominal set of axis-aligned bounding rectangles that cover every pixel.
     /// </summary>
     public static BoundingRect[] ComputeOpaqueRects(
-        this Bitmap image,
+        this IReadableTexture2D image,
         int cellSize = 8,
         byte alphaThreshold = 0)
     {
         ArgumentNullException.ThrowIfNull(image);
         ArgumentOutOfRangeException.ThrowIfLessThan(cellSize, 1);
 
-        var (w, h) = image.Size;
+        int w = image.Width, h = image.Height;
         if (w <= 0 || h <= 0) return Array.Empty<BoundingRect>();
 
         int cols = (w + cellSize - 1) / cellSize;
@@ -219,7 +219,7 @@ public static class ImageBounds
     /// a <see cref="CapsuleHitShape2D"/> for elongated ones, choosing
     /// whichever covers the opaque pixels with the smaller area.
     /// </summary>
-    public static HitShape2D ComputeOpaqueHitShape2D(this Bitmap image, byte alphaThreshold = 0)
+    public static HitShape2D ComputeOpaqueHitShape2D(this IReadableTexture2D image, byte alphaThreshold = 0)
     {
         ArgumentNullException.ThrowIfNull(image);
         var bounds = image.ComputeOpaqueBounds(alphaThreshold);

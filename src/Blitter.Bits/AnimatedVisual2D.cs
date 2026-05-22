@@ -4,12 +4,13 @@ namespace Blitter.Bits;
 
 /// <summary>
 /// A <see cref="Visual2D"/> that plays a named <see cref="AnimationSequence"/>
-/// from an <see cref="AnimationAtlas"/>. Set <see cref="Visual2D.State"/>
+/// from an <see cref="AnimationCatalog"/>. Set <see cref="Visual2D.State"/>
 /// to switch sequences; the new sequence starts from its first frame.
 /// </summary>
 public sealed class AnimatedVisual2D : Visual2D
 {
-    private readonly AnimationAtlas _atlas;
+    private readonly AnimationCatalog _catalog;
+    private readonly Dictionary<string, HitShape2D> _shapeCache = new(StringComparer.Ordinal);
     private BoundingCircle? _boundary;
 
     // Local playback clock: the elapsed value that the current sequence treats as
@@ -20,25 +21,33 @@ public sealed class AnimatedVisual2D : Visual2D
     private TimeSpan _sequenceStartElapsed;
     private bool _resetPending;
 
-    public AnimatedVisual2D(AnimationAtlas atlas, TimeSpan offset = default)
+    public AnimatedVisual2D(AnimationCatalog catalog, TimeSpan offset = default)
+        : this(catalog, catalog?.Names[0]!, offset)
     {
-        ArgumentNullException.ThrowIfNull(atlas);
-        _atlas = atlas;
-        _state = atlas.DefaultState;
-        _current = atlas[_state];
+    }
+
+    public AnimatedVisual2D(AnimationCatalog catalog, string initialState, TimeSpan offset = default)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentException.ThrowIfNullOrEmpty(initialState);
+        if (!catalog.TryGet(initialState, out var seq))
+            throw new ArgumentException($"Unknown state '{initialState}'.", nameof(initialState));
+        _catalog = catalog;
+        _state = initialState;
+        _current = seq;
         Offset = offset;
     }
 
-    private AnimatedVisual2D(AnimationAtlas atlas, string state, TimeSpan offset)
+    private AnimatedVisual2D(AnimationCatalog catalog, string state, AnimationSequence current, TimeSpan offset)
     {
-        _atlas = atlas;
+        _catalog = catalog;
         _state = state;
-        _current = atlas[state];
+        _current = current;
         Offset = offset;
     }
 
-    /// <summary>Atlas + sequences this visual draws from.</summary>
-    public AnimationAtlas Atlas => _atlas;
+    /// <summary>Catalog of sequences this visual draws from.</summary>
+    public AnimationCatalog Catalog => _catalog;
 
     /// <inheritdoc/>
     public override string State
@@ -47,22 +56,25 @@ public sealed class AnimatedVisual2D : Visual2D
         set
         {
             ArgumentException.ThrowIfNullOrEmpty(value);
-            if (value == _state) 
+            if (value == _state)
                 return;
-            if (!_atlas.TryGet(value, out var seq))
+            if (!_catalog.TryGet(value, out var seq))
                 throw new ArgumentException($"Unknown state '{value}'.", nameof(value));
             _state = value;
             _current = seq;
             _resetPending = true;
+            // Re-derive (or fetch from cache) on next access; a custom HitShape
+            // explicitly assigned by the caller does not survive state changes.
+            InvalidateHitShape();
         }
     }
 
     /// <inheritdoc/>
-    public override IReadOnlyList<string> States => 
-        _atlas.States;
+    public override IReadOnlyList<string> States =>
+        _catalog.Names;
 
     /// <summary>Sequence currently selected by <see cref="State"/>.</summary>
-    public AnimationSequence CurrentSequence => 
+    public AnimationSequence CurrentSequence =>
         _current;
 
     /// <summary>
@@ -76,18 +88,18 @@ public sealed class AnimatedVisual2D : Visual2D
     /// <paramref name="offset"/>.
     /// </summary>
     public AnimatedVisual2D WithOffset(TimeSpan offset) =>
-        new(_atlas, _state, offset);
+        new(_catalog, _state, _current, offset);
 
     /// <summary>
-    /// Atlas region index that should be drawn for the given host
-    /// <paramref name="elapsed"/> time in the current sequence.
+    /// Index into the current sequence's frame list at the given host
+    /// <paramref name="elapsed"/> time.
     /// </summary>
     public int FrameIndexAt(TimeSpan elapsed) =>
         _current.FrameIndexAt(LocalTime(elapsed));
 
-    /// <summary>Atlas region for the current frame at the given time.</summary>
-    public Rect RegionAt(TimeSpan elapsed) =>
-        _atlas.Atlas[FrameIndexAt(elapsed)];
+    /// <summary>Texture drawn for the current frame at the given time.</summary>
+    public Texture2D FrameAt(TimeSpan elapsed) =>
+        _current.FrameAt(LocalTime(elapsed));
 
     /// <summary>True if the current sequence is <see cref="AnimationLoop.Once"/>
     /// and has reached its last frame.</summary>
@@ -96,20 +108,20 @@ public sealed class AnimatedVisual2D : Visual2D
 
     /// <summary>
     /// Bounding circle covering the largest frame across every sequence
-    /// in the atlas.
+    /// in the catalog.
     /// </summary>
     public override BoundingCircle Boundary => _boundary ??= ComputeBoundary();
 
     private BoundingCircle ComputeBoundary()
     {
         float maxR2 = 0f;
-        foreach (var seq in _atlas.Sequences)
+        foreach (var seq in _catalog.Sequences)
         {
             foreach (var frame in seq.Frames)
             {
-                var r = _atlas.Atlas[frame];
-                var hw = r.Width / 2f;
-                var hh = r.Height / 2f;
+                var s = frame.Size;
+                var hw = s.Width / 2f;
+                var hh = s.Height / 2f;
                 var r2 = hw * hw + hh * hh;
                 if (r2 > maxR2) maxR2 = r2;
             }
@@ -117,33 +129,60 @@ public sealed class AnimatedVisual2D : Visual2D
         return new BoundingCircle(Vector2.Zero, MathF.Sqrt(maxR2));
     }
 
+    /// <summary>
+    /// Derives a hit shape from the first frame of the current sequence,
+    /// caching the result per state. Assumes a sequence's silhouette does
+    /// not change materially across its own frames.
+    /// </summary>
+    protected override HitShape2D DeriveHitShape()
+    {
+        if (_shapeCache.TryGetValue(_state, out var cached))
+            return cached;
+
+        var first = _current.Frames[0];
+        HitShape2D shape;
+        if (first is ReadableTexture2D readable)
+        {
+            var sz = first.Size;
+            shape = readable.ComputeOpaqueHitShape2D()
+                .Translate(new Vector2(-sz.Width / 2f, -sz.Height / 2f));
+        }
+        else
+        {
+            shape = base.DeriveHitShape();
+        }
+        _shapeCache[_state] = shape;
+        return shape;
+    }
+
     public override void Draw(Renderer2D renderer, in Pose2D pose, Color tint, TimeSpan elapsed)
     {
-        var source = RegionAt(elapsed);
-        var image = _atlas.Atlas.Image;
-        var scaledW = source.Width * pose.Scale;
-        var scaledH = source.Height * pose.Scale;
+        var frame = _current.FrameAt(LocalTime(elapsed));
+        var size = frame.Size;
+        var scaledW = size.Width * pose.Scale;
+        var scaledH = size.Height * pose.Scale;
         var dest = new Rect(
             pose.Position.X - scaledW / 2f,
             pose.Position.Y - scaledH / 2f,
             scaledW,
             scaledH);
+        var source = new Rect(0f, 0f, size.Width, size.Height);
         bool tinted = tint != Color.White;
 
         if (pose.Rotation != 0f || pose.Flipped != FlipMode.None)
         {
             var rc = new Vector2(scaledW / 2f, scaledH / 2f);
             if (tinted)
-                renderer.DrawImageRotated(image, source, dest, pose.Rotation, rc, pose.Flipped, tint);
+                renderer.DrawImageRotated(frame, source, dest, pose.Rotation, rc, pose.Flipped, tint);
             else
-                renderer.DrawImageRotated(image, source, dest, pose.Rotation, rc, pose.Flipped);
+                renderer.DrawImageRotated(frame, source, dest, pose.Rotation, rc, pose.Flipped);
         }
         else
         {
             if (tinted)
-                renderer.DrawImage(image, source, dest, tint);
+                renderer.DrawImage(frame, source, dest, tint);
             else
-                renderer.DrawImage(image, source, dest);
+                renderer.DrawImage(frame, source, dest);
         }
     }
 

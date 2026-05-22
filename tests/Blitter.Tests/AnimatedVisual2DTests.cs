@@ -9,7 +9,7 @@ public class AnimatedVisual2DTests
     {
         using var bmp = Bitmap.Create(16, 4);
         var atlas = Atlas.Grid(bmp, 4, 1);
-        var aa = new AnimationAtlas(atlas, [
+        var aa = atlas.ToAnimationCatalog([
             new("walk", [0, 1, 2, 3], TimeSpan.FromSeconds(1)),
         ]);
         var v = new AnimatedVisual2D(aa);
@@ -24,7 +24,7 @@ public class AnimatedVisual2DTests
     {
         using var bmp = Bitmap.Create(32, 4);
         var atlas = Atlas.Grid(bmp, 8, 1);
-        var aa = new AnimationAtlas(atlas, [
+        var aa = atlas.ToAnimationCatalog([
             new("idle", [0, 1], TimeSpan.FromSeconds(1)),
             new("attack", [4, 5, 6, 7], TimeSpan.FromSeconds(1)),
         ]);
@@ -33,9 +33,10 @@ public class AnimatedVisual2DTests
         Assert.Equal(1, v.FrameIndexAt(TimeSpan.FromSeconds(5)));
         v.State = "attack";
         // The first lookup after the switch stamps the local clock base.
-        Assert.Equal(4, v.FrameIndexAt(TimeSpan.FromSeconds(5)));
-        Assert.Equal(5, v.FrameIndexAt(TimeSpan.FromSeconds(6)));
-        Assert.Equal(7, v.FrameIndexAt(TimeSpan.FromSeconds(8)));
+        // FrameIndexAt returns the position within the sequence's frame list.
+        Assert.Equal(0, v.FrameIndexAt(TimeSpan.FromSeconds(5)));
+        Assert.Equal(1, v.FrameIndexAt(TimeSpan.FromSeconds(6)));
+        Assert.Equal(3, v.FrameIndexAt(TimeSpan.FromSeconds(8)));
     }
 
     [Fact]
@@ -43,7 +44,7 @@ public class AnimatedVisual2DTests
     {
         using var bmp = Bitmap.Create(8, 4);
         var atlas = Atlas.Grid(bmp, 2, 1);
-        var aa = new AnimationAtlas(atlas, [
+        var aa = atlas.ToAnimationCatalog([
             new("idle", [0, 1], TimeSpan.FromSeconds(1)),
         ]);
         var v = new AnimatedVisual2D(aa);
@@ -56,7 +57,7 @@ public class AnimatedVisual2DTests
     {
         using var bmp = Bitmap.Create(16, 4);
         var atlas = Atlas.Grid(bmp, 4, 1);
-        var aa = new AnimationAtlas(atlas, [
+        var aa = atlas.ToAnimationCatalog([
             new("walk", [0, 1, 2, 3], TimeSpan.FromSeconds(1)),
         ]);
         var a = new AnimatedVisual2D(aa);
@@ -66,7 +67,7 @@ public class AnimatedVisual2DTests
         Assert.Equal(2, b.FrameIndexAt(TimeSpan.FromSeconds(0)));
         Assert.Equal(TimeSpan.Zero, a.Offset);
         Assert.Equal(TimeSpan.FromSeconds(2), b.Offset);
-        Assert.Same(a.Atlas, b.Atlas);
+        Assert.Same(a.Catalog, b.Catalog);
     }
 
     [Fact]
@@ -74,7 +75,7 @@ public class AnimatedVisual2DTests
     {
         using var bmp = Bitmap.Create(12, 4);
         var atlas = Atlas.Grid(bmp, 3, 1);
-        var aa = new AnimationAtlas(atlas, [
+        var aa = atlas.ToAnimationCatalog([
             new("idle", [0, 1], TimeSpan.FromSeconds(1), AnimationLoop.Loop),
             new("attack", [0, 1, 2], TimeSpan.FromSeconds(1), AnimationLoop.Once),
         ]);

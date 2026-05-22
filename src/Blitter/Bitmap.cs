@@ -5,7 +5,7 @@ namespace Blitter;
 /// <summary>
 /// Represents an image bitmap in memory.
 /// </summary>
-public sealed class Bitmap : Texture2D
+public sealed class Bitmap : ReadableTexture2D
 {
     private readonly Application _application;
     internal nint _imageId;
@@ -520,7 +520,7 @@ public sealed class Bitmap : Texture2D
     /// <summary>
     /// Gets the color of the pixel at (x, y).
     /// </summary>
-    public Color GetPixel(int x, int y)
+    public override Color GetPixel(int x, int y)
     {
         if (IsDisposed)
             return default;

@@ -532,6 +532,7 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
     {
         if (IsDisposed)
             return false;
+        TextureSegment2D.Unwrap(ref image, ref source);
         if (!TryGetOrCreateTexture(image, out var texture))
             return false;
         EnsureCleared();
@@ -543,6 +544,7 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
     {
         if (IsDisposed)
             return false;
+        TextureSegment2D.Unwrap(ref image, ref source);
         if (!TryGetOrCreateTexture(image, out var texture))
             return false;
         EnsureCleared();
@@ -564,6 +566,7 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
     {
         if (IsDisposed)
             return false;
+        TextureSegment2D.Unwrap(ref image, ref source);
         if (!TryGetOrCreateTexture(image, out var texture))
             return false;
         EnsureCleared();
@@ -580,6 +583,7 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
     {
         if (IsDisposed)
             return false;
+        TextureSegment2D.Unwrap(ref image, ref source);
         if (!TryGetOrCreateTexture(image, out var texture))
             return false;
         EnsureCleared();

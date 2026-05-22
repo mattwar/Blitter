@@ -25,12 +25,12 @@ public sealed class TextureVisual2D : Visual2D
 
     private BoundingCircle ComputeBoundary()
     {
-        // Pixel-accurate boundary requires CPU pixel access (Bitmap).
+        // Pixel-accurate boundary requires CPU pixel access (ReadableTexture2D).
         // For other Texture2D backings, fall back to the circle that
         // circumscribes the full image rect.
         var size = _texture.Size;
-        if (_texture is Bitmap bmp)
-            return ToVisualLocal(bmp.ComputeOpaqueCircle(), size);
+        if (_texture is ReadableTexture2D readable)
+            return ToVisualLocal(readable.ComputeOpaqueCircle(), size);
         var half = new Vector2(size.Width / 2f, size.Height / 2f);
         return new BoundingCircle(Vector2.Zero, half.Length());
     }
@@ -68,9 +68,9 @@ public sealed class TextureVisual2D : Visual2D
 
     protected override HitShape2D DeriveHitShape()
     {
-        if (_texture is not Bitmap bmp)
+        if (_texture is not ReadableTexture2D readable)
             return base.DeriveHitShape();
-        var opaqueShape = bmp.ComputeOpaqueHitShape2D();
+        var opaqueShape = readable.ComputeOpaqueHitShape2D();
         // Compute returned pixel-space coords (top-left origin); shift to visual-local (image-centered) coords.
         var size = _texture.Size;
         return opaqueShape.Translate(new Vector2(-size.Width / 2f, -size.Height / 2f));

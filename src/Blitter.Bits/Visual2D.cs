@@ -55,6 +55,13 @@ public abstract class Visual2D
         new CircleHitShape2D(Boundary.Center, Boundary.Radius);
 
     /// <summary>
+    /// Drops the cached <see cref="HitShape"/> so the next access re-derives it.
+    /// Use after a change that would affect collision geometry. A shape that
+    /// was explicitly assigned to <see cref="HitShape"/> is also cleared.
+    /// </summary>
+    protected void InvalidateHitShape() => _hitShape = null;
+
+    /// <summary>
     /// Draw this visual at the given world <paramref name="pose"/>, with the specified <paramref name="tint"/>. 
     /// Pass <see cref="Color.White"/> for untinted output. 
     /// Pass <paramref name="elapsed"/> as the host's age — animated visuals use it to pick the current frame;

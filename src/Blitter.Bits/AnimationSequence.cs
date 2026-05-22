@@ -3,34 +3,34 @@ using System.Collections.Immutable;
 namespace Blitter.Bits;
 
 /// <summary>
-/// A named sequence of atlas frame indices played at a fixed cadence with a chosen loop behavior. 
-/// Immutable; safe to share across <see cref="AnimationAtlas"/> consumers.
+/// A sequence of <see cref="Texture2D"/> frames played at a fixed
+/// cadence with a chosen loop behavior. Immutable; safe to share across
+/// many <see cref="AnimatedVisual2D"/>s.
 /// </summary>
 public sealed class AnimationSequence
 {
     public AnimationSequence(
-        string name,
-        ImmutableArray<int> frames,
+        ImmutableArray<Texture2D> frames,
         TimeSpan frameDuration,
         AnimationLoop loop = AnimationLoop.Loop)
     {
-        ArgumentException.ThrowIfNullOrEmpty(name);
         if (frames.IsDefaultOrEmpty)
             throw new ArgumentException("At least one frame is required.", nameof(frames));
         if (frameDuration <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(frameDuration));
+        for (int i = 0; i < frames.Length; i++)
+        {
+            if (frames[i] is null)
+                throw new ArgumentException($"Frame {i} is null.", nameof(frames));
+        }
 
-        Name = name;
         Frames = frames;
         FrameDuration = frameDuration;
         Loop = loop;
     }
 
-    /// <summary>Identifier used to select this sequence as a visual's state.</summary>
-    public string Name { get; }
-
-    /// <summary>Atlas region indices, in playback order.</summary>
-    public ImmutableArray<int> Frames { get; }
+    /// <summary>Frames in playback order.</summary>
+    public ImmutableArray<Texture2D> Frames { get; }
 
     /// <summary>Time each frame is held.</summary>
     public TimeSpan FrameDuration { get; }
@@ -42,13 +42,13 @@ public sealed class AnimationSequence
     public int FrameCount => Frames.Length;
 
     /// <summary>
-    /// Atlas frame index drawn after <paramref name="elapsed"/> time
-    /// in this sequence (measured from when the sequence started).
+    /// Index into <see cref="Frames"/> drawn after <paramref name="elapsed"/>
+    /// time in this sequence (measured from when the sequence started).
     /// </summary>
     public int FrameIndexAt(TimeSpan elapsed)
     {
         int n = Frames.Length;
-        if (n == 1) return Frames[0];
+        if (n == 1) return 0;
 
         var step = (long)Math.Floor(elapsed.TotalSeconds / FrameDuration.TotalSeconds);
         long idx = Loop switch
@@ -58,7 +58,7 @@ public sealed class AnimationSequence
             AnimationLoop.Once => step < 0 ? 0 : Math.Min(step, n - 1),
             _ => 0,
         };
-        return Frames[(int)idx];
+        return (int)idx;
 
         static long Mod(long a, int m)
         {
@@ -74,6 +74,9 @@ public sealed class AnimationSequence
             return s < n ? s : period - s;
         }
     }
+
+    /// <summary>Frame drawn after <paramref name="elapsed"/> time in this sequence.</summary>
+    public Texture2D FrameAt(TimeSpan elapsed) => Frames[FrameIndexAt(elapsed)];
 
     /// <summary>
     /// True for <see cref="AnimationLoop.Once"/> sequences after they

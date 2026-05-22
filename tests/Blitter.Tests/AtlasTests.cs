@@ -1,3 +1,4 @@
+using Blitter;
 using Blitter.Bits;
 
 namespace Blitter.Tests;
@@ -8,34 +9,34 @@ public class AtlasTests
         Bitmap.Create(w, h, PixelFormat.RGBA8888);
 
     [Fact]
-    public void Construct_StoresImageAndRects()
+    public void Construct_StoresImageAndSegments()
     {
         var image = CreateImage();
         var rects = new[] { new Rect(0, 0, 8, 8), new Rect(8, 0, 8, 8) };
-        using var atlas = new Atlas(image, rects);
+        using var atlas = Atlas.FromRegions(image, rects);
 
-        Assert.Same(image, atlas.Image);
         Assert.Equal(2, atlas.Count);
-        Assert.Equal(rects[0], atlas[0]);
-        Assert.Equal(rects[1], atlas[1]);
+        Assert.Equal(rects[0], ((ITextureRegion)atlas[0]).SourceRect);
+        Assert.Equal(rects[1], ((ITextureRegion)atlas[1]).SourceRect);
+        Assert.Same(image, ((ITextureRegion)atlas[0]).Source);
     }
 
     [Fact]
     public void Indexer_OutOfRange_Throws()
     {
-        using var atlas = new Atlas(CreateImage(), [new Rect(0, 0, 4, 4)]);
+        using var atlas = Atlas.FromRegions(CreateImage(), [new Rect(0, 0, 4, 4)]);
         Assert.Throws<IndexOutOfRangeException>(() => atlas[1]);
     }
 
     [Fact]
-    public void NameLookup_ReturnsRect()
+    public void NameLookup_ReturnsSegment()
     {
         var rects = new[] { new Rect(0, 0, 4, 4), new Rect(4, 0, 4, 4) };
         var names = new Dictionary<string, int> { ["alpha"] = 0, ["beta"] = 1 };
-        using var atlas = new Atlas(CreateImage(), rects, names);
+        using var atlas = Atlas.FromRegions(CreateImage(), rects, names);
 
-        Assert.Equal(rects[0], atlas["alpha"]);
-        Assert.Equal(rects[1], atlas["beta"]);
+        Assert.Equal(rects[0], ((ITextureRegion)atlas["alpha"]).SourceRect);
+        Assert.Equal(rects[1], ((ITextureRegion)atlas["beta"]).SourceRect);
         Assert.True(atlas.Contains("alpha"));
         Assert.False(atlas.Contains("missing"));
     }
@@ -44,14 +45,14 @@ public class AtlasTests
     public void NameLookup_Missing_Throws()
     {
         var names = new Dictionary<string, int> { ["a"] = 0 };
-        using var atlas = new Atlas(CreateImage(), [new Rect(0, 0, 4, 4)], names);
+        using var atlas = Atlas.FromRegions(CreateImage(), [new Rect(0, 0, 4, 4)], names);
         Assert.Throws<KeyNotFoundException>(() => atlas["nope"]);
     }
 
     [Fact]
     public void NameLookup_WithoutMap_Throws()
     {
-        using var atlas = new Atlas(CreateImage(), [new Rect(0, 0, 4, 4)]);
+        using var atlas = Atlas.FromRegions(CreateImage(), [new Rect(0, 0, 4, 4)]);
         Assert.Throws<InvalidOperationException>(() => atlas["x"]);
     }
 
@@ -59,7 +60,7 @@ public class AtlasTests
     public void TryGetIndex_Resolves()
     {
         var names = new Dictionary<string, int> { ["a"] = 0, ["b"] = 1 };
-        using var atlas = new Atlas(
+        using var atlas = Atlas.FromRegions(
             CreateImage(),
             [new Rect(0, 0, 4, 4), new Rect(4, 0, 4, 4)],
             names);
@@ -71,11 +72,11 @@ public class AtlasTests
     }
 
     [Fact]
-    public void NamesValidated_AgainstRectCount()
+    public void NamesValidated_AgainstSegmentCount()
     {
         var names = new Dictionary<string, int> { ["a"] = 5 };
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => new Atlas(CreateImage(), [new Rect(0, 0, 4, 4)], names));
+            () => Atlas.FromRegions(CreateImage(), [new Rect(0, 0, 4, 4)], names));
     }
 
     [Fact]
@@ -86,30 +87,27 @@ public class AtlasTests
         using var atlas = Atlas.Grid(image, columns: 4, rows: 4);
 
         Assert.Equal(16, atlas.Count);
-        Assert.Equal(new Rect(0, 0, 4, 4), atlas[0]);
-        Assert.Equal(new Rect(4, 0, 4, 4), atlas[1]);
-        Assert.Equal(new Rect(0, 4, 4, 4), atlas[4]);     // row 1, col 0
-        Assert.Equal(new Rect(12, 12, 4, 4), atlas[15]);  // row 3, col 3
+        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
+        Assert.Equal(new Rect(4, 0, 4, 4), ((ITextureRegion)atlas[1]).SourceRect);
+        Assert.Equal(new Rect(0, 4, 4, 4), ((ITextureRegion)atlas[4]).SourceRect);
+        Assert.Equal(new Rect(12, 12, 4, 4), ((ITextureRegion)atlas[15]).SourceRect);
     }
 
     [Fact]
     public void Grid_RowMajor()
     {
-        // Index = row * columns + col
         using var atlas = Atlas.Grid(CreateImage(12, 8), columns: 3, rows: 2);
-        // cellW = 12/3 = 4, cellH = 8/2 = 4
-        Assert.Equal(new Rect(8, 4, 4, 4), atlas[5]); // row 1, col 2
+        Assert.Equal(new Rect(8, 4, 4, 4), ((ITextureRegion)atlas[5]).SourceRect); // row 1, col 2
     }
 
     [Fact]
     public void Grid_WithExplicitCellSize_UsesIt()
     {
-        // 20x20 image but only the top-left 16x16 is meaningful (4x4 cells of 4px)
         using var atlas = Atlas.Grid(CreateImage(20, 20),
             columns: 4, rows: 4, cellWidth: 4, cellHeight: 4);
 
         Assert.Equal(16, atlas.Count);
-        Assert.Equal(new Rect(12, 12, 4, 4), atlas[15]);
+        Assert.Equal(new Rect(12, 12, 4, 4), ((ITextureRegion)atlas[15]).SourceRect);
     }
 
     [Fact]
@@ -126,7 +124,7 @@ public class AtlasTests
     public void Dispose_DefaultOwnsImage()
     {
         var image = CreateImage();
-        var atlas = new Atlas(image, [new Rect(0, 0, 4, 4)]);
+        var atlas = Atlas.FromRegions(image, [new Rect(0, 0, 4, 4)]);
         atlas.Dispose();
         Assert.True(image.IsDisposed);
     }
@@ -135,7 +133,7 @@ public class AtlasTests
     public void Dispose_DoesNotDisposeImageWhenNotOwned()
     {
         var image = CreateImage();
-        var atlas = new Atlas(image, [new Rect(0, 0, 4, 4)], ownsImage: false);
+        var atlas = Atlas.FromRegions(image, [new Rect(0, 0, 4, 4)], ownsImage: false);
         atlas.Dispose();
         Assert.False(image.IsDisposed);
         image.Dispose();
@@ -145,16 +143,14 @@ public class AtlasTests
     public void Dispose_Idempotent()
     {
         var image = CreateImage();
-        var atlas = new Atlas(image, [new Rect(0, 0, 4, 4)]);
+        var atlas = Atlas.FromRegions(image, [new Rect(0, 0, 4, 4)]);
         atlas.Dispose();
-        atlas.Dispose(); // does not throw
+        atlas.Dispose();
     }
 
     [Fact]
     public void Sense_DetectsHorizontalStrip()
     {
-        // 16x4 image with three 4-wide opaque cells separated by 1px gutters
-        // at x=4, x=9. (Layout: [0..3] gutter [5..8] gutter [10..13] trailing 14..15)
         var bmp = CreateImage(16, 4);
         FillRect(bmp, 0, 0, 4, 4);
         FillRect(bmp, 5, 0, 4, 4);
@@ -163,15 +159,14 @@ public class AtlasTests
         using var atlas = Atlas.Sense(bmp);
 
         Assert.Equal(3, atlas.Count);
-        Assert.Equal(new Rect(0, 0, 4, 4), atlas[0]);
-        Assert.Equal(new Rect(5, 0, 4, 4), atlas[1]);
-        Assert.Equal(new Rect(10, 0, 4, 4), atlas[2]);
+        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
+        Assert.Equal(new Rect(5, 0, 4, 4), ((ITextureRegion)atlas[1]).SourceRect);
+        Assert.Equal(new Rect(10, 0, 4, 4), ((ITextureRegion)atlas[2]).SourceRect);
     }
 
     [Fact]
     public void Sense_DetectsGrid_RowMajor()
     {
-        // 2x2 grid of 4x4 cells with 2px gutters at x=4..5 and y=4..5.
         var bmp = CreateImage(10, 10);
         FillRect(bmp, 0, 0, 4, 4);
         FillRect(bmp, 6, 0, 4, 4);
@@ -181,16 +176,15 @@ public class AtlasTests
         using var atlas = Atlas.Sense(bmp);
 
         Assert.Equal(4, atlas.Count);
-        Assert.Equal(new Rect(0, 0, 4, 4), atlas[0]);
-        Assert.Equal(new Rect(6, 0, 4, 4), atlas[1]);
-        Assert.Equal(new Rect(0, 6, 4, 4), atlas[2]);
-        Assert.Equal(new Rect(6, 6, 4, 4), atlas[3]);
+        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
+        Assert.Equal(new Rect(6, 0, 4, 4), ((ITextureRegion)atlas[1]).SourceRect);
+        Assert.Equal(new Rect(0, 6, 4, 4), ((ITextureRegion)atlas[2]).SourceRect);
+        Assert.Equal(new Rect(6, 6, 4, 4), ((ITextureRegion)atlas[3]).SourceRect);
     }
 
     [Fact]
     public void Sense_SkipsEmptyCellsByDefault()
     {
-        // 2x2 grid but only the diagonal cells (TL and BR) are filled.
         var bmp = CreateImage(10, 10);
         FillRect(bmp, 0, 0, 4, 4);
         FillRect(bmp, 6, 6, 4, 4);
@@ -198,8 +192,8 @@ public class AtlasTests
         using var atlas = Atlas.Sense(bmp);
 
         Assert.Equal(2, atlas.Count);
-        Assert.Equal(new Rect(0, 0, 4, 4), atlas[0]);
-        Assert.Equal(new Rect(6, 6, 4, 4), atlas[1]);
+        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
+        Assert.Equal(new Rect(6, 6, 4, 4), ((ITextureRegion)atlas[1]).SourceRect);
     }
 
     [Fact]
@@ -212,10 +206,10 @@ public class AtlasTests
         using var atlas = Atlas.Sense(bmp, includeEmptyCells: true);
 
         Assert.Equal(4, atlas.Count);
-        Assert.Equal(new Rect(0, 0, 4, 4), atlas[0]);
-        Assert.Equal(new Rect(6, 0, 4, 4), atlas[1]);
-        Assert.Equal(new Rect(0, 6, 4, 4), atlas[2]);
-        Assert.Equal(new Rect(6, 6, 4, 4), atlas[3]);
+        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
+        Assert.Equal(new Rect(6, 0, 4, 4), ((ITextureRegion)atlas[1]).SourceRect);
+        Assert.Equal(new Rect(0, 6, 4, 4), ((ITextureRegion)atlas[2]).SourceRect);
+        Assert.Equal(new Rect(6, 6, 4, 4), ((ITextureRegion)atlas[3]).SourceRect);
     }
 
     [Fact]
@@ -230,15 +224,12 @@ public class AtlasTests
     public void Sense_HonorsAlphaThreshold()
     {
         var bmp = CreateImage(8, 4);
-        // Two cells, both filled with translucent alpha=128.
         FillRect(bmp, 0, 0, 4, 4, new Color(255, 255, 255, 128));
-        // Threshold above the content -> treated as transparent.
         using var sensedAbove = Atlas.Sense(bmp, alphaThreshold: 200);
         Assert.Equal(0, sensedAbove.Count);
-        // Threshold below the content -> picks it up.
         using var sensedBelow = Atlas.Sense(bmp, alphaThreshold: 64);
         Assert.Equal(1, sensedBelow.Count);
-        Assert.Equal(new Rect(0, 0, 4, 4), sensedBelow[0]);
+        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)sensedBelow[0]).SourceRect);
     }
 
     private static void FillRect(Bitmap bmp, int x, int y, int w, int h) =>

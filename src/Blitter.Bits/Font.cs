@@ -12,6 +12,7 @@ namespace Blitter.Bits;
 public sealed class Font : IDisposable
 {
     private readonly Atlas _atlas;
+    private readonly Bitmap _image;
     private readonly int _cellPixelW;
     private readonly int _cellPixelH;
     private readonly int _columns;
@@ -246,7 +247,8 @@ public sealed class Font : IDisposable
             }
 
             var image = bmp.ToImage();
-            _atlas = new Atlas(image, rects, nameMap);
+            _image = image;
+            _atlas = Atlas.FromRegions(image, rects, nameMap);
         }
         finally
         {
@@ -286,7 +288,14 @@ public sealed class Font : IDisposable
         foreach (var rune in text.EnumerateRunes())
         {
             if (_runeToSlot.TryGetValue(rune.Value, out var slot))
-                renderer.DrawImage(_atlas.Image, _atlas[slot], new Rect(x + i * cw, y, cw, ch), color);
+            {
+                var glyph = _atlas[slot];
+                var glyphSize = glyph.Size;
+                renderer.DrawImage(glyph,
+                    new Rect(0f, 0f, glyphSize.Width, glyphSize.Height),
+                    new Rect(x + i * cw, y, cw, ch),
+                    color);
+            }
             i++;
         }
     }
@@ -324,7 +333,7 @@ public sealed class Font : IDisposable
         {
             renderer.CullMode = CullMode.None;
             renderer.DepthMode = DepthMode.Transparent;
-            renderer.DrawMesh(mesh, _atlas.Image, Shaders.PositionTextureWithTransformAndColor, in args);
+            renderer.DrawMesh(mesh, _image, Shaders.PositionTextureWithTransformAndColor, in args);
         }
     }
 
@@ -332,8 +341,8 @@ public sealed class Font : IDisposable
     {
         // UVs are derived from the Atlas's pixel rects (single source of
         // truth for cell placement) divided by atlas dimensions.
-        float atlasW = _atlas.Image.Size.Width;
-        float atlasH = _atlas.Image.Size.Height;
+        float atlasW = _image.Size.Width;
+        float atlasH = _image.Size.Height;
 
         var verts = new List<TextureVertex3D>();
         int i = 0;
@@ -341,7 +350,8 @@ public sealed class Font : IDisposable
         {
             if (_runeToSlot.TryGetValue(rune.Value, out var slot))
             {
-                var rect = _atlas[slot];
+                // Font's atlas slots are always regions over _image.
+                var rect = ((ITextureRegion)_atlas[slot]).SourceRect;
                 float u0 = rect.X / atlasW;
                 float u1 = (rect.X + rect.Width) / atlasW;
                 float v0 = rect.Y / atlasH;

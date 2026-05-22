@@ -2,41 +2,19 @@ using Blitter.Bits;
 
 namespace Blitter.Tests;
 
-public class AnimationAtlasTests
+public class AnimationCatalogTests
 {
     [Fact]
-    public void Default_State_Is_First_Sequence()
+    public void Names_In_Declaration_Order()
     {
         using var atlas = MakeAtlas(8);
-        var a = new AnimationAtlas(atlas, [
+        var a = atlas.ToAnimationCatalog([
             new("idle", [0, 1], TimeSpan.FromSeconds(1)),
             new("walk", [2, 3, 4], TimeSpan.FromSeconds(1)),
         ]);
 
-        Assert.Equal("idle", a.DefaultState);
-        Assert.Equal(new[] { "idle", "walk" }, a.States);
-    }
-
-    [Fact]
-    public void Explicit_DefaultState_Is_Honored()
-    {
-        using var atlas = MakeAtlas(8);
-        var a = new AnimationAtlas(atlas, [
-            new("idle", [0], TimeSpan.FromSeconds(1)),
-            new("walk", [1, 2], TimeSpan.FromSeconds(1)),
-        ], defaultState: "walk");
-
-        Assert.Equal("walk", a.DefaultState);
-    }
-
-    [Fact]
-    public void Unknown_DefaultState_Throws()
-    {
-        using var atlas = MakeAtlas(4);
-        Assert.Throws<ArgumentException>(() =>
-            new AnimationAtlas(atlas, [
-                new("idle", [0], TimeSpan.FromSeconds(1)),
-            ], defaultState: "missing"));
+        Assert.Equal(new[] { "idle", "walk" }, a.Names);
+        Assert.Equal(2, a.Count);
     }
 
     [Fact]
@@ -44,7 +22,7 @@ public class AnimationAtlasTests
     {
         using var atlas = MakeAtlas(2);
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            new AnimationAtlas(atlas, [
+            atlas.ToAnimationCatalog([
                 new("a", [0, 5], TimeSpan.FromSeconds(1)),
             ]));
     }
@@ -54,7 +32,7 @@ public class AnimationAtlasTests
     {
         using var atlas = MakeAtlas(4);
         Assert.Throws<ArgumentException>(() =>
-            new AnimationAtlas(atlas, [
+            atlas.ToAnimationCatalog([
                 new("a", [0], TimeSpan.FromSeconds(1)),
                 new("a", [1], TimeSpan.FromSeconds(1)),
             ]));
@@ -64,27 +42,36 @@ public class AnimationAtlasTests
     public void Lookup_By_Name_And_Index()
     {
         using var atlas = MakeAtlas(4);
-        var walk = new AnimationSequence("walk", [1, 2], TimeSpan.FromSeconds(1));
-        var a = new AnimationAtlas(atlas, [
+        var a = atlas.ToAnimationCatalog([
             new("idle", [0], TimeSpan.FromSeconds(1)),
-            walk,
+            new("walk", [1, 2], TimeSpan.FromSeconds(1)),
         ]);
 
-        Assert.Same(walk, a["walk"]);
+        var walk = a["walk"];
+        Assert.Equal(2, walk.FrameCount);
         Assert.Same(walk, a[1]);
+        Assert.True(a.Contains("walk"));
+        Assert.False(a.Contains("missing"));
         Assert.True(a.TryGet("walk", out var got));
         Assert.Same(walk, got);
         Assert.False(a.TryGet("missing", out _));
     }
 
     [Fact]
-    public void Single_Factory_Builds_One_Sequence_Atlas()
+    public void Single_Factory_Builds_One_Sequence_Catalog()
     {
         using var atlas = MakeAtlas(3);
-        var a = AnimationAtlas.Single(atlas, TimeSpan.FromSeconds(1));
+        var a = atlas.ToSingleSequenceCatalog(TimeSpan.FromSeconds(1));
 
-        Assert.Equal("default", a.DefaultState);
+        Assert.Equal(1, a.Count);
         Assert.Equal(3, a["default"].FrameCount);
+    }
+
+    [Fact]
+    public void Empty_Sequences_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new AnimationCatalog(Array.Empty<KeyValuePair<string, AnimationSequence>>()));
     }
 
     private static Atlas MakeAtlas(int frames)

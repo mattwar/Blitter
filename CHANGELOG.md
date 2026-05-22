@@ -4,7 +4,52 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- `ReadableTexture2D` abstract base in `Blitter` for textures that
+  support CPU pixel reads via `GetPixel`. `Bitmap` now derives from
+  it.
+- `IReadableTexture2D` interface — the readable contract used by
+  `ImageBounds` and other consumers; implemented by
+  `ReadableTexture2D` and `ReadableTextureSegment2D`.
+- `ITextureRegion` interface — `Source` + `SourceRect` pair shared
+  by texture region wrappers; renderer uses it to unwrap regions.
+- `Texture2D.Slice(Rect)` returns a sub-rect view of an image,
+  `string.Substring`-style; readable images return readable slices.
+- `TextureSegment2D` in `Blitter` is a non-readable region wrapper.
+  `ReadableTextureSegment2D` adds CPU pixel reads. The renderer
+  transparently unwraps either back to source + offset source rect.
+
 ### Changed
+- `ImageBounds` extension helpers now accept any
+  `IReadableTexture2D`, not just `Bitmap`.
+- `Atlas` is an ordered, optionally-named collection of
+  `Texture2D`s with no `Image` property; entries may originate
+  from multiple sources. Build via `Atlas.FromRegions(image, …)`,
+  `Atlas.Grid(image, …)`, or `Atlas.Sense(image, …)`. Only `Sense`
+  requires a readable image.
+- `AnimationSequence.Frames` is now `ImmutableArray<Texture2D>`;
+  `FrameIndexAt` returns the position within the frame list and a
+  new `FrameAt` returns the frame texture. Atlas-built sequences
+  hold sliced frames over the atlas image.
+- `AnimationSequence` no longer carries a `Name`; the name lives
+  with the catalog entry. Construct as
+  `new AnimationSequence(frames, frameDuration, loop)`.
+- `AnimationAtlas` renamed to `AnimationCatalog` and decoupled from
+  `Atlas`. Catalog is an ordered collection of named
+  `AnimationSequence`s (`Count` / `Names` / indexers / `Contains` /
+  `TryGet`) built from
+  `IEnumerable<KeyValuePair<string, AnimationSequence>>` — no
+  default state. Build from an atlas via
+  `atlas.ToAnimationCatalog(specs)` /
+  `atlas.ToSingleSequenceCatalog(frameDuration, …)` in
+  `AtlasAnimations`. `Spec` lives on that extension class.
+- `AnimatedVisual2D` now owns its initial state; pass it to the
+  ctor (defaults to the catalog's first sequence). `Atlas` property
+  renamed to `Catalog`.
+- `AnimatedVisual2D` derives a per-state `HitShape2D` from the
+  first frame of the current sequence (cached per state), assuming
+  a sequence's silhouette is stable within itself.
+
 - `SpriteImage2D` renamed to `Visual2D` and moved to `Blitter.Bits`;
   `TextureSpriteImage2D` → `TextureVisual2D`,
   `AnimatedSpriteImage2D` → `AnimatedVisual2D`. The type no longer
