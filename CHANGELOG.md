@@ -60,7 +60,8 @@ All notable changes to this project will be documented in this file.
   `Age` (passed to `Draw` as `elapsed`). Supports `Loop`,
   `PingPong`, and `Once`. `WithOffset` / `WithFrameDuration` /
   `WithLoop` clone an instance with one property changed (use
-  `WithOffset` to desync sprites that share an animation).
+  `WithOffset` to start one host's animation out of phase with
+  another).
 - `Pose2D` struct (`Position`, `Rotation`, `Scale`, `Flipped`) used by
   `Visual2D.Draw` and `PosedHitShape2D`.
 - `Visual2D.State` / `Visual2D.States` / `Visual2D.DefaultState`:
