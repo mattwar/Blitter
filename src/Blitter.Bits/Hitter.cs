@@ -7,22 +7,22 @@ namespace Blitter.Bits;
 /// through the interface dispatch table.
 /// </summary>
 /// <remarks>
-/// The double-dispatch protocol against <see cref="HitShape"/>:
-/// stage 1 hands us shape A's primitives and shape B; we recurse
-/// into B to collect its primitives; stage 2 fires with both
-/// spans live on the stack, where subclasses do the real work.
+/// The double-dispatch protocol against <see cref="PosedHitShape"/>:
+/// stage 1 hands us shape A's posed primitives and B (still a posed
+/// shape); we expand B by stackallocing its primitives; stage 2 fires
+/// with both spans live on the stack, where subclasses do the real work.
 /// </remarks>
 public abstract class Hitter
 {
     /// <summary>
-    /// Stage 1: shape A has placed its primitives in <paramref name="a"/>.
-    /// Default behavior recurses into <paramref name="b"/> so it can
-    /// stackalloc its own primitives and finish the dispatch via
-    /// <see cref="TestHit(System.ReadOnlySpan{HitPrimitive}, System.ReadOnlySpan{HitPrimitive})"/>.
-    /// Subclasses rarely need to override this stage.
+    /// Stage 1: shape A has placed its posed primitives in
+    /// <paramref name="a"/>. Default behavior recurses into
+    /// <paramref name="b"/> so it can stackalloc its own primitives
+    /// and finish dispatch via the span-vs-span stage. Subclasses
+    /// rarely need to override this stage.
     /// </summary>
-    public virtual bool TestHit(ReadOnlySpan<HitPrimitive> a, HitShape b) =>
-        b.TestHitWith(a, this);
+    public virtual bool TestHit(ReadOnlySpan<HitPrimitive> a, in PosedHitShape b) =>
+        b.Shape.TestHitWith(in b, a, this);
 
     /// <summary>
     /// Stage 2: both primitive lists are live on the stack. Subclasses

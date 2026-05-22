@@ -354,8 +354,9 @@ sealed class Rocket : Sprite2D
     public TimeSpan StunUntil { get; set; }
     public bool IsStunned => Age < StunUntil;
 
-    // Cached capsule shape oriented along the rocket body. Lazy
-    // because Image isn't set in the ctor.
+    // Cached image-local capsule shape along the rocket body. Lazy
+    // because Image isn't set in the ctor; pose is applied per access
+    // via PosedHitShape.
     private HitShape? _rocketHitShape;
 
     /// <summary>
@@ -363,7 +364,8 @@ sealed class Rocket : Sprite2D
     /// <see cref="Sprite2D.Rotation"/> and sized from the image's
     /// opaque-pixel bounding rectangle.
     /// </summary>
-    public override HitShape HitShape => _rocketHitShape ??= BuildHitShape();
+    public override PosedHitShape HitShape =>
+        new(_rocketHitShape ??= BuildHitShape(), Center, Rotation, Scale);
 
     private HitShape BuildHitShape()
     {
@@ -373,10 +375,10 @@ sealed class Rocket : Sprite2D
         // = long side - 2·radius; both cap-circles end up tangent
         // to the short edges of the box.
         if (Image is not TextureSpriteImage2D tsi || tsi.Texture is not Bitmap bmp)
-            return new CircleHitShape(this);
+            return Blitter.Bits.HitShape.None;
         var bounds = bmp.ComputeOpaqueBounds();
         if (bounds.IsEmpty)
-            return new CircleHitShape(this);
+            return Blitter.Bits.HitShape.None;
 
         // ComputeOpaqueBounds is in image-pixel space (origin
         // top-left); sprite-local has origin at the image center.
@@ -388,7 +390,6 @@ sealed class Rocket : Sprite2D
         var halfLen = (tall ? size.Y : size.X) * 0.5f - bodyRadius;
         var axis = tall ? new Vector2(0f, 1f) : new Vector2(1f, 0f);
         return new CapsuleHitShape(
-            this,
             localCenter - axis * halfLen,
             localCenter + axis * halfLen,
             bodyRadius

@@ -19,6 +19,20 @@ public abstract class SpriteImage2D
     /// </summary>
     public abstract BoundingCircle Boundary { get; }
 
+    /// <summary>
+    /// Image-local collision shape. Defaults to a single circle
+    /// derived from <see cref="Boundary"/>; assign a hand-rolled
+    /// shape (e.g. a capsule along the visible body) for tighter
+    /// geometry. The same instance can be shared across sprites and
+    /// across animation frames.
+    /// </summary>
+    public HitShape HitShape
+    {
+        get => _hitShape ??= new CircleHitShape(Boundary.Center, Boundary.Radius);
+        set => _hitShape = value;
+    }
+    private HitShape? _hitShape;
+
     /// <summary>Draw this image at the given world transform, multiplied
     /// by <paramref name="tint"/> (per-channel). Pass <see cref="Color.White"/>
     /// for untinted output.</summary>

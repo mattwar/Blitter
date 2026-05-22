@@ -22,129 +22,111 @@ public class HitShapeTests
     }
 
     [Fact]
-    public void HitShape_Intersects_Uses_BroadCircle_Reject()
+    public void PosedHitShape_Intersects_Uses_BroadCircle_Reject()
     {
-        // Two stub shapes whose broad circles miss should never reach
-        // the primitive dispatch — verified by the canary hitter below.
+        // Two shapes whose broad circles miss should never reach the
+        // primitive dispatch — verified by the canary hitter below.
         var canary = new CanaryHitter();
-        var a = new StubShape(new BoundingCircle(new Vector2(0, 0), 4f), HitPrimitive.Circle(new Vector2(0, 0), 4f));
-        var b = new StubShape(new BoundingCircle(new Vector2(100, 0), 4f), HitPrimitive.Circle(new Vector2(100, 0), 4f));
+        var a = Pose(new CircleHitShape(Vector2.Zero, 4f), new Vector2(0, 0));
+        var b = Pose(new CircleHitShape(Vector2.Zero, 4f), new Vector2(100, 0));
 
-        Assert.False(HitShape.Intersects(a, b));
-        Assert.Equal(0, canary.Calls);
+        Assert.False(a.Intersects(b));
+        // Run the dispatch directly through the canary to confirm it
+        // would have been invoked if the broad-phase had let us through.
+        Assert.False(a.TestHit(in b, canary)); // BroadCircle miss is in Intersects, not TestHit
+        // Sanity: the canary was invoked once for that direct TestHit call.
+        Assert.Equal(1, canary.Calls);
     }
 
     [Fact]
-    public void HitShape_Intersects_Returns_True_On_Overlap()
+    public void PosedHitShape_Intersects_Returns_True_On_Overlap()
     {
-        var a = new StubShape(new BoundingCircle(new Vector2(0, 0), 5f), HitPrimitive.Circle(new Vector2(0, 0), 5f));
-        var b = new StubShape(new BoundingCircle(new Vector2(6, 0), 5f), HitPrimitive.Circle(new Vector2(6, 0), 5f));
-        Assert.True(HitShape.Intersects(a, b));
+        var a = Pose(new CircleHitShape(Vector2.Zero, 5f), new Vector2(0, 0));
+        var b = Pose(new CircleHitShape(Vector2.Zero, 5f), new Vector2(6, 0));
+        Assert.True(a.Intersects(b));
     }
 
     [Fact]
     public void MultiPrimitive_Shape_Hits_Via_Any_Primitive()
     {
         // Shape A has two well-separated circles; B overlaps only the second.
-        var a = new MultiShape(
-            HitPrimitive.Circle(new Vector2(0, 0), 2f),
-            HitPrimitive.Circle(new Vector2(20, 0), 2f));
-        var b = new StubShape(new BoundingCircle(new Vector2(21, 0), 2f), HitPrimitive.Circle(new Vector2(21, 0), 2f));
-        Assert.True(HitShape.Intersects(a, b));
+        var a = Pose(new TwoCircleShape(new Vector2(0, 0), new Vector2(20, 0), 2f), Vector2.Zero);
+        var b = Pose(new CircleHitShape(Vector2.Zero, 2f), new Vector2(21, 0));
+        Assert.True(a.Intersects(b));
     }
 
     [Fact]
     public void MultiPrimitive_Shape_Misses_When_No_Pair_Overlaps()
     {
-        var a = new MultiShape(
-            HitPrimitive.Circle(new Vector2(0, 0), 2f),
-            HitPrimitive.Circle(new Vector2(20, 0), 2f));
-        // Broad circle of MultiShape covers both, so this lands inside the
-        // broad reject but no individual primitive overlaps the target.
-        var b = new StubShape(new BoundingCircle(new Vector2(10, 0), 2f), HitPrimitive.Circle(new Vector2(10, 0), 2f));
-        Assert.False(HitShape.Intersects(a, b));
+        var a = Pose(new TwoCircleShape(new Vector2(0, 0), new Vector2(20, 0), 2f), Vector2.Zero);
+        // Broad circle of TwoCircleShape covers both, so this lands inside
+        // the broad reject but no individual primitive overlaps the target.
+        var b = Pose(new CircleHitShape(Vector2.Zero, 2f), new Vector2(10, 0));
+        Assert.False(a.Intersects(b));
     }
 
-    private sealed class StubShape : HitShape
+    private static PosedHitShape Pose(HitShape shape, Vector2 position) =>
+        new(shape, position, 0f, 1f);
+
+    /// <summary>
+    /// Two-circle test shape: emits a circle at each local point with
+    /// the same radius, and a bounding circle covering both.
+    /// </summary>
+    private sealed class TwoCircleShape : HitShape
     {
-        private readonly BoundingCircle _broad;
-        private readonly HitPrimitive _prim;
+        private readonly Vector2 _a;
+        private readonly Vector2 _b;
+        private readonly float _r;
 
-        public StubShape(BoundingCircle broad, HitPrimitive prim)
-        {
-            _broad = broad;
-            _prim = prim;
-        }
-
-        public override BoundingCircle BroadCircle => _broad;
-
-        public override bool TestHit(HitShape other, Hitter hitter)
-        {
-            Span<HitPrimitive> mine = stackalloc HitPrimitive[1];
-            mine[0] = _prim;
-            return hitter.TestHit(mine, other);
-        }
-
-        public override bool TestHitWith(ReadOnlySpan<HitPrimitive> other, Hitter hitter)
-        {
-            Span<HitPrimitive> mine = stackalloc HitPrimitive[1];
-            mine[0] = _prim;
-            return hitter.TestHit(other, mine);
-        }
-
-        public override void Visit(HitShapeVisitor visitor)
-        {
-            Span<HitPrimitive> mine = stackalloc HitPrimitive[1];
-            mine[0] = _prim;
-            visitor(mine);
-        }
-    }
-
-    private sealed class MultiShape : HitShape
-    {
-        private readonly HitPrimitive _a, _b;
-
-        public MultiShape(HitPrimitive a, HitPrimitive b)
+        public TwoCircleShape(Vector2 a, Vector2 b, float r)
         {
             _a = a;
             _b = b;
+            _r = r;
         }
 
-        public override BoundingCircle BroadCircle
+        public override BoundingCircle LocalBoundary
         {
-            // A loose bounding circle covering both primitives.
             get
             {
-                var mid = (_a.P0 + _b.P0) * 0.5f;
-                var halfSpan = (_a.P0 - _b.P0).Length() * 0.5f;
-                var r = halfSpan + MathF.Max(_a.R, _b.R);
-                return new BoundingCircle(mid, r);
+                var mid = (_a + _b) * 0.5f;
+                var half = (_a - _b).Length() * 0.5f;
+                return new BoundingCircle(mid, half + _r);
             }
         }
 
-        public override bool TestHit(HitShape other, Hitter hitter)
+        public override bool TestHit(in PosedHitShape mine, in PosedHitShape other, Hitter hitter)
         {
-            Span<HitPrimitive> mine = stackalloc HitPrimitive[2];
-            mine[0] = _a;
-            mine[1] = _b;
-            return hitter.TestHit(mine, other);
+            Span<HitPrimitive> span = stackalloc HitPrimitive[2];
+            Pose(span, in mine);
+            return hitter.TestHit(span, in other);
         }
 
-        public override bool TestHitWith(ReadOnlySpan<HitPrimitive> other, Hitter hitter)
+        public override bool TestHitWith(in PosedHitShape mine, ReadOnlySpan<HitPrimitive> other, Hitter hitter)
         {
-            Span<HitPrimitive> mine = stackalloc HitPrimitive[2];
-            mine[0] = _a;
-            mine[1] = _b;
-            return hitter.TestHit(other, mine);
+            Span<HitPrimitive> span = stackalloc HitPrimitive[2];
+            Pose(span, in mine);
+            return hitter.TestHit(other, span);
         }
 
-        public override void Visit(HitShapeVisitor visitor)
+        public override void Visit(in PosedHitShape mine, HitShapeVisitor visitor)
         {
-            Span<HitPrimitive> mine = stackalloc HitPrimitive[2];
-            mine[0] = _a;
-            mine[1] = _b;
-            visitor(mine);
+            Span<HitPrimitive> span = stackalloc HitPrimitive[2];
+            Pose(span, in mine);
+            visitor(span);
         }
+
+        private void Pose(Span<HitPrimitive> destination, in PosedHitShape pose)
+        {
+            var rad = pose.Rotation * (MathF.PI / 180f);
+            var cos = MathF.Cos(rad);
+            var sin = MathF.Sin(rad);
+            destination[0] = HitPrimitive.Circle(pose.Position + Rotate(_a * pose.Scale, cos, sin), _r * pose.Scale);
+            destination[1] = HitPrimitive.Circle(pose.Position + Rotate(_b * pose.Scale, cos, sin), _r * pose.Scale);
+        }
+
+        private static Vector2 Rotate(Vector2 v, float cos, float sin) =>
+            new(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos);
     }
 
     private sealed class CanaryHitter : Hitter

@@ -256,7 +256,7 @@ public class PlayField2D : Layer2D
                     var bShape = b.HitShape;
                     if (bShape.BroadCircle.Radius <= 0f)
                         continue;
-                    if (!HitShape.Intersects(aShape, bShape))
+                    if (!aShape.Intersects(bShape))
                         continue;
 
                     a.OnHitSprite(b, spriteContext);

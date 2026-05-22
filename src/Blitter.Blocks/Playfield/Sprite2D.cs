@@ -77,19 +77,19 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
             : TimeSpan.Zero;
 
     /// <summary>
-    /// The collision boundary of the sprite. Default is a single
-    /// circle covering the sprite's image. Override to return a
-    /// shape with tighter or multi-primitive geometry (e.g. for
-    /// an elongated rocket).
+    /// The sprite's world-space collision shape: the current
+    /// <see cref="Image"/>'s <see cref="SpriteImage2D.HitShape"/>
+    /// combined with this sprite's <see cref="Center"/>,
+    /// <see cref="Rotation"/>, and <see cref="Scale"/>. Override
+    /// to substitute a different shape (still posed by the sprite).
     /// </summary>
-    public virtual HitShape HitShape => _hitShape ??= new CircleHitShape(this);
-    private HitShape? _hitShape;
+    public virtual PosedHitShape HitShape =>
+        new(Image?.HitShape ?? Blitter.Bits.HitShape.None, Center, Rotation, Scale);
 
     /// <summary>
     /// Broad-phase bounding circle of the sprite for collision
     /// purposes; equivalent to <see cref="HitShape"/>'s
-    /// <see cref="HitShape.BroadCircle"/>. Kept as a convenience
-    /// for legacy callers and for the broad-phase reject path.
+    /// <see cref="PosedHitShape.BroadCircle"/>.
     /// </summary>
     public BoundingCircle HitCircle => HitShape.BroadCircle;
 
