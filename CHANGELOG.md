@@ -8,8 +8,9 @@ All notable changes to this project will be documented in this file.
 - `HitShape`, `PosedHitShape`, `HitPrimitive`, `HitKind`, `Hitter`,
   and `HitShapeVisitor` renamed with a `2D` suffix (e.g.
   `HitShape2D`). 3D equivalents will follow.
-- `SpriteImage2D.Draw` now takes `in Pose2D pose` instead of separate
-  `center` / `rotation` / `scale` / `flipped` parameters.
+- `SpriteImage2D.Draw` now takes `in Pose2D pose` and a
+  `TimeSpan elapsed` (the host sprite's age) so animated images
+  can pick a frame.
 - `PosedHitShape2D` now honors `Pose2D.Flipped` in hit tests, so
   asymmetric local shapes mirror correctly with their sprite.
 - `Bitmap.ComputeOpaqueHitShape` renamed to
@@ -44,6 +45,16 @@ All notable changes to this project will be documented in this file.
   `Layers.Remove` remain for the rare case of dynamic layer changes.
 
 ### Added
+- `Atlas.Sense(Bitmap, ...)`: factory that detects a sprite sheet's
+  implicit grid from rows/columns of transparent gutters. Skips
+  empty cells (e.g. blanks in a diagonal layout) by default; pass
+  `includeEmptyCells: true` to keep them.
+- `AnimatedSpriteImage2D`: a `SpriteImage2D` that cycles through
+  frames of an `Atlas`. Playback is driven by the sprite's
+  `Age` (passed to `Draw` as `elapsed`). Supports `Loop`,
+  `PingPong`, and `Once`. `WithOffset` / `WithFrameDuration` /
+  `WithLoop` clone an instance with one property changed (use
+  `WithOffset` to desync sprites that share an animation).
 - `Pose2D` struct (`Position`, `Rotation`, `Scale`, `Flipped`) used by
   `SpriteImage2D.Draw` and `PosedHitShape2D`.
 - `SpriteImage2D.State` / `SpriteImage2D.States` / `SpriteImage2D.DefaultState`:

@@ -65,9 +65,11 @@ public abstract class SpriteImage2D
         new CircleHitShape2D(Boundary.Center, Boundary.Radius);
 
     /// <summary>Draw this image at the given world <paramref name="pose"/>,
-    /// multiplied by <paramref name="tint"/> (per-channel). 
-    /// Pass <see cref="Color.White"/> for untinted output.</summary>
-    public abstract void Draw(Renderer2D renderer, in Pose2D pose, Color tint);
+    /// multiplied by <paramref name="tint"/> (per-channel). Pass
+    /// <see cref="Color.White"/> for untinted output. <paramref name="elapsed"/>
+    /// is the host sprite's age — animated images use it to pick the
+    /// current frame; static images ignore it.</summary>
+    public abstract void Draw(Renderer2D renderer, in Pose2D pose, Color tint, TimeSpan elapsed);
 
     /// <summary>
     /// Implicit wrap of a <see cref="Texture2D"/> in a
@@ -111,7 +113,7 @@ public sealed class TextureSpriteImage2D : SpriteImage2D
         return new BoundingCircle(Vector2.Zero, half.Length());
     }
 
-    public override void Draw(Renderer2D renderer, in Pose2D pose, Color tint)
+    public override void Draw(Renderer2D renderer, in Pose2D pose, Color tint, TimeSpan elapsed)
     {
         var size = _texture.Size;
         var scaledWidth = size.Width * pose.Scale;

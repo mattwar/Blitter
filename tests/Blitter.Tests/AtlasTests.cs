@@ -149,4 +149,105 @@ public class AtlasTests
         atlas.Dispose();
         atlas.Dispose(); // does not throw
     }
+
+    [Fact]
+    public void Sense_DetectsHorizontalStrip()
+    {
+        // 16x4 image with three 4-wide opaque cells separated by 1px gutters
+        // at x=4, x=9. (Layout: [0..3] gutter [5..8] gutter [10..13] trailing 14..15)
+        var bmp = CreateImage(16, 4);
+        FillRect(bmp, 0, 0, 4, 4);
+        FillRect(bmp, 5, 0, 4, 4);
+        FillRect(bmp, 10, 0, 4, 4);
+
+        using var atlas = Atlas.Sense(bmp);
+
+        Assert.Equal(3, atlas.Count);
+        Assert.Equal(new Rect(0, 0, 4, 4), atlas[0]);
+        Assert.Equal(new Rect(5, 0, 4, 4), atlas[1]);
+        Assert.Equal(new Rect(10, 0, 4, 4), atlas[2]);
+    }
+
+    [Fact]
+    public void Sense_DetectsGrid_RowMajor()
+    {
+        // 2x2 grid of 4x4 cells with 2px gutters at x=4..5 and y=4..5.
+        var bmp = CreateImage(10, 10);
+        FillRect(bmp, 0, 0, 4, 4);
+        FillRect(bmp, 6, 0, 4, 4);
+        FillRect(bmp, 0, 6, 4, 4);
+        FillRect(bmp, 6, 6, 4, 4);
+
+        using var atlas = Atlas.Sense(bmp);
+
+        Assert.Equal(4, atlas.Count);
+        Assert.Equal(new Rect(0, 0, 4, 4), atlas[0]);
+        Assert.Equal(new Rect(6, 0, 4, 4), atlas[1]);
+        Assert.Equal(new Rect(0, 6, 4, 4), atlas[2]);
+        Assert.Equal(new Rect(6, 6, 4, 4), atlas[3]);
+    }
+
+    [Fact]
+    public void Sense_SkipsEmptyCellsByDefault()
+    {
+        // 2x2 grid but only the diagonal cells (TL and BR) are filled.
+        var bmp = CreateImage(10, 10);
+        FillRect(bmp, 0, 0, 4, 4);
+        FillRect(bmp, 6, 6, 4, 4);
+
+        using var atlas = Atlas.Sense(bmp);
+
+        Assert.Equal(2, atlas.Count);
+        Assert.Equal(new Rect(0, 0, 4, 4), atlas[0]);
+        Assert.Equal(new Rect(6, 6, 4, 4), atlas[1]);
+    }
+
+    [Fact]
+    public void Sense_IncludesEmptyCells_WhenOptedIn()
+    {
+        var bmp = CreateImage(10, 10);
+        FillRect(bmp, 0, 0, 4, 4);
+        FillRect(bmp, 6, 6, 4, 4);
+
+        using var atlas = Atlas.Sense(bmp, includeEmptyCells: true);
+
+        Assert.Equal(4, atlas.Count);
+        Assert.Equal(new Rect(0, 0, 4, 4), atlas[0]);
+        Assert.Equal(new Rect(6, 0, 4, 4), atlas[1]);
+        Assert.Equal(new Rect(0, 6, 4, 4), atlas[2]);
+        Assert.Equal(new Rect(6, 6, 4, 4), atlas[3]);
+    }
+
+    [Fact]
+    public void Sense_AllTransparent_ReturnsEmpty()
+    {
+        var bmp = CreateImage(8, 8);
+        using var atlas = Atlas.Sense(bmp);
+        Assert.Equal(0, atlas.Count);
+    }
+
+    [Fact]
+    public void Sense_HonorsAlphaThreshold()
+    {
+        var bmp = CreateImage(8, 4);
+        // Two cells, both filled with translucent alpha=128.
+        FillRect(bmp, 0, 0, 4, 4, new Color(255, 255, 255, 128));
+        // Threshold above the content -> treated as transparent.
+        using var sensedAbove = Atlas.Sense(bmp, alphaThreshold: 200);
+        Assert.Equal(0, sensedAbove.Count);
+        // Threshold below the content -> picks it up.
+        using var sensedBelow = Atlas.Sense(bmp, alphaThreshold: 64);
+        Assert.Equal(1, sensedBelow.Count);
+        Assert.Equal(new Rect(0, 0, 4, 4), sensedBelow[0]);
+    }
+
+    private static void FillRect(Bitmap bmp, int x, int y, int w, int h) =>
+        FillRect(bmp, x, y, w, h, Color.White);
+
+    private static void FillRect(Bitmap bmp, int x, int y, int w, int h, Color color)
+    {
+        for (int yy = y; yy < y + h; yy++)
+            for (int xx = x; xx < x + w; xx++)
+                bmp.SetPixel(xx, yy, color);
+    }
 }

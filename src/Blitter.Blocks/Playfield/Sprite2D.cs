@@ -139,7 +139,7 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer2D renderer)
     {
-        this.Image?.Draw(renderer, new Pose2D(Center, Rotation, Scale, Flipped), this.Tint);
+        this.Image?.Draw(renderer, new Pose2D(Center, Rotation, Scale, Flipped), this.Tint, this.Age);
     }
 
     /// <summary>
