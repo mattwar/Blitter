@@ -23,11 +23,11 @@ public abstract class HitShape2D
     /// <summary>
     /// Stage 1 of double dispatch. This shape, posed by
     /// <paramref name="mine"/>, places its world-space primitives on
-    /// the stack and hands them to <paramref name="hitter"/> along
+    /// the stack and hands them to <paramref name="tester"/> along
     /// with the still-posed <paramref name="other"/>; 
-    /// the hitter expands <paramref name="other"/> for stage 2.
+    /// the tester expands <paramref name="other"/> for stage 2.
     /// </summary>
-    public abstract bool TestHit(in PosedHitShape2D mine, in PosedHitShape2D other, Hitter2D hitter);
+    public abstract bool TestHit(in PosedHitShape2D mine, in PosedHitShape2D other, HitTester2D tester);
 
     /// <summary>
     /// Stage 2 of double dispatch. The other shape's primitives are
@@ -35,7 +35,7 @@ public abstract class HitShape2D
     /// <paramref name="mine"/>, stackallocs its own primitives and
     /// finishes the dispatch.
     /// </summary>
-    public abstract bool TestHitWith(in PosedHitShape2D mine, ReadOnlySpan<HitPrimitive2D> other, Hitter2D hitter);
+    public abstract bool TestHitWith(in PosedHitShape2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester);
 
     /// <summary>
     /// Hands this shape's current posed primitives to
@@ -60,8 +60,8 @@ public abstract class HitShape2D
     private sealed class NoneShape : HitShape2D
     {
         public override BoundingCircle LocalBoundary => BoundingCircle.Empty;
-        public override bool TestHit(in PosedHitShape2D mine, in PosedHitShape2D other, Hitter2D hitter) => false;
-        public override bool TestHitWith(in PosedHitShape2D mine, ReadOnlySpan<HitPrimitive2D> other, Hitter2D hitter) => false;
+        public override bool TestHit(in PosedHitShape2D mine, in PosedHitShape2D other, HitTester2D tester) => false;
+        public override bool TestHitWith(in PosedHitShape2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester) => false;
         public override void Visit(in PosedHitShape2D mine, HitShapeVisitor2D visitor) { }
         public override HitShape2D Translate(Vector2 offset) => this;
     }
@@ -114,16 +114,16 @@ public readonly struct PosedHitShape2D
     {
         if (!BroadCircle.Intersects(other.BroadCircle))
             return false;
-        return Shape.TestHit(in this, in other, IntersectsHitter2D.Instance);
+        return Shape.TestHit(in this, in other, IntersectsHitTester2D.Instance);
     }
 
     /// <summary>
-    /// Stage 1 of double dispatch using a custom <paramref name="hitter"/>.
+    /// Stage 1 of double dispatch using a custom <paramref name="tester"/>.
     /// Skips the broad-phase reject; call <see cref="Intersects"/> if
     /// you want the cheap reject.
     /// </summary>
-    public bool TestHit(in PosedHitShape2D other, Hitter2D hitter) =>
-        Shape.TestHit(in this, in other, hitter);
+    public bool TestHit(in PosedHitShape2D other, HitTester2D tester) =>
+        Shape.TestHit(in this, in other, tester);
 
     /// <summary>
     /// Hands this shape's current posed primitives to
@@ -151,18 +151,18 @@ public sealed class CircleHitShape2D : HitShape2D
 
     public override BoundingCircle LocalBoundary => new(LocalCenter, LocalRadius);
 
-    public override bool TestHit(in PosedHitShape2D mine, in PosedHitShape2D other, Hitter2D hitter)
+    public override bool TestHit(in PosedHitShape2D mine, in PosedHitShape2D other, HitTester2D tester)
     {
         Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
         span[0] = Pose(in mine);
-        return hitter.TestHit(span, in other);
+        return tester.TestHit(span, in other);
     }
 
-    public override bool TestHitWith(in PosedHitShape2D mine, ReadOnlySpan<HitPrimitive2D> other, Hitter2D hitter)
+    public override bool TestHitWith(in PosedHitShape2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester)
     {
         Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
         span[0] = Pose(in mine);
-        return hitter.TestHit(other, span);
+        return tester.TestHit(other, span);
     }
 
     public override void Visit(in PosedHitShape2D mine, HitShapeVisitor2D visitor)
@@ -207,18 +207,18 @@ public sealed class CapsuleHitShape2D : HitShape2D
         }
     }
 
-    public override bool TestHit(in PosedHitShape2D mine, in PosedHitShape2D other, Hitter2D hitter)
+    public override bool TestHit(in PosedHitShape2D mine, in PosedHitShape2D other, HitTester2D tester)
     {
         Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
         span[0] = Pose(in mine);
-        return hitter.TestHit(span, in other);
+        return tester.TestHit(span, in other);
     }
 
-    public override bool TestHitWith(in PosedHitShape2D mine, ReadOnlySpan<HitPrimitive2D> other, Hitter2D hitter)
+    public override bool TestHitWith(in PosedHitShape2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester)
     {
         Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
         span[0] = Pose(in mine);
-        return hitter.TestHit(other, span);
+        return tester.TestHit(other, span);
     }
 
     public override void Visit(in PosedHitShape2D mine, HitShapeVisitor2D visitor)

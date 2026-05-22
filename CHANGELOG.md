@@ -13,7 +13,9 @@ All notable changes to this project will be documented in this file.
 - `Sprite2D.Image` renamed to `Sprite2D.Visual`.
 - `HitShape`, `PosedHitShape`, `HitPrimitive`, `HitKind`, `Hitter`,
   and `HitShapeVisitor` renamed with a `2D` suffix (e.g.
-  `HitShape2D`). 3D equivalents will follow.
+  `HitShape2D`); `Hitter2D` further renamed to `HitTester2D`
+  (with `IntersectsHitter2D` → `IntersectsHitTester2D`). 3D
+  equivalents will follow.
 - `Visual2D.Draw` now takes `in Pose2D pose` and a
   `TimeSpan elapsed` (the host's age) so animated visuals can pick
   a frame.

@@ -24,7 +24,7 @@ public enum HitKind2D : byte
 /// <summary>
 /// A single collidable 2D primitive. Stack-only by convention — built
 /// by a <see cref="HitShape2D"/> into a <see cref="System.Span{T}"/>
-/// and handed to a <see cref="Hitter2D"/>; never stored on the heap.
+/// and handed to a <see cref="HitTester2D"/>; never stored on the heap.
 /// </summary>
 public readonly struct HitPrimitive2D
 {

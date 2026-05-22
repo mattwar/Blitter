@@ -25,8 +25,8 @@ public class HitShapeTests
     public void PosedHitShape_Intersects_Uses_BroadCircle_Reject()
     {
         // Two shapes whose broad circles miss should never reach the
-        // primitive dispatch — verified by the canary hitter below.
-        var canary = new CanaryHitter();
+        // primitive dispatch — verified by the canary tester below.
+        var canary = new CanaryHitTester();
         var a = Pose(new CircleHitShape2D(Vector2.Zero, 4f), new Vector2(0, 0));
         var b = Pose(new CircleHitShape2D(Vector2.Zero, 4f), new Vector2(100, 0));
 
@@ -133,18 +133,18 @@ public class HitShapeTests
             }
         }
 
-        public override bool TestHit(in PosedHitShape2D mine, in PosedHitShape2D other, Hitter2D hitter)
+        public override bool TestHit(in PosedHitShape2D mine, in PosedHitShape2D other, HitTester2D tester)
         {
             Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[2];
             Pose(span, in mine);
-            return hitter.TestHit(span, in other);
+            return tester.TestHit(span, in other);
         }
 
-        public override bool TestHitWith(in PosedHitShape2D mine, ReadOnlySpan<HitPrimitive2D> other, Hitter2D hitter)
+        public override bool TestHitWith(in PosedHitShape2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester)
         {
             Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[2];
             Pose(span, in mine);
-            return hitter.TestHit(other, span);
+            return tester.TestHit(other, span);
         }
 
         public override void Visit(in PosedHitShape2D mine, HitShapeVisitor2D visitor)
@@ -164,7 +164,7 @@ public class HitShapeTests
             new TwoCircleShape(_a + offset, _b + offset, _r);
     }
 
-    private sealed class CanaryHitter : Hitter2D
+    private sealed class CanaryHitTester : HitTester2D
     {
         public int Calls { get; private set; }
 
