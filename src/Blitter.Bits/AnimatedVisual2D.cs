@@ -3,182 +3,116 @@ using System.Numerics;
 namespace Blitter.Bits;
 
 /// <summary>
-/// How an <see cref="AnimatedVisual2D"/> repeats once it
-/// runs past the last frame.
-/// </summary>
-public enum AnimationLoop
-{
-    /// <summary>Wrap back to the first frame.</summary>
-    Loop,
-    /// <summary>Reverse direction at each end, bouncing forever.</summary>
-    PingPong,
-    /// <summary>Hold on the last frame.</summary>
-    Once,
-}
-
-/// <summary>
-/// A <see cref="Visual2D"/> that cycles through frames of an <see cref="Atlas"/>. 
+/// A <see cref="Visual2D"/> that plays a named <see cref="AnimationSequence"/>
+/// from an <see cref="AnimationAtlas"/>. Set <see cref="Visual2D.State"/>
+/// to switch sequences; the new sequence starts from its first frame.
 /// </summary>
 public sealed class AnimatedVisual2D : Visual2D
 {
-    private readonly Atlas _atlas;
-    // null = identity sequence (atlas frames 0..Count-1 in order); otherwise an explicit subset/reorder.
-    private readonly int[]? _frames;
+    private readonly AnimationAtlas _atlas;
     private BoundingCircle? _boundary;
 
-    public AnimatedVisual2D(
-        Atlas atlas,
-        TimeSpan frameDuration,
-        AnimationLoop loop = AnimationLoop.Loop,
-        TimeSpan offset = default,
-        ReadOnlySpan<int> frames = default)
+    // Local playback clock: the elapsed value that the current sequence treats as
+    // "time zero". On a State change we mark the clock as pending-reset; the next
+    // Draw stamps the base so the new sequence starts from frame 0.
+    private string _state;
+    private AnimationSequence _current;
+    private TimeSpan _sequenceStartElapsed;
+    private bool _resetPending;
+
+    public AnimatedVisual2D(AnimationAtlas atlas, TimeSpan offset = default)
     {
         ArgumentNullException.ThrowIfNull(atlas);
-        if (frameDuration <= TimeSpan.Zero)
-            throw new ArgumentOutOfRangeException(nameof(frameDuration));
-
         _atlas = atlas;
-        if (frames.IsEmpty)
-        {
-            if (atlas.Count == 0)
-                throw new ArgumentException("Atlas has no frames.", nameof(atlas));
-            _frames = null;
-        }
-        else
-        {
-            _frames = frames.ToArray();
-            for (int i = 0; i < _frames.Length; i++)
-            {
-                if ((uint)_frames[i] >= (uint)atlas.Count)
-                    throw new ArgumentOutOfRangeException(nameof(frames),
-                        $"Frame index {_frames[i]} is outside the atlas range [0, {atlas.Count}).");
-            }
-        }
-
-        FrameDuration = frameDuration;
-        Loop = loop;
+        _state = atlas.DefaultState;
+        _current = atlas[_state];
         Offset = offset;
     }
 
-    // Clone ctor used by With* — skips validation and shares the (immutable-by-convention) frames array.
-    private AnimatedVisual2D(
-        Atlas atlas,
-        int[]? frames,
-        TimeSpan frameDuration,
-        AnimationLoop loop,
-        TimeSpan offset)
+    private AnimatedVisual2D(AnimationAtlas atlas, string state, TimeSpan offset)
     {
         _atlas = atlas;
-        _frames = frames;
-        FrameDuration = frameDuration;
-        Loop = loop;
+        _state = state;
+        _current = atlas[state];
         Offset = offset;
     }
 
-    /// <summary>
-    /// Atlas providing the source regions.
-    /// </summary>
-    public Atlas Atlas => _atlas;
+    /// <summary>Atlas + sequences this visual draws from.</summary>
+    public AnimationAtlas Atlas => _atlas;
+
+    /// <inheritdoc/>
+    public override string State
+    {
+        get => _state;
+        set
+        {
+            ArgumentException.ThrowIfNullOrEmpty(value);
+            if (value == _state) 
+                return;
+            if (!_atlas.TryGet(value, out var seq))
+                throw new ArgumentException($"Unknown state '{value}'.", nameof(value));
+            _state = value;
+            _current = seq;
+            _resetPending = true;
+        }
+    }
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<string> States => 
+        _atlas.States;
+
+    /// <summary>Sequence currently selected by <see cref="State"/>.</summary>
+    public AnimationSequence CurrentSequence => 
+        _current;
 
     /// <summary>
-    /// Time each frame is held.
-    /// </summary>
-    public TimeSpan FrameDuration { get; }
-
-    /// <summary>
-    /// Loop behavior at the end of the sequence.
-    /// </summary>
-    public AnimationLoop Loop { get; }
-
-    /// <summary>
-    /// Phase offset added to <c>elapsed</c> before picking a frame.
-    /// Set at construction (or via <see cref="WithOffset"/>) to start a
-    /// new instance out of phase with another.
+    /// Phase offset added to local sequence time before picking a frame.
+    /// Useful for starting a second host's animation out of phase.
     /// </summary>
     public TimeSpan Offset { get; }
 
     /// <summary>
-    /// Number of frames in the sequence.
-    /// </summary>
-    public int FrameCount => _frames?.Length ?? _atlas.Count;
-
-    /// <summary>
     /// Returns a copy of this visual with a different phase
-    /// <paramref name="offset"/>; useful for starting a second host's
-    /// animation out of phase.
+    /// <paramref name="offset"/>.
     /// </summary>
     public AnimatedVisual2D WithOffset(TimeSpan offset) =>
-        new(_atlas, _frames, FrameDuration, Loop, offset);
+        new(_atlas, _state, offset);
 
     /// <summary>
-    /// Returns a copy of this visual with a different
-    /// <paramref name="frameDuration"/>.
+    /// Atlas region index that should be drawn for the given host
+    /// <paramref name="elapsed"/> time in the current sequence.
     /// </summary>
-    public AnimatedVisual2D WithFrameDuration(TimeSpan frameDuration) =>
-        new(_atlas, _frames, frameDuration, Loop, Offset);
+    public int FrameIndexAt(TimeSpan elapsed) =>
+        _current.FrameIndexAt(LocalTime(elapsed));
+
+    /// <summary>Atlas region for the current frame at the given time.</summary>
+    public Rect RegionAt(TimeSpan elapsed) =>
+        _atlas.Atlas[FrameIndexAt(elapsed)];
+
+    /// <summary>True if the current sequence is <see cref="AnimationLoop.Once"/>
+    /// and has reached its last frame.</summary>
+    public bool IsAtEnd(TimeSpan elapsed) =>
+        _current.IsAtEnd(LocalTime(elapsed));
 
     /// <summary>
-    /// Returns a copy of this visual with a different
-    /// <paramref name="loop"/> behavior.
-    /// </summary>
-    public AnimatedVisual2D WithLoop(AnimationLoop loop) =>
-        new(_atlas, _frames, FrameDuration, loop, Offset);
-
-    /// <summary>
-    /// Atlas region index that should be drawn for the given
-    /// elapsed time.
-    /// </summary>
-    public int FrameIndexAt(TimeSpan elapsed)
-    {
-        int n = FrameCount;
-        if (n == 1) return FrameAt(0);
-
-        var step = (long)Math.Floor((elapsed + Offset).TotalSeconds / FrameDuration.TotalSeconds);
-        long idx = Loop switch
-        {
-            AnimationLoop.Loop => Mod(step, n),
-            AnimationLoop.PingPong => PingPong(step, n),
-            AnimationLoop.Once => step < 0 ? 0 : Math.Min(step, n - 1),
-            _ => 0,
-        };
-        return FrameAt((int)idx);
-
-        static long Mod(long a, int m)
-        {
-            var r = a % m;
-            return r < 0 ? r + m : r;
-        }
-
-        static long PingPong(long step, int n)
-        {
-            if (n <= 1) return 0;
-            int period = 2 * (n - 1);
-            var s = Mod(step, period);
-            return s < n ? s : period - s;
-        }
-    }
-
-    /// <summary>
-    /// Atlas region for the current frame at the given time.
-    /// </summary>
-    public Rect RegionAt(TimeSpan elapsed) => _atlas[FrameIndexAt(elapsed)];
-
-    /// <summary>
-    /// Bounding circle covering the largest frame in the sequence.
+    /// Bounding circle covering the largest frame across every sequence
+    /// in the atlas.
     /// </summary>
     public override BoundingCircle Boundary => _boundary ??= ComputeBoundary();
 
     private BoundingCircle ComputeBoundary()
     {
         float maxR2 = 0f;
-        int n = FrameCount;
-        for (int i = 0; i < n; i++)
+        foreach (var seq in _atlas.Sequences)
         {
-            var r = _atlas[FrameAt(i)];
-            var hw = r.Width / 2f;
-            var hh = r.Height / 2f;
-            var r2 = hw * hw + hh * hh;
-            if (r2 > maxR2) maxR2 = r2;
+            foreach (var frame in seq.Frames)
+            {
+                var r = _atlas.Atlas[frame];
+                var hw = r.Width / 2f;
+                var hh = r.Height / 2f;
+                var r2 = hw * hw + hh * hh;
+                if (r2 > maxR2) maxR2 = r2;
+            }
         }
         return new BoundingCircle(Vector2.Zero, MathF.Sqrt(maxR2));
     }
@@ -186,6 +120,7 @@ public sealed class AnimatedVisual2D : Visual2D
     public override void Draw(Renderer2D renderer, in Pose2D pose, Color tint, TimeSpan elapsed)
     {
         var source = RegionAt(elapsed);
+        var image = _atlas.Atlas.Image;
         var scaledW = source.Width * pose.Scale;
         var scaledH = source.Height * pose.Scale;
         var dest = new Rect(
@@ -199,18 +134,26 @@ public sealed class AnimatedVisual2D : Visual2D
         {
             var rc = new Vector2(scaledW / 2f, scaledH / 2f);
             if (tinted)
-                renderer.DrawImageRotated(_atlas.Image, source, dest, pose.Rotation, rc, pose.Flipped, tint);
+                renderer.DrawImageRotated(image, source, dest, pose.Rotation, rc, pose.Flipped, tint);
             else
-                renderer.DrawImageRotated(_atlas.Image, source, dest, pose.Rotation, rc, pose.Flipped);
+                renderer.DrawImageRotated(image, source, dest, pose.Rotation, rc, pose.Flipped);
         }
         else
         {
             if (tinted)
-                renderer.DrawImage(_atlas.Image, source, dest, tint);
+                renderer.DrawImage(image, source, dest, tint);
             else
-                renderer.DrawImage(_atlas.Image, source, dest);
+                renderer.DrawImage(image, source, dest);
         }
     }
 
-    private int FrameAt(int i) => _frames is null ? i : _frames[i];
+    private TimeSpan LocalTime(TimeSpan elapsed)
+    {
+        if (_resetPending)
+        {
+            _sequenceStartElapsed = elapsed;
+            _resetPending = false;
+        }
+        return elapsed - _sequenceStartElapsed + Offset;
+    }
 }

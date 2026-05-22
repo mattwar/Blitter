@@ -5,104 +5,91 @@ namespace Blitter.Tests;
 public class AnimatedVisual2DTests
 {
     [Fact]
-    public void Loop_Wraps_Through_Frames()
+    public void Default_State_Plays_First_Sequence()
     {
-        using var atlas = MakeAtlas(4);
-        var v = new AnimatedVisual2D(atlas, TimeSpan.FromSeconds(1));
+        using var bmp = Bitmap.Create(16, 4);
+        var atlas = Atlas.Grid(bmp, 4, 1);
+        var aa = new AnimationAtlas(atlas, [
+            new("walk", [0, 1, 2, 3], TimeSpan.FromSeconds(1)),
+        ]);
+        var v = new AnimatedVisual2D(aa);
 
-        Assert.Equal(0, v.FrameIndexAt(TimeSpan.FromSeconds(0)));
-        Assert.Equal(1, v.FrameIndexAt(TimeSpan.FromSeconds(1)));
-        Assert.Equal(3, v.FrameIndexAt(TimeSpan.FromSeconds(3)));
-        Assert.Equal(0, v.FrameIndexAt(TimeSpan.FromSeconds(4)));
-        Assert.Equal(2, v.FrameIndexAt(TimeSpan.FromSeconds(6)));
-    }
-
-    [Fact]
-    public void Once_Holds_On_Last_Frame()
-    {
-        using var atlas = MakeAtlas(3);
-        var v = new AnimatedVisual2D(atlas, TimeSpan.FromSeconds(1), AnimationLoop.Once);
-
+        Assert.Equal("walk", v.State);
         Assert.Equal(0, v.FrameIndexAt(TimeSpan.FromSeconds(0)));
         Assert.Equal(2, v.FrameIndexAt(TimeSpan.FromSeconds(2)));
-        Assert.Equal(2, v.FrameIndexAt(TimeSpan.FromSeconds(50)));
     }
 
     [Fact]
-    public void PingPong_Bounces_Between_Ends()
+    public void State_Change_Restarts_Sequence()
     {
-        using var atlas = MakeAtlas(4);
-        var v = new AnimatedVisual2D(atlas, TimeSpan.FromSeconds(1), AnimationLoop.PingPong);
+        using var bmp = Bitmap.Create(32, 4);
+        var atlas = Atlas.Grid(bmp, 8, 1);
+        var aa = new AnimationAtlas(atlas, [
+            new("idle", [0, 1], TimeSpan.FromSeconds(1)),
+            new("attack", [4, 5, 6, 7], TimeSpan.FromSeconds(1)),
+        ]);
+        var v = new AnimatedVisual2D(aa);
 
-        // Period for n=4 is 6: 0,1,2,3,2,1, 0,1,2,3,2,1, ...
-        var expected = new[] { 0, 1, 2, 3, 2, 1, 0, 1, 2, 3, 2, 1 };
-        for (int i = 0; i < expected.Length; i++)
-            Assert.Equal(expected[i], v.FrameIndexAt(TimeSpan.FromSeconds(i)));
+        Assert.Equal(1, v.FrameIndexAt(TimeSpan.FromSeconds(5)));
+        v.State = "attack";
+        // The first lookup after the switch stamps the local clock base.
+        Assert.Equal(4, v.FrameIndexAt(TimeSpan.FromSeconds(5)));
+        Assert.Equal(5, v.FrameIndexAt(TimeSpan.FromSeconds(6)));
+        Assert.Equal(7, v.FrameIndexAt(TimeSpan.FromSeconds(8)));
     }
 
     [Fact]
-    public void Custom_Frames_Are_Used_In_Order()
+    public void Unknown_State_Throws()
     {
-        using var atlas = MakeAtlas(6);
-        var v = new AnimatedVisual2D(
-            atlas,
-            TimeSpan.FromSeconds(1),
-            frames: new[] { 5, 3, 1 });
+        using var bmp = Bitmap.Create(8, 4);
+        var atlas = Atlas.Grid(bmp, 2, 1);
+        var aa = new AnimationAtlas(atlas, [
+            new("idle", [0, 1], TimeSpan.FromSeconds(1)),
+        ]);
+        var v = new AnimatedVisual2D(aa);
 
-        Assert.Equal(3, v.FrameCount);
-        Assert.Equal(5, v.FrameIndexAt(TimeSpan.FromSeconds(0)));
-        Assert.Equal(3, v.FrameIndexAt(TimeSpan.FromSeconds(1)));
-        Assert.Equal(1, v.FrameIndexAt(TimeSpan.FromSeconds(2)));
-        Assert.Equal(5, v.FrameIndexAt(TimeSpan.FromSeconds(3)));
+        Assert.Throws<ArgumentException>(() => v.State = "missing");
     }
 
     [Fact]
     public void WithOffset_Desyncs_Playback()
     {
-        using var atlas = MakeAtlas(4);
-        var a = new AnimatedVisual2D(atlas, TimeSpan.FromSeconds(1));
+        using var bmp = Bitmap.Create(16, 4);
+        var atlas = Atlas.Grid(bmp, 4, 1);
+        var aa = new AnimationAtlas(atlas, [
+            new("walk", [0, 1, 2, 3], TimeSpan.FromSeconds(1)),
+        ]);
+        var a = new AnimatedVisual2D(aa);
         var b = a.WithOffset(TimeSpan.FromSeconds(2));
 
         Assert.Equal(0, a.FrameIndexAt(TimeSpan.FromSeconds(0)));
         Assert.Equal(2, b.FrameIndexAt(TimeSpan.FromSeconds(0)));
-        // Original is unchanged.
         Assert.Equal(TimeSpan.Zero, a.Offset);
         Assert.Equal(TimeSpan.FromSeconds(2), b.Offset);
-        // Same atlas + same frames + same duration.
         Assert.Same(a.Atlas, b.Atlas);
-        Assert.Equal(a.FrameDuration, b.FrameDuration);
     }
 
     [Fact]
-    public void WithFrameDuration_Returns_Independent_Copy()
+    public void IsAtEnd_Tracks_Once_Sequences()
     {
-        using var atlas = MakeAtlas(4);
-        var a = new AnimatedVisual2D(atlas, TimeSpan.FromSeconds(1));
-        var b = a.WithFrameDuration(TimeSpan.FromSeconds(0.5));
+        using var bmp = Bitmap.Create(12, 4);
+        var atlas = Atlas.Grid(bmp, 3, 1);
+        var aa = new AnimationAtlas(atlas, [
+            new("idle", [0, 1], TimeSpan.FromSeconds(1), AnimationLoop.Loop),
+            new("attack", [0, 1, 2], TimeSpan.FromSeconds(1), AnimationLoop.Once),
+        ]);
+        var v = new AnimatedVisual2D(aa);
 
-        Assert.Equal(2, b.FrameIndexAt(TimeSpan.FromSeconds(1)));
-        Assert.Equal(1, a.FrameIndexAt(TimeSpan.FromSeconds(1)));
+        Assert.False(v.IsAtEnd(TimeSpan.FromSeconds(50)));
+        v.State = "attack";
+        Assert.False(v.IsAtEnd(TimeSpan.FromSeconds(50)));      // stamps base = 50
+        Assert.False(v.IsAtEnd(TimeSpan.FromSeconds(51)));      // local = 1
+        Assert.True(v.IsAtEnd(TimeSpan.FromSeconds(52)));       // local = 2 (last frame)
     }
 
     [Fact]
-    public void Invalid_FrameDuration_Throws()
+    public void Null_Atlas_Throws()
     {
-        using var atlas = MakeAtlas(2);
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            new AnimatedVisual2D(atlas, TimeSpan.Zero));
-    }
-
-    [Fact]
-    public void Out_Of_Range_Frame_Throws()
-    {
-        using var atlas = MakeAtlas(2);
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            new AnimatedVisual2D(atlas, TimeSpan.FromSeconds(1), frames: new[] { 0, 2 }));
-    }
-
-    private static Atlas MakeAtlas(int frames)
-    {
-        var bmp = Bitmap.Create(frames * 4, 4);
-        return Atlas.Grid(bmp, frames, 1);
+        Assert.Throws<ArgumentNullException>(() => new AnimatedVisual2D(null!));
     }
 }

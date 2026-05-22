@@ -55,13 +55,16 @@ All notable changes to this project will be documented in this file.
   implicit grid from rows/columns of transparent gutters. Skips
   empty cells (e.g. blanks in a diagonal layout) by default; pass
   `includeEmptyCells: true` to keep them.
-- `AnimatedVisual2D`: a `Visual2D` that cycles through
-  frames of an `Atlas`. Playback is driven by the sprite's
-  `Age` (passed to `Draw` as `elapsed`). Supports `Loop`,
-  `PingPong`, and `Once`. `WithOffset` / `WithFrameDuration` /
-  `WithLoop` clone an instance with one property changed (use
-  `WithOffset` to start one host's animation out of phase with
-  another).
+- `AnimationSequence`: named, immutable sequence of atlas frame
+  indices with its own `FrameDuration` and `AnimationLoop`.
+- `AnimationAtlas`: bundles an `Atlas` with a set of named
+  `AnimationSequence`s and a `DefaultState`. `AnimationAtlas.Single`
+  is a convenience factory for the one-sequence case.
+- `AnimatedVisual2D`: a `Visual2D` that plays an `AnimationSequence`
+  from an `AnimationAtlas`. Setting `State` switches sequences and
+  restarts the new one from its first frame. Exposes `IsAtEnd` for
+  `Once` sequences and `WithOffset` to start a second host's
+  animation out of phase.
 - `Pose2D` struct (`Position`, `Rotation`, `Scale`, `Flipped`) used by
   `Visual2D.Draw` and `PosedHitShape2D`.
 - `Visual2D.State` / `Visual2D.States` / `Visual2D.DefaultState`:
