@@ -1,4 +1,4 @@
-namespace Blitter.Blocks;
+namespace Blitter.Bits;
 
 /// <summary>
 /// Receives both sides of a collision query and decides what counts

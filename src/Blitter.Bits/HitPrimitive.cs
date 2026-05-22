@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace Blitter.Blocks;
+namespace Blitter.Bits;
 
 /// <summary>
 /// Discriminator for a <see cref="HitPrimitive"/>.
