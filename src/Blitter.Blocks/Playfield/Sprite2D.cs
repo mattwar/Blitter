@@ -88,11 +88,11 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
         new(Visual?.HitShape ?? HitShape2D.None, new Pose2D(Center, Rotation, Scale, Flipped));
 
     /// <summary>
-    /// Broad-phase bounding circle of the sprite for collision
+    /// Bounding circle of the sprite for collision
     /// purposes; equivalent to <see cref="HitShape"/>'s
-    /// <see cref="PosedHitShape2D.BroadCircle"/>.
+    /// <see cref="PosedHitShape2D.BoundingCircle"/>.
     /// </summary>
-    public BoundingCircle HitCircle => HitShape.BroadCircle;
+    public BoundingCircle HitCircle => HitShape.BoundingCircle;
 
     public Sprite2D()
     {

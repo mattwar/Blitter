@@ -23,6 +23,12 @@ All notable changes to this project will be documented in this file.
   asymmetric local shapes mirror correctly with their sprite.
 - `Bitmap.ComputeOpaqueHitShape` renamed to
   `Bitmap.ComputeOpaqueHitShape2D`.
+- `HitShape2D.TestHit`, `TestHitWith`, and `Visit` now take
+  `in Pose2D mine` instead of `in PosedHitShape2D mine` (the
+  shape is always `this`).
+- `PosedHitShape2D.Intersects` removed; `TestHit` (with or
+  without a tester) now always runs the bounding-circle reject
+  before primitive dispatch.
 - `SpriteBehavior2D.Update` and `SceneBehavior2D.Update` renamed to
   `Apply` to reflect that a behavior mutates someone else's state.
 - `CustomSpriteBehavior2D.OnUpdate` / `CustomSceneBehavior2D.OnUpdate`

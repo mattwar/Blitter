@@ -242,7 +242,7 @@ public class PlayField2D : Layer2D
                 if (!a.IsAlive || !a.CanBeHit)
                     continue;
                 var aShape = a.HitShape;
-                if (aShape.BroadCircle.Radius <= 0f)
+                if (aShape.BoundingCircle.Radius <= 0f)
                     continue;
 
                 for (int j = i + 1; j < _sprites.Count; j++)
@@ -254,9 +254,9 @@ public class PlayField2D : Layer2D
                     if (!b.IsAlive || !b.CanBeHit)
                         continue;
                     var bShape = b.HitShape;
-                    if (bShape.BroadCircle.Radius <= 0f)
+                    if (bShape.BoundingCircle.Radius <= 0f)
                         continue;
-                    if (!aShape.Intersects(bShape))
+                    if (!aShape.TestHit(bShape))
                         continue;
 
                     a.OnHitSprite(b, spriteContext);

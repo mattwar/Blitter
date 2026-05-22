@@ -245,13 +245,13 @@ var hitDebug = new CustomLayer2D
         using var _ = rd.PushState();
         rd.DrawColor = new Color(0, 255, 120, 220);
         rocket.HitShape.Visit(HitShapeDebug2D.Draw(rd));
-        // Also outline the broad-phase circle in a dimmer color
+        // Also outline the bounding circle in a dimmer color
         // so we can see when the cheap reject would skip.
         rd.DrawColor = new Color(0, 200, 255, 90);
-        HitShapeDebug2D.DrawCircleOutline(rd, rocket.HitShape.BroadCircle.Center, rocket.HitShape.BroadCircle.Radius);
+        HitShapeDebug2D.DrawCircleOutline(rd, rocket.HitShape.BoundingCircle.Center, rocket.HitShape.BoundingCircle.Radius);
 
         // Same treatment for every asteroid currently on the field:
-        // magenta hit shape outline + dim broad circle.
+        // magenta hit shape outline + dim bounding circle.
         var hitVisitor = HitShapeDebug2D.Draw(rd);
         foreach (var sprite in playField.Sprites)
         {
@@ -259,7 +259,7 @@ var hitDebug = new CustomLayer2D
             rd.DrawColor = new Color(255, 80, 200, 220);
             asteroid.HitShape.Visit(hitVisitor);
             rd.DrawColor = new Color(255, 120, 220, 70);
-            HitShapeDebug2D.DrawCircleOutline(rd, asteroid.HitShape.BroadCircle.Center, asteroid.HitShape.BroadCircle.Radius);
+            HitShapeDebug2D.DrawCircleOutline(rd, asteroid.HitShape.BoundingCircle.Center, asteroid.HitShape.BoundingCircle.Radius);
         }
     },
 };

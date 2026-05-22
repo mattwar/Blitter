@@ -10,14 +10,14 @@ public abstract class HitTester2D
     /// </summary>
     public bool TestHit(in PosedHitShape2D a, in PosedHitShape2D b) =>
         // should call back on TestHit(ReadOnlySpan<HitPrimitive2D>, in PosedHitShape2D) below
-        a.Shape.TestHit(in a, in b, this);
+        a.Shape.TestHit(in a.Pose, in b, this);
 
     /// <summary>
     /// Returns true if any of the primitives 'hit' the shape.
     /// </summary>
     public bool TestHit(ReadOnlySpan<HitPrimitive2D> a, in PosedHitShape2D b) =>
         // should call back on TestHit(ReadOnlySpan<HitPrimitive2D>, ReadOnlySpan<HitPrimitive2D>) below
-        b.Shape.TestHitWith(in b, a, this);
+        b.Shape.TestHitWith(in b.Pose, a, this);
 
     /// <summary>
     /// Returns true if any of the primitives in 'a' hit any of the primitives in 'b'.
