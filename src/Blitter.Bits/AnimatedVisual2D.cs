@@ -1,10 +1,8 @@
 using System.Numerics;
 
-using Blitter.Bits;
+namespace Blitter.Bits;
 
-namespace Blitter.Blocks;
-
-/// <summary>How an <see cref="AnimatedSpriteImage2D"/> repeats once it
+/// <summary>How an <see cref="AnimatedVisual2D"/> repeats once it
 /// runs past the last frame.</summary>
 public enum AnimationLoop
 {
@@ -17,19 +15,19 @@ public enum AnimationLoop
 }
 
 /// <summary>
-/// A <see cref="SpriteImage2D"/> that cycles through frames of an
+/// A <see cref="Visual2D"/> that cycles through frames of an
 /// <see cref="Atlas"/>. Playback is driven by the <c>elapsed</c>
-/// argument <see cref="SpriteImage2D.Draw"/> receives, so a single
-/// instance can be shared across many sprites — each sprite's
-/// <see cref="Sprite2D.Age"/> is its own timeline.
+/// argument <see cref="Visual2D.Draw"/> receives, so a single
+/// instance can be shared across many hosts — each host's elapsed
+/// time is its own timeline.
 /// </summary>
-public sealed class AnimatedSpriteImage2D : SpriteImage2D
+public sealed class AnimatedVisual2D : Visual2D
 {
     private readonly Atlas _atlas;
     private readonly int[] _frames;
     private BoundingCircle? _boundary;
 
-    public AnimatedSpriteImage2D(
+    public AnimatedVisual2D(
         Atlas atlas,
         TimeSpan frameDuration,
         AnimationLoop loop = AnimationLoop.Loop,
@@ -77,20 +75,20 @@ public sealed class AnimatedSpriteImage2D : SpriteImage2D
     /// <summary>Number of frames in the sequence.</summary>
     public int FrameCount => _frames.Length;
 
-    /// <summary>Returns a copy of this image with a different phase
-    /// <paramref name="offset"/>; useful for desyncing sprites that
+    /// <summary>Returns a copy of this visual with a different phase
+    /// <paramref name="offset"/>; useful for desyncing hosts that
     /// share an animation.</summary>
-    public AnimatedSpriteImage2D WithOffset(TimeSpan offset) =>
+    public AnimatedVisual2D WithOffset(TimeSpan offset) =>
         new(_atlas, FrameDuration, Loop, offset, _frames);
 
-    /// <summary>Returns a copy of this image with a different
+    /// <summary>Returns a copy of this visual with a different
     /// <paramref name="frameDuration"/>.</summary>
-    public AnimatedSpriteImage2D WithFrameDuration(TimeSpan frameDuration) =>
+    public AnimatedVisual2D WithFrameDuration(TimeSpan frameDuration) =>
         new(_atlas, frameDuration, Loop, Offset, _frames);
 
-    /// <summary>Returns a copy of this image with a different
+    /// <summary>Returns a copy of this visual with a different
     /// <paramref name="loop"/> behavior.</summary>
-    public AnimatedSpriteImage2D WithLoop(AnimationLoop loop) =>
+    public AnimatedVisual2D WithLoop(AnimationLoop loop) =>
         new(_atlas, FrameDuration, loop, Offset, _frames);
 
     /// <summary>Atlas region index that should be drawn for the given

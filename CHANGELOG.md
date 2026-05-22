@@ -5,12 +5,18 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- `SpriteImage2D` renamed to `Visual2D` and moved to `Blitter.Bits`;
+  `TextureSpriteImage2D` → `TextureVisual2D`,
+  `AnimatedSpriteImage2D` → `AnimatedVisual2D`. The type no longer
+  has any sprite/playfield coupling and is reusable from any host
+  (`Visual3D` will follow the same pattern).
+- `Sprite2D.Image` renamed to `Sprite2D.Visual`.
 - `HitShape`, `PosedHitShape`, `HitPrimitive`, `HitKind`, `Hitter`,
   and `HitShapeVisitor` renamed with a `2D` suffix (e.g.
   `HitShape2D`). 3D equivalents will follow.
-- `SpriteImage2D.Draw` now takes `in Pose2D pose` and a
-  `TimeSpan elapsed` (the host sprite's age) so animated images
-  can pick a frame.
+- `Visual2D.Draw` now takes `in Pose2D pose` and a
+  `TimeSpan elapsed` (the host's age) so animated visuals can pick
+  a frame.
 - `PosedHitShape2D` now honors `Pose2D.Flipped` in hit tests, so
   asymmetric local shapes mirror correctly with their sprite.
 - `Bitmap.ComputeOpaqueHitShape` renamed to
@@ -49,20 +55,20 @@ All notable changes to this project will be documented in this file.
   implicit grid from rows/columns of transparent gutters. Skips
   empty cells (e.g. blanks in a diagonal layout) by default; pass
   `includeEmptyCells: true` to keep them.
-- `AnimatedSpriteImage2D`: a `SpriteImage2D` that cycles through
+- `AnimatedVisual2D`: a `Visual2D` that cycles through
   frames of an `Atlas`. Playback is driven by the sprite's
   `Age` (passed to `Draw` as `elapsed`). Supports `Loop`,
   `PingPong`, and `Once`. `WithOffset` / `WithFrameDuration` /
   `WithLoop` clone an instance with one property changed (use
   `WithOffset` to desync sprites that share an animation).
 - `Pose2D` struct (`Position`, `Rotation`, `Scale`, `Flipped`) used by
-  `SpriteImage2D.Draw` and `PosedHitShape2D`.
-- `SpriteImage2D.State` / `SpriteImage2D.States` / `SpriteImage2D.DefaultState`:
-  extension point for animated or multi-pose images. Single-image
+  `Visual2D.Draw` and `PosedHitShape2D`.
+- `Visual2D.State` / `Visual2D.States` / `Visual2D.DefaultState`:
+  extension point for animated or multi-pose visuals. Single-state
   implementations expose just `"default"`.
 - `Bitmap.ComputeOpaqueHitShape()`: fits a circle or capsule to the
   opaque pixels and picks whichever covers them with less area.
-- `TextureSpriteImage2D` now uses the fit shape as its default
+- `TextureVisual2D` now uses the fit shape as its default
   `HitShape`, so elongated sprites get a tight capsule for free.
 - `WrapInBounds2D`: toroidal sprite wrap across the update bounds.
 - `SeekTarget2D`: steers a sprite toward a `Func<Vector2?>` target with

@@ -1,18 +1,14 @@
 using System.Numerics;
 
-using Blitter.Bits;
-
-namespace Blitter.Blocks;
+namespace Blitter.Bits;
 
 /// <summary>
-/// The visual+bounds for a <see cref="Sprite2D"/>. Implementations
-/// know how to draw themselves at a given transform and report a
-/// sprite-local bounding circle the sprite uses for collision.
+/// Something drawable in 2D with a bounding circle and a <see cref="HitShape2D"/>.
 /// </summary>
-public abstract class SpriteImage2D
+public abstract class Visual2D
 {
     /// <summary>
-    /// Name of the implicit single state for images that have no
+    /// Name of the implicit single state for visuals that have no
     /// animation or sequence concept.
     /// </summary>
     public const string DefaultState = "default";
@@ -21,31 +17,30 @@ public abstract class SpriteImage2D
 
     /// <summary>
     /// Currently selected animation, pose, or variant name. Setting
-    /// it switches which frames the image draws and which
+    /// it switches which frames the visual draws and which
     /// <see cref="Boundary"/> / <see cref="HitShape"/> it reports.
-    /// Single-state images keep this at <see cref="DefaultState"/>.
+    /// Single-state visuals keep this at <see cref="DefaultState"/>.
     /// </summary>
     public virtual string State { get; set; } = DefaultState;
 
     /// <summary>
-    /// All state names this image can switch between, in declaration
-    /// order. Single-state images expose just <see cref="DefaultState"/>.
+    /// All state names this visual can switch between, in declaration
+    /// order. Single-state visuals expose just <see cref="DefaultState"/>.
     /// </summary>
     public virtual IReadOnlyList<string> States => _defaultStates;
 
     /// <summary>
-    /// Bounding circle in sprite-local coordinates (origin at sprite
-    /// center, unscaled). The sprite applies its own
-    /// <see cref="Sprite2D.Center"/> and <see cref="Sprite2D.Scale"/>
-    /// when computing world-space collision.
+    /// Bounding circle in visual-local coordinates (origin at the
+    /// visual's center, unscaled). The caller applies its own
+    /// position/scale when computing world-space collision.
     /// </summary>
     public abstract BoundingCircle Boundary { get; }
 
     /// <summary>
-    /// Image-local collision shape. Defaults to a single circle
+    /// Visual-local collision shape. Defaults to a single circle
     /// derived from <see cref="Boundary"/>; assign a hand-rolled
     /// shape (e.g. a capsule along the visible body) for tighter
-    /// geometry. The same instance can be shared across sprites and
+    /// geometry. The same instance can be shared across hosts and
     /// across animation frames.
     /// </summary>
     public HitShape2D HitShape
@@ -64,33 +59,35 @@ public abstract class SpriteImage2D
     protected virtual HitShape2D DeriveHitShape() =>
         new CircleHitShape2D(Boundary.Center, Boundary.Radius);
 
-    /// <summary>Draw this image at the given world <paramref name="pose"/>,
+    /// <summary>
+    /// Draw this visual at the given world <paramref name="pose"/>,
     /// multiplied by <paramref name="tint"/> (per-channel). Pass
     /// <see cref="Color.White"/> for untinted output. <paramref name="elapsed"/>
-    /// is the host sprite's age — animated images use it to pick the
-    /// current frame; static images ignore it.</summary>
+    /// is the host's age — animated visuals use it to pick the current
+    /// frame; static visuals ignore it.
+    /// </summary>
     public abstract void Draw(Renderer2D renderer, in Pose2D pose, Color tint, TimeSpan elapsed);
 
     /// <summary>
     /// Implicit wrap of a <see cref="Texture2D"/> in a
-    /// <see cref="TextureSpriteImage2D"/> so callers can assign a
-    /// texture directly to <see cref="Sprite2D.Image"/>.
+    /// <see cref="TextureVisual2D"/> so callers can assign a texture
+    /// directly to a visual-typed property.
     /// </summary>
-    public static implicit operator SpriteImage2D(Texture2D texture) =>
-        new TextureSpriteImage2D(texture);
+    public static implicit operator Visual2D(Texture2D texture) =>
+        new TextureVisual2D(texture);
 }
 
 /// <summary>
-/// A <see cref="SpriteImage2D"/> backed by a single <see cref="Texture2D"/>.
+/// A <see cref="Visual2D"/> backed by a single <see cref="Texture2D"/>.
 /// The boundary is the texture's opaque-pixel bounding circle, computed
 /// once on first access.
 /// </summary>
-public sealed class TextureSpriteImage2D : SpriteImage2D
+public sealed class TextureVisual2D : Visual2D
 {
     private readonly Texture2D _texture;
     private BoundingCircle? _boundary;
 
-    public TextureSpriteImage2D(Texture2D texture)
+    public TextureVisual2D(Texture2D texture)
     {
         ArgumentNullException.ThrowIfNull(texture);
         _texture = texture;
@@ -108,7 +105,7 @@ public sealed class TextureSpriteImage2D : SpriteImage2D
         // circumscribes the full image rect.
         var size = _texture.Size;
         if (_texture is Bitmap bmp)
-            return ToSpriteLocal(bmp.ComputeOpaqueCircle(), size);
+            return ToVisualLocal(bmp.ComputeOpaqueCircle(), size);
         var half = new Vector2(size.Width / 2f, size.Height / 2f);
         return new BoundingCircle(Vector2.Zero, half.Length());
     }
@@ -139,17 +136,17 @@ public sealed class TextureSpriteImage2D : SpriteImage2D
         }
     }
 
-    // Convert a bounding circle from texture-local (top-left origin) to sprite-local (center origin) coordinates.
-    private static BoundingCircle ToSpriteLocal(BoundingCircle c, (int Width, int Height) size) =>
+    // Convert a bounding circle from texture-local (top-left origin) to visual-local (center origin) coordinates.
+    private static BoundingCircle ToVisualLocal(BoundingCircle c, (int Width, int Height) size) =>
         c.IsEmpty ? c
         : new BoundingCircle(c.Center - new Vector2(size.Width / 2f, size.Height / 2f), c.Radius);
 
     protected override HitShape2D DeriveHitShape()
     {
-        if (_texture is not Bitmap bmp) 
+        if (_texture is not Bitmap bmp)
             return base.DeriveHitShape();
         var opaqueShape = bmp.ComputeOpaqueHitShape2D();
-        // Compute returned pixel-space coords (top-left origin); shift to sprite-local (image-centered) coords.
+        // Compute returned pixel-space coords (top-left origin); shift to visual-local (image-centered) coords.
         var size = _texture.Size;
         return opaqueShape.Translate(new Vector2(-size.Width / 2f, -size.Height / 2f));
     }

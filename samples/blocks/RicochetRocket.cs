@@ -87,7 +87,7 @@ Asteroid.Particles = debrisParticles;
 
 var rocket = new Rocket
 {
-    Image = rocketImage,
+    Visual = rocketImage,
     Center = new Vector2(WorldW / 2f, WorldH / 2f),
     Scale = 0.1f,
     Speed = 600f,
@@ -330,7 +330,7 @@ static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
 
         var asteriod = new Asteroid
         {
-            Image = image,
+            Visual = image,
             Center = new Vector2(x, y),
             Scale = scale,
             Rotation = rotation,
@@ -625,7 +625,7 @@ sealed class Asteroid : Sprite2D
 
                 var shard = new Asteroid(childKind)
                 {
-                    Image = this.Image,
+                    Visual = this.Visual,
                     Center = this.Center,
                     Scale = newScale,
                     Rotation = Random.Shared.Next(0, 360),

@@ -10,8 +10,8 @@ namespace Blitter.Blocks;
 /// </summary>
 public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
 {
-    /// <summary>The image to render.</summary>
-    public SpriteImage2D? Image { get; set; }
+    /// <summary>The visual to render.</summary>
+    public Visual2D? Visual { get; set; }
 
     /// <summary>The position of the center of the sprite.</summary>
     public Vector2 Center { get; set; }
@@ -28,13 +28,13 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// <summary>How many degrees the sprite rotates in a second.</summary>
     public float RotationSpeed { get; set; }
 
-    /// <summary>The scale factor to apply to the image.</summary>
+    /// <summary>The scale factor to apply to the visual.</summary>
     public float Scale { get; set; } = 1f;
 
-    /// <summary>The flip mode to apply when rendering the image.</summary>
+    /// <summary>The flip mode to apply when rendering the visual.</summary>
     public FlipMode Flipped = FlipMode.None;
 
-    /// <summary>Per-channel tint multiplied into the image at draw time.
+    /// <summary>Per-channel tint multiplied into the visual at draw time.
     /// Defaults to <see cref="Color.White"/> (no change).</summary>
     public Color Tint { get; set; } = Color.White;
 
@@ -78,14 +78,14 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
 
     /// <summary>
     /// The sprite's world-space collision shape: the current
-    /// <see cref="Image"/>'s <see cref="SpriteImage2D.HitShape"/>
+    /// <see cref="Visual"/>'s <see cref="Visual2D.HitShape"/>
     /// combined with this sprite's <see cref="Center"/>,
     /// <see cref="Rotation"/>, <see cref="Scale"/>, and
     /// <see cref="Flipped"/>. Override to substitute a different
     /// shape (still posed by the sprite).
     /// </summary>
     public virtual PosedHitShape2D HitShape =>
-        new(Image?.HitShape ?? HitShape2D.None, new Pose2D(Center, Rotation, Scale, Flipped));
+        new(Visual?.HitShape ?? HitShape2D.None, new Pose2D(Center, Rotation, Scale, Flipped));
 
     /// <summary>
     /// Broad-phase bounding circle of the sprite for collision
@@ -139,7 +139,7 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer2D renderer)
     {
-        this.Image?.Draw(renderer, new Pose2D(Center, Rotation, Scale, Flipped), this.Tint, this.Age);
+        this.Visual?.Draw(renderer, new Pose2D(Center, Rotation, Scale, Flipped), this.Tint, this.Age);
     }
 
     /// <summary>
