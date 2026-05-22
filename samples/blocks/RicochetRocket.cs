@@ -151,7 +151,7 @@ var playField = new PlayField2D([..asteroids, rocket])
     ShowWorldBounds = true,
 };
 
-// HUD layer for overlay text
+// Custom layer for overlay text
 var hud = new CustomLayer2D
 {
     OnRender = rd =>
@@ -244,22 +244,22 @@ var hitDebug = new CustomLayer2D
         if (!showHitShape) return;
         using var _ = rd.PushState();
         rd.DrawColor = new Color(0, 255, 120, 220);
-        rocket.HitShape.Visit(HitShapeDebug.Draw(rd));
+        rocket.HitShape.Visit(HitShapeDebug2D.Draw(rd));
         // Also outline the broad-phase circle in a dimmer color
         // so we can see when the cheap reject would skip.
         rd.DrawColor = new Color(0, 200, 255, 90);
-        HitShapeDebug.DrawCircleOutline(rd, rocket.HitShape.BroadCircle.Center, rocket.HitShape.BroadCircle.Radius);
+        HitShapeDebug2D.DrawCircleOutline(rd, rocket.HitShape.BroadCircle.Center, rocket.HitShape.BroadCircle.Radius);
 
         // Same treatment for every asteroid currently on the field:
         // magenta hit shape outline + dim broad circle.
-        var hitVisitor = HitShapeDebug.Draw(rd);
+        var hitVisitor = HitShapeDebug2D.Draw(rd);
         foreach (var sprite in playField.Sprites)
         {
             if (sprite is not Asteroid asteroid) continue;
             rd.DrawColor = new Color(255, 80, 200, 220);
             asteroid.HitShape.Visit(hitVisitor);
             rd.DrawColor = new Color(255, 120, 220, 70);
-            HitShapeDebug.DrawCircleOutline(rd, asteroid.HitShape.BroadCircle.Center, asteroid.HitShape.BroadCircle.Radius);
+            HitShapeDebug2D.DrawCircleOutline(rd, asteroid.HitShape.BroadCircle.Center, asteroid.HitShape.BroadCircle.Radius);
         }
     },
 };
@@ -696,21 +696,21 @@ sealed class RocketController : SpriteBehavior2D
 /// line draws. Lives in the sample so the engine doesn't pull in a
 /// rendering dependency for collision debug.
 /// </summary>
-static class HitShapeDebug
+static class HitShapeDebug2D
 {
     // Build a visitor that draws each primitive. Returned delegate is
     // fresh each call but a debug overlay isn't on the hot path.
-    public static HitShapeVisitor Draw(Renderer2D rd) => prims =>
+    public static HitShapeVisitor2D Draw(Renderer2D rd) => prims =>
     {
         for (int i = 0; i < prims.Length; i++)
         {
             var p = prims[i];
             switch (p.Kind)
             {
-                case HitKind.Circle:
+                case HitKind2D.Circle:
                     DrawCircleOutline(rd, p.P0, p.R);
                     break;
-                case HitKind.Capsule:
+                case HitKind2D.Capsule:
                     DrawCapsuleOutline(rd, p.P0, p.P1, p.R);
                     break;
             }

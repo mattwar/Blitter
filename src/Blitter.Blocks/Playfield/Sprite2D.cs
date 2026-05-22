@@ -80,16 +80,17 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// The sprite's world-space collision shape: the current
     /// <see cref="Image"/>'s <see cref="SpriteImage2D.HitShape"/>
     /// combined with this sprite's <see cref="Center"/>,
-    /// <see cref="Rotation"/>, and <see cref="Scale"/>. Override
-    /// to substitute a different shape (still posed by the sprite).
+    /// <see cref="Rotation"/>, <see cref="Scale"/>, and
+    /// <see cref="Flipped"/>. Override to substitute a different
+    /// shape (still posed by the sprite).
     /// </summary>
-    public virtual PosedHitShape HitShape =>
-        new(Image?.HitShape ?? Blitter.Bits.HitShape.None, Center, Rotation, Scale);
+    public virtual PosedHitShape2D HitShape =>
+        new(Image?.HitShape ?? HitShape2D.None, new Pose2D(Center, Rotation, Scale, Flipped));
 
     /// <summary>
     /// Broad-phase bounding circle of the sprite for collision
     /// purposes; equivalent to <see cref="HitShape"/>'s
-    /// <see cref="PosedHitShape.BroadCircle"/>.
+    /// <see cref="PosedHitShape2D.BroadCircle"/>.
     /// </summary>
     public BoundingCircle HitCircle => HitShape.BroadCircle;
 
@@ -138,7 +139,7 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer2D renderer)
     {
-        this.Image?.Draw(renderer, this.Center, this.Rotation, this.Scale, this.Flipped, this.Tint);
+        this.Image?.Draw(renderer, new Pose2D(Center, Rotation, Scale, Flipped), this.Tint);
     }
 
     /// <summary>

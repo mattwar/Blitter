@@ -213,17 +213,17 @@ public static class ImageBounds
     }
 
     /// <summary>
-    /// Picks a good default <see cref="HitShape"/> for the image's
+    /// Picks a good default <see cref="HitShape2D"/> for the image's
     /// opaque pixels (in image-pixel space, origin top-left). Returns
-    /// a <see cref="CircleHitShape"/> for round/blocky silhouettes and
-    /// a <see cref="CapsuleHitShape"/> for elongated ones, choosing
+    /// a <see cref="CircleHitShape2D"/> for round/blocky silhouettes and
+    /// a <see cref="CapsuleHitShape2D"/> for elongated ones, choosing
     /// whichever covers the opaque pixels with the smaller area.
     /// </summary>
-    public static HitShape ComputeOpaqueHitShape(this Bitmap image, byte alphaThreshold = 0)
+    public static HitShape2D ComputeOpaqueHitShape2D(this Bitmap image, byte alphaThreshold = 0)
     {
         ArgumentNullException.ThrowIfNull(image);
         var bounds = image.ComputeOpaqueBounds(alphaThreshold);
-        if (bounds.IsEmpty) return HitShape.None;
+        if (bounds.IsEmpty) return HitShape2D.None;
 
         var circle = image.ComputeOpaqueCircle(alphaThreshold);
 
@@ -235,7 +235,7 @@ public static class ImageBounds
         // For nearly-square silhouettes the inscribed capsule degenerates
         // to a circle. Skip the capsule fit and return the tight circle.
         if (longSide < shortSide * 1.4f)
-            return new CircleHitShape(circle.Center, circle.Radius);
+            return new CircleHitShape2D(circle.Center, circle.Radius);
 
         // Start with the capsule inscribed in the AABB along the long
         // axis (endpoints offset from center by half-long - half-short).
@@ -267,8 +267,8 @@ public static class ImageBounds
         float circleArea = MathF.PI * circle.Radius * circle.Radius;
         float capArea = MathF.PI * radius * radius + 2f * radius * (halfL * 2f);
         return circleArea <= capArea
-            ? new CircleHitShape(circle.Center, circle.Radius)
-            : new CapsuleHitShape(endA, endB, radius);
+            ? new CircleHitShape2D(circle.Center, circle.Radius)
+            : new CapsuleHitShape2D(endA, endB, radius);
     }
 
     private static float DistancePointToSegment(Vector2 p, Vector2 a, Vector2 b)

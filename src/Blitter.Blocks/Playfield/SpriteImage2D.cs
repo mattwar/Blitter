@@ -12,6 +12,28 @@ namespace Blitter.Blocks;
 public abstract class SpriteImage2D
 {
     /// <summary>
+    /// Name of the implicit single state for images that have no
+    /// animation or sequence concept.
+    /// </summary>
+    public const string DefaultState = "default";
+
+    private static readonly IReadOnlyList<string> _defaultStates = [DefaultState];
+
+    /// <summary>
+    /// Currently selected animation, pose, or variant name. Setting
+    /// it switches which frames the image draws and which
+    /// <see cref="Boundary"/> / <see cref="HitShape"/> it reports.
+    /// Single-state images keep this at <see cref="DefaultState"/>.
+    /// </summary>
+    public virtual string State { get; set; } = DefaultState;
+
+    /// <summary>
+    /// All state names this image can switch between, in declaration
+    /// order. Single-state images expose just <see cref="DefaultState"/>.
+    /// </summary>
+    public virtual IReadOnlyList<string> States => _defaultStates;
+
+    /// <summary>
     /// Bounding circle in sprite-local coordinates (origin at sprite
     /// center, unscaled). The sprite applies its own
     /// <see cref="Sprite2D.Center"/> and <see cref="Sprite2D.Scale"/>
@@ -26,32 +48,26 @@ public abstract class SpriteImage2D
     /// geometry. The same instance can be shared across sprites and
     /// across animation frames.
     /// </summary>
-    public HitShape HitShape
+    public HitShape2D HitShape
     {
         get => _hitShape ??= DeriveHitShape();
         set => _hitShape = value;
     }
-    private HitShape? _hitShape;
+    private HitShape2D? _hitShape;
 
     /// <summary>
-    /// Produces the default <see cref="HitShape"/> when none has been
-    /// explicitly set. The base implementation returns a circle from
-    /// <see cref="Boundary"/>; subclasses with pixel access can fit a
-    /// tighter shape.
+    /// Produces the default <see cref="HitShape2D"/> when none has
+    /// been explicitly set. The base implementation returns a circle
+    /// from <see cref="Boundary"/>; subclasses with pixel access can
+    /// fit a tighter shape.
     /// </summary>
-    protected virtual HitShape DeriveHitShape() =>
-        new CircleHitShape(Boundary.Center, Boundary.Radius);
+    protected virtual HitShape2D DeriveHitShape() =>
+        new CircleHitShape2D(Boundary.Center, Boundary.Radius);
 
-    /// <summary>Draw this image at the given world transform, multiplied
-    /// by <paramref name="tint"/> (per-channel). Pass <see cref="Color.White"/>
-    /// for untinted output.</summary>
-    public abstract void Draw(
-        Renderer2D renderer,
-        Vector2 center,
-        float rotation,
-        float scale,
-        FlipMode flipped,
-        Color tint);
+    /// <summary>Draw this image at the given world <paramref name="pose"/>,
+    /// multiplied by <paramref name="tint"/> (per-channel). 
+    /// Pass <see cref="Color.White"/> for untinted output.</summary>
+    public abstract void Draw(Renderer2D renderer, in Pose2D pose, Color tint);
 
     /// <summary>
     /// Implicit wrap of a <see cref="Texture2D"/> in a
@@ -95,22 +111,22 @@ public sealed class TextureSpriteImage2D : SpriteImage2D
         return new BoundingCircle(Vector2.Zero, half.Length());
     }
 
-    public override void Draw(Renderer2D renderer, Vector2 center, float rotation, float scale, FlipMode flipped, Color tint)
+    public override void Draw(Renderer2D renderer, in Pose2D pose, Color tint)
     {
         var size = _texture.Size;
-        var scaledWidth = size.Width * scale;
-        var scaledHeight = size.Height * scale;
+        var scaledWidth = size.Width * pose.Scale;
+        var scaledHeight = size.Height * pose.Scale;
         var source = new Rect(0, 0, size.Width, size.Height);
-        var dest = new Rect(center.X - scaledWidth / 2f, center.Y - scaledHeight / 2f, scaledWidth, scaledHeight);
+        var dest = new Rect(pose.Position.X - scaledWidth / 2f, pose.Position.Y - scaledHeight / 2f, scaledWidth, scaledHeight);
         bool tinted = tint != Color.White;
 
-        if (rotation != 0f || flipped != FlipMode.None)
+        if (pose.Rotation != 0f || pose.Flipped != FlipMode.None)
         {
             var rotationCenter = new Vector2(scaledWidth / 2f, scaledHeight / 2f);
             if (tinted)
-                renderer.DrawImageRotated(_texture, source, dest, rotation, rotationCenter, flipped, tint);
+                renderer.DrawImageRotated(_texture, source, dest, pose.Rotation, rotationCenter, pose.Flipped, tint);
             else
-                renderer.DrawImageRotated(_texture, source, dest, rotation, rotationCenter, flipped);
+                renderer.DrawImageRotated(_texture, source, dest, pose.Rotation, rotationCenter, pose.Flipped);
         }
         else
         {
@@ -121,26 +137,18 @@ public sealed class TextureSpriteImage2D : SpriteImage2D
         }
     }
 
-    // ComputeOpaqueCircle returns coords in image-pixel space (origin
-    // at top-left). Sprite draws the image centered, so translate the
-    // circle so its origin matches the sprite center.
+    // Convert a bounding circle from texture-local (top-left origin) to sprite-local (center origin) coordinates.
     private static BoundingCircle ToSpriteLocal(BoundingCircle c, (int Width, int Height) size) =>
-        c.IsEmpty
-            ? c
-            : new BoundingCircle(c.Center - new Vector2(size.Width / 2f, size.Height / 2f), c.Radius);
+        c.IsEmpty ? c
+        : new BoundingCircle(c.Center - new Vector2(size.Width / 2f, size.Height / 2f), c.Radius);
 
-    protected override HitShape DeriveHitShape()
+    protected override HitShape2D DeriveHitShape()
     {
-        if (_texture is not Bitmap bmp) return base.DeriveHitShape();
-        var shape = bmp.ComputeOpaqueHitShape();
+        if (_texture is not Bitmap bmp) 
+            return base.DeriveHitShape();
+        var opaqueShape = bmp.ComputeOpaqueHitShape2D();
+        // Compute returned pixel-space coords (top-left origin); shift to sprite-local (image-centered) coords.
         var size = _texture.Size;
-        var offset = new Vector2(size.Width / 2f, size.Height / 2f);
-        return shape switch
-        {
-            CircleHitShape c => new CircleHitShape(c.LocalCenter - offset, c.LocalRadius),
-            CapsuleHitShape c => new CapsuleHitShape(
-                c.LocalEndA - offset, c.LocalEndB - offset, c.LocalRadius),
-            _ => shape,
-        };
+        return opaqueShape.Translate(new Vector2(-size.Width / 2f, -size.Height / 2f));
     }
 }

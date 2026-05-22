@@ -23,24 +23,24 @@ public class ComputeOpaqueHitShapeTests
     public void AllTransparent_ReturnsNone()
     {
         using var img = MakeImage(16, 16, _ => { });
-        var shape = img.ComputeOpaqueHitShape();
-        Assert.Same(HitShape.None, shape);
+        var shape = img.ComputeOpaqueHitShape2D();
+        Assert.Same(HitShape2D.None, shape);
     }
 
     [Fact]
     public void SquareBlock_PrefersCircle()
     {
         using var img = MakeImage(32, 32, i => FillRect(i, 8, 8, 23, 23));
-        var shape = img.ComputeOpaqueHitShape();
-        Assert.IsType<CircleHitShape>(shape);
+        var shape = img.ComputeOpaqueHitShape2D();
+        Assert.IsType<CircleHitShape2D>(shape);
     }
 
     [Fact]
     public void TallNarrowRect_PrefersVerticalCapsule()
     {
         using var img = MakeImage(32, 64, i => FillRect(i, 14, 4, 17, 59));
-        var shape = img.ComputeOpaqueHitShape();
-        var capsule = Assert.IsType<CapsuleHitShape>(shape);
+        var shape = img.ComputeOpaqueHitShape2D();
+        var capsule = Assert.IsType<CapsuleHitShape2D>(shape);
         // Endpoints should lie along the vertical axis (same X).
         Assert.Equal(capsule.LocalEndA.X, capsule.LocalEndB.X, precision: 3);
         Assert.NotEqual(capsule.LocalEndA.Y, capsule.LocalEndB.Y);
@@ -50,8 +50,8 @@ public class ComputeOpaqueHitShapeTests
     public void WideShortRect_PrefersHorizontalCapsule()
     {
         using var img = MakeImage(64, 32, i => FillRect(i, 4, 14, 59, 17));
-        var shape = img.ComputeOpaqueHitShape();
-        var capsule = Assert.IsType<CapsuleHitShape>(shape);
+        var shape = img.ComputeOpaqueHitShape2D();
+        var capsule = Assert.IsType<CapsuleHitShape2D>(shape);
         // Endpoints should lie along the horizontal axis (same Y).
         Assert.Equal(capsule.LocalEndA.Y, capsule.LocalEndB.Y, precision: 3);
         Assert.NotEqual(capsule.LocalEndA.X, capsule.LocalEndB.X);
@@ -71,8 +71,8 @@ public class ComputeOpaqueHitShapeTests
                     if (dx * dx + dy * dy <= 15 * 15) i.SetPixel(x, y, Color.White);
                 }
         });
-        var shape = img.ComputeOpaqueHitShape();
-        var circle = Assert.IsType<CircleHitShape>(shape);
+        var shape = img.ComputeOpaqueHitShape2D();
+        var circle = Assert.IsType<CircleHitShape2D>(shape);
         var rSq = circle.LocalRadius * circle.LocalRadius;
         for (int y = 0; y < 40; y++)
             for (int x = 0; x < 40; x++)
@@ -87,8 +87,8 @@ public class ComputeOpaqueHitShapeTests
     public void Capsule_CoversEveryOpaquePixel()
     {
         using var img = MakeImage(16, 64, i => FillRect(i, 4, 2, 11, 61));
-        var shape = img.ComputeOpaqueHitShape();
-        var capsule = Assert.IsType<CapsuleHitShape>(shape);
+        var shape = img.ComputeOpaqueHitShape2D();
+        var capsule = Assert.IsType<CapsuleHitShape2D>(shape);
         var ab = capsule.LocalEndB - capsule.LocalEndA;
         var lenSq = ab.LengthSquared();
         var rSq = capsule.LocalRadius * capsule.LocalRadius;

@@ -3,35 +3,35 @@ using System.Numerics;
 namespace Blitter.Bits;
 
 /// <summary>
-/// Discriminator for a <see cref="HitPrimitive"/>.
+/// Discriminator for a <see cref="HitPrimitive2D"/>.
 /// </summary>
-public enum HitKind : byte
+public enum HitKind2D : byte
 {
     /// <summary>
-    /// Center + radius circle (<see cref="HitPrimitive.P0"/> = center,
-    /// <see cref="HitPrimitive.R"/> = radius).
+    /// Center + radius circle (<see cref="HitPrimitive2D.P0"/> = center,
+    /// <see cref="HitPrimitive2D.R"/> = radius).
     /// </summary>
     Circle,
 
     /// <summary>
-    /// Rounded line segment (<see cref="HitPrimitive.P0"/> and
-    /// <see cref="HitPrimitive.P1"/> = endpoints,
-    /// <see cref="HitPrimitive.R"/> = radius).
+    /// Rounded line segment (<see cref="HitPrimitive2D.P0"/> and
+    /// <see cref="HitPrimitive2D.P1"/> = endpoints,
+    /// <see cref="HitPrimitive2D.R"/> = radius).
     /// </summary>
     Capsule,
 }
 
 /// <summary>
-/// A single collidable primitive. Stack-only by convention — built
-/// by a <see cref="HitShape"/> into a <see cref="System.Span{T}"/>
-/// and handed to a <see cref="Hitter"/>; never stored on the heap.
+/// A single collidable 2D primitive. Stack-only by convention — built
+/// by a <see cref="HitShape2D"/> into a <see cref="System.Span{T}"/>
+/// and handed to a <see cref="Hitter2D"/>; never stored on the heap.
 /// </summary>
-public readonly struct HitPrimitive
+public readonly struct HitPrimitive2D
 {
     /// <summary>
     /// Which primitive shape this struct represents.
     /// </summary>
-    public readonly HitKind Kind;
+    public readonly HitKind2D Kind;
 
     /// <summary>
     /// Primary point. Circle center / capsule endpoint A.
@@ -40,7 +40,7 @@ public readonly struct HitPrimitive
 
     /// <summary>
     /// Secondary point. Capsule endpoint B; unused for
-    /// <see cref="HitKind.Circle"/>.
+    /// <see cref="HitKind2D.Circle"/>.
     /// </summary>
     public readonly Vector2 P1;
 
@@ -49,7 +49,7 @@ public readonly struct HitPrimitive
     /// </summary>
     public readonly float R;
 
-    private HitPrimitive(HitKind kind, Vector2 p0, Vector2 p1, float r)
+    private HitPrimitive2D(HitKind2D kind, Vector2 p0, Vector2 p1, float r)
     {
         Kind = kind;
         P0 = p0;
@@ -61,8 +61,8 @@ public readonly struct HitPrimitive
     /// Builds a circle primitive centered on <paramref name="center"/>
     /// with radius <paramref name="radius"/>.
     /// </summary>
-    public static HitPrimitive Circle(Vector2 center, float radius) =>
-        new(HitKind.Circle, center, default, radius);
+    public static HitPrimitive2D Circle(Vector2 center, float radius) =>
+        new(HitKind2D.Circle, center, default, radius);
 
     /// <summary>
     /// Builds a capsule primitive — the Minkowski sum of the segment
@@ -70,42 +70,42 @@ public readonly struct HitPrimitive
     /// <paramref name="radius"/>. Degenerate endpoints
     /// (<paramref name="a"/> = <paramref name="b"/>) collide as a circle.
     /// </summary>
-    public static HitPrimitive Capsule(Vector2 a, Vector2 b, float radius) =>
-        new(HitKind.Capsule, a, b, radius);
+    public static HitPrimitive2D Capsule(Vector2 a, Vector2 b, float radius) =>
+        new(HitKind2D.Capsule, a, b, radius);
 
     /// <summary>
     /// True when this primitive overlaps <paramref name="other"/>.
     /// </summary>
-    public bool Intersects(in HitPrimitive other)
+    public bool Intersects(in HitPrimitive2D other)
     {
         // Pair table. Each (kind, kind) case dispatches to a closed-form
         // test. Asymmetric pairs delegate to the reverse case so each
         // combination is implemented exactly once.
         return (Kind, other.Kind) switch
         {
-            (HitKind.Circle, HitKind.Circle) => IntersectsCircleCircle(in this, in other),
-            (HitKind.Circle, HitKind.Capsule) => IntersectsCircleCapsule(in this, in other),
-            (HitKind.Capsule, HitKind.Circle) => IntersectsCircleCapsule(in other, in this),
-            (HitKind.Capsule, HitKind.Capsule) => IntersectsCapsuleCapsule(in this, in other),
+            (HitKind2D.Circle, HitKind2D.Circle) => IntersectsCircleCircle(in this, in other),
+            (HitKind2D.Circle, HitKind2D.Capsule) => IntersectsCircleCapsule(in this, in other),
+            (HitKind2D.Capsule, HitKind2D.Circle) => IntersectsCircleCapsule(in other, in this),
+            (HitKind2D.Capsule, HitKind2D.Capsule) => IntersectsCapsuleCapsule(in this, in other),
             _ => false,
         };
     }
 
-    private static bool IntersectsCircleCircle(in HitPrimitive a, in HitPrimitive b)
+    private static bool IntersectsCircleCircle(in HitPrimitive2D a, in HitPrimitive2D b)
     {
         var d = a.P0 - b.P0;
         var rs = a.R + b.R;
         return d.LengthSquared() <= rs * rs;
     }
 
-    private static bool IntersectsCircleCapsule(in HitPrimitive circle, in HitPrimitive capsule)
+    private static bool IntersectsCircleCapsule(in HitPrimitive2D circle, in HitPrimitive2D capsule)
     {
         var distSq = PointSegmentDistanceSquared(circle.P0, capsule.P0, capsule.P1);
         var rs = circle.R + capsule.R;
         return distSq <= rs * rs;
     }
 
-    private static bool IntersectsCapsuleCapsule(in HitPrimitive a, in HitPrimitive b)
+    private static bool IntersectsCapsuleCapsule(in HitPrimitive2D a, in HitPrimitive2D b)
     {
         var distSq = SegmentSegmentDistanceSquared(a.P0, a.P1, b.P0, b.P1);
         var rs = a.R + b.R;

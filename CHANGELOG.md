@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- `HitShape`, `PosedHitShape`, `HitPrimitive`, `HitKind`, `Hitter`,
+  and `HitShapeVisitor` renamed with a `2D` suffix (e.g.
+  `HitShape2D`). 3D equivalents will follow.
+- `SpriteImage2D.Draw` now takes `in Pose2D pose` instead of separate
+  `center` / `rotation` / `scale` / `flipped` parameters.
+- `PosedHitShape2D` now honors `Pose2D.Flipped` in hit tests, so
+  asymmetric local shapes mirror correctly with their sprite.
+- `Bitmap.ComputeOpaqueHitShape` renamed to
+  `Bitmap.ComputeOpaqueHitShape2D`.
 - `SpriteBehavior2D.Update` and `SceneBehavior2D.Update` renamed to
   `Apply` to reflect that a behavior mutates someone else's state.
 - `CustomSpriteBehavior2D.OnUpdate` / `CustomSceneBehavior2D.OnUpdate`
@@ -35,6 +44,11 @@ All notable changes to this project will be documented in this file.
   `Layers.Remove` remain for the rare case of dynamic layer changes.
 
 ### Added
+- `Pose2D` struct (`Position`, `Rotation`, `Scale`, `Flipped`) used by
+  `SpriteImage2D.Draw` and `PosedHitShape2D`.
+- `SpriteImage2D.State` / `SpriteImage2D.States` / `SpriteImage2D.DefaultState`:
+  extension point for animated or multi-pose images. Single-image
+  implementations expose just `"default"`.
 - `Bitmap.ComputeOpaqueHitShape()`: fits a circle or capsule to the
   opaque pixels and picks whichever covers them with less area.
 - `TextureSpriteImage2D` now uses the fit shape as its default

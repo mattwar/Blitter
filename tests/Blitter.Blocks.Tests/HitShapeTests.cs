@@ -8,16 +8,16 @@ public class HitShapeTests
     [Fact]
     public void Circle_Primitives_Intersect_When_Close()
     {
-        var a = HitPrimitive.Circle(new Vector2(0, 0), 5f);
-        var b = HitPrimitive.Circle(new Vector2(8, 0), 5f);
+        var a = HitPrimitive2D.Circle(new Vector2(0, 0), 5f);
+        var b = HitPrimitive2D.Circle(new Vector2(8, 0), 5f);
         Assert.True(a.Intersects(b));
     }
 
     [Fact]
     public void Circle_Primitives_Miss_When_Far()
     {
-        var a = HitPrimitive.Circle(new Vector2(0, 0), 5f);
-        var b = HitPrimitive.Circle(new Vector2(20, 0), 5f);
+        var a = HitPrimitive2D.Circle(new Vector2(0, 0), 5f);
+        var b = HitPrimitive2D.Circle(new Vector2(20, 0), 5f);
         Assert.False(a.Intersects(b));
     }
 
@@ -27,8 +27,8 @@ public class HitShapeTests
         // Two shapes whose broad circles miss should never reach the
         // primitive dispatch — verified by the canary hitter below.
         var canary = new CanaryHitter();
-        var a = Pose(new CircleHitShape(Vector2.Zero, 4f), new Vector2(0, 0));
-        var b = Pose(new CircleHitShape(Vector2.Zero, 4f), new Vector2(100, 0));
+        var a = Pose(new CircleHitShape2D(Vector2.Zero, 4f), new Vector2(0, 0));
+        var b = Pose(new CircleHitShape2D(Vector2.Zero, 4f), new Vector2(100, 0));
 
         Assert.False(a.Intersects(b));
         // Run the dispatch directly through the canary to confirm it
@@ -41,8 +41,8 @@ public class HitShapeTests
     [Fact]
     public void PosedHitShape_Intersects_Returns_True_On_Overlap()
     {
-        var a = Pose(new CircleHitShape(Vector2.Zero, 5f), new Vector2(0, 0));
-        var b = Pose(new CircleHitShape(Vector2.Zero, 5f), new Vector2(6, 0));
+        var a = Pose(new CircleHitShape2D(Vector2.Zero, 5f), new Vector2(0, 0));
+        var b = Pose(new CircleHitShape2D(Vector2.Zero, 5f), new Vector2(6, 0));
         Assert.True(a.Intersects(b));
     }
 
@@ -51,7 +51,7 @@ public class HitShapeTests
     {
         // Shape A has two well-separated circles; B overlaps only the second.
         var a = Pose(new TwoCircleShape(new Vector2(0, 0), new Vector2(20, 0), 2f), Vector2.Zero);
-        var b = Pose(new CircleHitShape(Vector2.Zero, 2f), new Vector2(21, 0));
+        var b = Pose(new CircleHitShape2D(Vector2.Zero, 2f), new Vector2(21, 0));
         Assert.True(a.Intersects(b));
     }
 
@@ -61,18 +61,56 @@ public class HitShapeTests
         var a = Pose(new TwoCircleShape(new Vector2(0, 0), new Vector2(20, 0), 2f), Vector2.Zero);
         // Broad circle of TwoCircleShape covers both, so this lands inside
         // the broad reject but no individual primitive overlaps the target.
-        var b = Pose(new CircleHitShape(Vector2.Zero, 2f), new Vector2(10, 0));
+        var b = Pose(new CircleHitShape2D(Vector2.Zero, 2f), new Vector2(10, 0));
         Assert.False(a.Intersects(b));
     }
 
-    private static PosedHitShape Pose(HitShape shape, Vector2 position) =>
-        new(shape, position, 0f, 1f);
+    [Fact]
+    public void HorizontalFlip_Mirrors_Asymmetric_Circle()
+    {
+        // Asymmetric circle: local center at (5, 0). Unflipped at world
+        // origin sits at (5, 0). Horizontal flip should land at (-5, 0).
+        var shape = new CircleHitShape2D(new Vector2(5, 0), 1f);
+        var flipped = new PosedHitShape2D(shape, new Pose2D(Vector2.Zero, flipped: FlipMode.Horizontal));
+        Assert.Equal(-5f, flipped.BroadCircle.Center.X, precision: 3);
+        Assert.Equal(0f, flipped.BroadCircle.Center.Y, precision: 3);
+    }
+
+    [Fact]
+    public void VerticalFlip_Mirrors_Asymmetric_Circle()
+    {
+        var shape = new CircleHitShape2D(new Vector2(0, 5), 1f);
+        var flipped = new PosedHitShape2D(shape, new Pose2D(Vector2.Zero, flipped: FlipMode.Vertical));
+        Assert.Equal(0f, flipped.BroadCircle.Center.X, precision: 3);
+        Assert.Equal(-5f, flipped.BroadCircle.Center.Y, precision: 3);
+    }
+
+    [Fact]
+    public void HorizontalFlip_Mirrors_Capsule_Endpoints()
+    {
+        // Capsule from (5,0) to (15,0). Flipping horizontally and placing
+        // at world origin should turn it into (-5,0)→(-15,0). A probe at
+        // +10 hits unflipped, misses flipped; at -10 the opposite.
+        var capsule = new CapsuleHitShape2D(new Vector2(5, 0), new Vector2(15, 0), 1f);
+        var unflipped = new PosedHitShape2D(capsule, new Pose2D(Vector2.Zero));
+        var flipped = new PosedHitShape2D(capsule, new Pose2D(Vector2.Zero, flipped: FlipMode.Horizontal));
+        var probePos = Pose(new CircleHitShape2D(Vector2.Zero, 1f), new Vector2(10, 0));
+        var probeNeg = Pose(new CircleHitShape2D(Vector2.Zero, 1f), new Vector2(-10, 0));
+
+        Assert.True(unflipped.Intersects(probePos));
+        Assert.False(unflipped.Intersects(probeNeg));
+        Assert.False(flipped.Intersects(probePos));
+        Assert.True(flipped.Intersects(probeNeg));
+    }
+
+    private static PosedHitShape2D Pose(HitShape2D shape, Vector2 position) =>
+        new(shape, new Pose2D(position));
 
     /// <summary>
     /// Two-circle test shape: emits a circle at each local point with
     /// the same radius, and a bounding circle covering both.
     /// </summary>
-    private sealed class TwoCircleShape : HitShape
+    private sealed class TwoCircleShape : HitShape2D
     {
         private readonly Vector2 _a;
         private readonly Vector2 _b;
@@ -95,45 +133,42 @@ public class HitShapeTests
             }
         }
 
-        public override bool TestHit(in PosedHitShape mine, in PosedHitShape other, Hitter hitter)
+        public override bool TestHit(in PosedHitShape2D mine, in PosedHitShape2D other, Hitter2D hitter)
         {
-            Span<HitPrimitive> span = stackalloc HitPrimitive[2];
+            Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[2];
             Pose(span, in mine);
             return hitter.TestHit(span, in other);
         }
 
-        public override bool TestHitWith(in PosedHitShape mine, ReadOnlySpan<HitPrimitive> other, Hitter hitter)
+        public override bool TestHitWith(in PosedHitShape2D mine, ReadOnlySpan<HitPrimitive2D> other, Hitter2D hitter)
         {
-            Span<HitPrimitive> span = stackalloc HitPrimitive[2];
+            Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[2];
             Pose(span, in mine);
             return hitter.TestHit(other, span);
         }
 
-        public override void Visit(in PosedHitShape mine, HitShapeVisitor visitor)
+        public override void Visit(in PosedHitShape2D mine, HitShapeVisitor2D visitor)
         {
-            Span<HitPrimitive> span = stackalloc HitPrimitive[2];
+            Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[2];
             Pose(span, in mine);
             visitor(span);
         }
 
-        private void Pose(Span<HitPrimitive> destination, in PosedHitShape pose)
+        private void Pose(Span<HitPrimitive2D> destination, in PosedHitShape2D pose)
         {
-            var rad = pose.Rotation * (MathF.PI / 180f);
-            var cos = MathF.Cos(rad);
-            var sin = MathF.Sin(rad);
-            destination[0] = HitPrimitive.Circle(pose.Position + Rotate(_a * pose.Scale, cos, sin), _r * pose.Scale);
-            destination[1] = HitPrimitive.Circle(pose.Position + Rotate(_b * pose.Scale, cos, sin), _r * pose.Scale);
+            destination[0] = HitPrimitive2D.Circle(pose.Pose.Transform(_a), _r * pose.Pose.Scale);
+            destination[1] = HitPrimitive2D.Circle(pose.Pose.Transform(_b), _r * pose.Pose.Scale);
         }
 
-        private static Vector2 Rotate(Vector2 v, float cos, float sin) =>
-            new(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos);
+        public override HitShape2D Translate(Vector2 offset) =>
+            new TwoCircleShape(_a + offset, _b + offset, _r);
     }
 
-    private sealed class CanaryHitter : Hitter
+    private sealed class CanaryHitter : Hitter2D
     {
         public int Calls { get; private set; }
 
-        public override bool TestHit(ReadOnlySpan<HitPrimitive> a, ReadOnlySpan<HitPrimitive> b)
+        public override bool TestHit(ReadOnlySpan<HitPrimitive2D> a, ReadOnlySpan<HitPrimitive2D> b)
         {
             Calls++;
             return false;
