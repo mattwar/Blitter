@@ -149,25 +149,46 @@ public sealed class TextureCatalog : IDisposable
     }
 
     /// <summary>
-    /// Builds an atlas by detecting the grid implicit in a sprite sheet:
-    /// rows and columns of fully-transparent pixels are treated as gutters,
-    /// and the opaque bands between them become the cells. 
-    /// Regions are numbered in row-major order (top-to-bottom, left-to-right).
+    /// Builds an atlas by detecting layout implicit in a sprite sheet.
+    /// First, rows of fully-transparent pixels split the image into
+    /// horizontal bands. Within each band, columns of transparent
+    /// pixels split the band into individual regions. This handles
+    /// sheets whose rows are not perfectly column-aligned.
+    /// <para/>
+    /// <paramref name="minRowGutter"/> and <paramref name="minColumnGutter"/>
+    /// set the minimum number of consecutive transparent rows or
+    /// columns that count as a real separator — shorter breaks are
+    /// absorbed into the surrounding region. Useful when JPEG halos
+    /// or shadow fragments leave a few-pixel gap inside a single
+    /// sprite's extent.
+    /// <para/>
+    /// <paramref name="minRegionWidth"/> and
+    /// <paramref name="minRegionHeight"/> drop regions smaller than
+    /// the given size in either dimension — useful for ignoring
+    /// stray noise pixels.
+    /// Regions are numbered band-by-band, left-to-right within each
+    /// band.
     /// </summary>
     public static TextureCatalog Sense(
         ReadableTexture2D image,
         byte alphaThreshold = 0,
-        bool includeEmptyCells = false,
+        int minRegionWidth = 1,
+        int minRegionHeight = 1,
+        int minRowGutter = 1,
+        int minColumnGutter = 1,
         bool ownsImage = true)
     {
         ArgumentNullException.ThrowIfNull(image);
+        ArgumentOutOfRangeException.ThrowIfLessThan(minRegionWidth, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(minRegionHeight, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(minRowGutter, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(minColumnGutter, 1);
         var (w, h) = image.Size;
         if (w <= 0 || h <= 0)
             return FromRegions(image, ReadOnlySpan<Rect>.Empty, names: null, ownsImage);
 
-        // Per-column / per-row "has any opaque pixel" flags. One pass
-        // over the image fills both.
-        Span<bool> colHasContent = w <= 1024 ? stackalloc bool[w] : new bool[w];
+        // First pass: per-row "has any opaque pixel" flag, used to
+        // partition the image into horizontal bands.
         Span<bool> rowHasContent = h <= 1024 ? stackalloc bool[h] : new bool[h];
         for (int y = 0; y < h; y++)
         {
@@ -175,47 +196,55 @@ public sealed class TextureCatalog : IDisposable
             {
                 if (image.GetPixel(x, y).A > alphaThreshold)
                 {
-                    colHasContent[x] = true;
                     rowHasContent[y] = true;
+                    break;
                 }
             }
         }
 
-        // Collapse the flag arrays into runs of opaque indices.
+        Span<int> bandStarts = stackalloc int[16];
+        Span<int> bandEnds = stackalloc int[16];
+        int bandCount = FindRuns(rowHasContent, ref bandStarts, ref bandEnds, minRowGutter);
+
+        // Second pass: for each band, project only that band's rows
+        // onto the x-axis and find column runs. Each run becomes a
+        // region whose y-extent spans the whole band.
+        var rects = new List<Rect>();
+        Span<bool> colHasContent = w <= 1024 ? stackalloc bool[w] : new bool[w];
         Span<int> colStarts = stackalloc int[16];
         Span<int> colEnds = stackalloc int[16];
-        int colCount = FindRuns(colHasContent, ref colStarts, ref colEnds);
-
-        Span<int> rowStarts = stackalloc int[16];
-        Span<int> rowEnds = stackalloc int[16];
-        int rowCount = FindRuns(rowHasContent, ref rowStarts, ref rowEnds);
-
-        var rects = new List<Rect>(rowCount * colCount);
-        for (int r = 0; r < rowCount; r++)
+        for (int b = 0; b < bandCount; b++)
         {
+            int y0 = bandStarts[b], y1 = bandEnds[b];
+            if (y1 - y0 < minRegionHeight) continue;
+
+            colHasContent.Clear();
+            for (int y = y0; y < y1; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    if (!colHasContent[x] && image.GetPixel(x, y).A > alphaThreshold)
+                        colHasContent[x] = true;
+                }
+            }
+
+            int colCount = FindRuns(colHasContent, ref colStarts, ref colEnds, minColumnGutter);
             for (int c = 0; c < colCount; c++)
             {
                 int x0 = colStarts[c], x1 = colEnds[c];
-                int y0 = rowStarts[r], y1 = rowEnds[r];
-                if (!includeEmptyCells && !HasOpaque(image, x0, y0, x1, y1, alphaThreshold))
-                    continue;
+                if (x1 - x0 < minRegionWidth) continue;
                 rects.Add(new Rect(x0, y0, x1 - x0, y1 - y0));
             }
         }
         return FromRegions(image, rects.ToArray(), names: null, ownsImage);
     }
 
-    private static bool HasOpaque(ReadableTexture2D image, int x0, int y0, int x1, int y1, byte alphaThreshold)
-    {
-        for (int y = y0; y < y1; y++)
-            for (int x = x0; x < x1; x++)
-                if (image.GetPixel(x, y).A > alphaThreshold) return true;
-        return false;
-    }
-
     // Finds runs of 'true' in <paramref name="flags"/> and writes their
-    // [start, end) extents. Grows the output spans if needed.
-    private static int FindRuns(ReadOnlySpan<bool> flags, ref Span<int> starts, ref Span<int> ends)
+    // [start, end) extents. Runs separated by a gap of fewer than
+    // <paramref name="minGap"/> false entries are merged — the merged
+    // run's extent then includes the bridged false entries.
+    // Grows the output spans if needed.
+    private static int FindRuns(ReadOnlySpan<bool> flags, ref Span<int> starts, ref Span<int> ends, int minGap = 1)
     {
         int count = 0;
         int i = 0;
@@ -224,6 +253,12 @@ public sealed class TextureCatalog : IDisposable
             if (!flags[i]) { i++; continue; }
             int start = i;
             while (i < flags.Length && flags[i]) i++;
+            // Bridge to the previous run if the gap is below the threshold.
+            if (count > 0 && start - ends[count - 1] < minGap)
+            {
+                ends[count - 1] = i;
+                continue;
+            }
             if (count == starts.Length)
             {
                 var newStarts = new int[starts.Length * 2];

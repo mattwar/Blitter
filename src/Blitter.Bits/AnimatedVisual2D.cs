@@ -98,9 +98,9 @@ public sealed class AnimatedVisual2D : Visual2D
         _current.FrameIndexAt(LocalTime(elapsed));
 
     /// <summary>
-    /// Texture drawn for the current frame at the given time.
+    /// Frame drawn for the current sequence at the given time.
     /// </summary>
-    public Texture2D FrameAt(TimeSpan elapsed) =>
+    public AnimationFrame FrameAt(TimeSpan elapsed) =>
         _current.FrameAt(LocalTime(elapsed));
 
     /// <summary>
@@ -114,12 +114,21 @@ public sealed class AnimatedVisual2D : Visual2D
         _boundary ??= ComputeBoundary();
 
     /// <inheritdoc/>
-    public override HitShape2D HitShape =>
-        _hitShapeCache.GetOrCreateHitShape(_current.Frames[0]);
+    public override HitShape2D HitShape
+    {
+        get
+        {
+            var f = _current.Frames[0];
+            return _hitShapeCache.GetOrCreateHitShape(f.Texture).Flipped(f.Flip);
+        }
+    }
 
     /// <inheritdoc/>
-    public override HitShape2D GetHitShapeAt(TimeSpan elapsed) =>
-        _hitShapeCache.GetOrCreateHitShape(_current.FrameAt(LocalTime(elapsed)));
+    public override HitShape2D GetHitShapeAt(TimeSpan elapsed)
+    {
+        var f = _current.FrameAt(LocalTime(elapsed));
+        return _hitShapeCache.GetOrCreateHitShape(f.Texture).Flipped(f.Flip);
+    }
 
     /// <summary>
     /// Computes the overall bounding circle for this visual by examining the sizes of all frames
@@ -131,7 +140,7 @@ public sealed class AnimatedVisual2D : Visual2D
         {
             foreach (var frame in seq.Frames)
             {
-                var s = frame.Size;
+                var s = frame.Texture.Size;
                 var hw = s.Width / 2f;
                 var hh = s.Height / 2f;
                 var r2 = hw * hw + hh * hh;
@@ -145,7 +154,8 @@ public sealed class AnimatedVisual2D : Visual2D
     public override void Draw(Renderer2D renderer, in Pose2D pose, Color tint, TimeSpan elapsed)
     {
         var frame = _current.FrameAt(LocalTime(elapsed));
-        var size = frame.Size;
+        var texture = frame.Texture;
+        var size = texture.Size;
         var scaledW = size.Width * pose.Scale;
         var scaledH = size.Height * pose.Scale;
         var dest = new Rect(
@@ -156,20 +166,20 @@ public sealed class AnimatedVisual2D : Visual2D
         var source = new Rect(0f, 0f, size.Width, size.Height);
         bool tinted = tint != Color.White;
 
-        if (pose.Rotation != 0f || pose.Flipped != FlipMode.None)
+        if (pose.Rotation != 0f || frame.Flip != FlipMode.None)
         {
             var rc = new Vector2(scaledW / 2f, scaledH / 2f);
             if (tinted)
-                renderer.DrawImageRotated(frame, source, dest, pose.Rotation, rc, pose.Flipped, tint);
+                renderer.DrawImageRotated(texture, source, dest, pose.Rotation, rc, frame.Flip, tint);
             else
-                renderer.DrawImageRotated(frame, source, dest, pose.Rotation, rc, pose.Flipped);
+                renderer.DrawImageRotated(texture, source, dest, pose.Rotation, rc, frame.Flip);
         }
         else
         {
             if (tinted)
-                renderer.DrawImage(frame, source, dest, tint);
+                renderer.DrawImage(texture, source, dest, tint);
             else
-                renderer.DrawImage(frame, source, dest);
+                renderer.DrawImage(texture, source, dest);
         }
     }
 

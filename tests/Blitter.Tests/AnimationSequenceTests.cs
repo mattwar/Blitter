@@ -46,10 +46,10 @@ public class AnimationSequenceTests
         var s = new AnimationSequence(frames, TimeSpan.FromSeconds(1));
 
         Assert.Equal(3, s.FrameCount);
-        Assert.Same(frames[0], s.FrameAt(TimeSpan.FromSeconds(0)));
-        Assert.Same(frames[1], s.FrameAt(TimeSpan.FromSeconds(1)));
-        Assert.Same(frames[2], s.FrameAt(TimeSpan.FromSeconds(2)));
-        Assert.Same(frames[0], s.FrameAt(TimeSpan.FromSeconds(3)));
+        Assert.Same(frames[0], s.FrameAt(TimeSpan.FromSeconds(0)).Texture);
+        Assert.Same(frames[1], s.FrameAt(TimeSpan.FromSeconds(1)).Texture);
+        Assert.Same(frames[2], s.FrameAt(TimeSpan.FromSeconds(2)).Texture);
+        Assert.Same(frames[0], s.FrameAt(TimeSpan.FromSeconds(3)).Texture);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public class AnimationSequenceTests
         Assert.Throws<ArgumentException>(() =>
             new AnimationSequence(ImmutableArray<Texture2D>.Empty, TimeSpan.FromSeconds(1)));
         Assert.Throws<ArgumentException>(() =>
-            new AnimationSequence(default, TimeSpan.FromSeconds(1)));
+            new AnimationSequence(default(ImmutableArray<Texture2D>), TimeSpan.FromSeconds(1)));
     }
 
     [Fact]

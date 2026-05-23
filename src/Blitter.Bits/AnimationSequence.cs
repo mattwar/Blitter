@@ -3,14 +3,14 @@ using System.Collections.Immutable;
 namespace Blitter.Bits;
 
 /// <summary>
-/// A sequence of <see cref="Texture2D"/> frames played at a fixed
-/// cadence with a chosen loop behavior. Immutable; safe to share across
-/// many <see cref="AnimatedVisual2D"/>s.
+/// A sequence of <see cref="AnimationFrame"/>s played at a fixed
+/// cadence with a chosen loop behavior. Immutable; safe to share
+/// across many <see cref="AnimatedVisual2D"/>s.
 /// </summary>
 public sealed class AnimationSequence
 {
     public AnimationSequence(
-        ImmutableArray<Texture2D> frames,
+        ImmutableArray<AnimationFrame> frames,
         TimeSpan frameDuration,
         AnimationLoop loop = AnimationLoop.Loop)
     {
@@ -20,8 +20,8 @@ public sealed class AnimationSequence
             throw new ArgumentOutOfRangeException(nameof(frameDuration));
         for (int i = 0; i < frames.Length; i++)
         {
-            if (frames[i] is null)
-                throw new ArgumentException($"Frame {i} is null.", nameof(frames));
+            if (frames[i].Texture is null)
+                throw new ArgumentException($"Frame {i} has a null texture.", nameof(frames));
         }
 
         Frames = frames;
@@ -29,8 +29,38 @@ public sealed class AnimationSequence
         Loop = loop;
     }
 
+    /// <summary>
+    /// Convenience overload that wraps each texture as a
+    /// <see cref="AnimationFrame"/>, optionally with a uniform
+    /// per-frame <paramref name="flip"/>.
+    /// </summary>
+    public AnimationSequence(
+        ImmutableArray<Texture2D> textures,
+        TimeSpan frameDuration,
+        AnimationLoop loop = AnimationLoop.Loop,
+        FlipMode flip = FlipMode.None)
+        : this(WrapTextures(textures, flip), frameDuration, loop)
+    {
+    }
+
+    private static ImmutableArray<AnimationFrame> WrapTextures(
+        ImmutableArray<Texture2D> textures,
+        FlipMode flip)
+    {
+        if (textures.IsDefaultOrEmpty)
+            throw new ArgumentException("At least one texture is required.", nameof(textures));
+        var builder = ImmutableArray.CreateBuilder<AnimationFrame>(textures.Length);
+        for (int i = 0; i < textures.Length; i++)
+        {
+            if (textures[i] is null)
+                throw new ArgumentException($"Texture {i} is null.", nameof(textures));
+            builder.Add(new AnimationFrame(textures[i], flip));
+        }
+        return builder.MoveToImmutable();
+    }
+
     /// <summary>Frames in playback order.</summary>
-    public ImmutableArray<Texture2D> Frames { get; }
+    public ImmutableArray<AnimationFrame> Frames { get; }
 
     /// <summary>Time each frame is held.</summary>
     public TimeSpan FrameDuration { get; }
@@ -76,7 +106,7 @@ public sealed class AnimationSequence
     }
 
     /// <summary>Frame drawn after <paramref name="elapsed"/> time in this sequence.</summary>
-    public Texture2D FrameAt(TimeSpan elapsed) => Frames[FrameIndexAt(elapsed)];
+    public AnimationFrame FrameAt(TimeSpan elapsed) => Frames[FrameIndexAt(elapsed)];
 
     /// <summary>
     /// True for <see cref="AnimationLoop.Once"/> sequences after they

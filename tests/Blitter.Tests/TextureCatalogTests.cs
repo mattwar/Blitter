@@ -197,19 +197,62 @@ public class TextureCatalogTests
     }
 
     [Fact]
-    public void Sense_IncludesEmptyCells_WhenOptedIn()
+    public void Sense_HandlesMisalignedBands()
     {
+        // Top band has cells at x in [0,4) and [6,10).
+        // Bottom band has a single cell at x in [3,8) — its column
+        // range overlaps both top cells. A global column projection
+        // would merge everything; per-band projection must not.
         var bmp = CreateImage(10, 10);
         FillRect(bmp, 0, 0, 4, 4);
-        FillRect(bmp, 6, 6, 4, 4);
+        FillRect(bmp, 6, 0, 4, 4);
+        FillRect(bmp, 3, 6, 5, 4);
 
-        using var atlas = TextureCatalog.Sense(bmp, includeEmptyCells: true);
+        using var atlas = TextureCatalog.Sense(bmp);
 
-        Assert.Equal(4, atlas.Count);
+        Assert.Equal(3, atlas.Count);
         Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
         Assert.Equal(new Rect(6, 0, 4, 4), ((ITextureRegion)atlas[1]).SourceRect);
-        Assert.Equal(new Rect(0, 6, 4, 4), ((ITextureRegion)atlas[2]).SourceRect);
-        Assert.Equal(new Rect(6, 6, 4, 4), ((ITextureRegion)atlas[3]).SourceRect);
+        Assert.Equal(new Rect(3, 6, 5, 4), ((ITextureRegion)atlas[2]).SourceRect);
+    }
+
+    [Fact]
+    public void Sense_DropsRegions_BelowMinSize()
+    {
+        // Three rows: a real sprite row (8x8), a 1-pixel noise stripe,
+        // and another real sprite row. Within the bottom row there's
+        // a stray 2x8 sliver before the real 8x8 cell.
+        var bmp = CreateImage(20, 20);
+        FillRect(bmp, 0, 0, 8, 8);
+        FillRect(bmp, 0, 10, 1, 1); // noise pixel between bands
+        FillRect(bmp, 0, 12, 2, 8); // narrow sliver
+        FillRect(bmp, 4, 12, 8, 8); // real cell
+
+        using var atlas = TextureCatalog.Sense(bmp, minRegionWidth: 4, minRegionHeight: 4);
+
+        Assert.Equal(2, atlas.Count);
+        Assert.Equal(new Rect(0, 0, 8, 8), ((ITextureRegion)atlas[0]).SourceRect);
+        Assert.Equal(new Rect(4, 12, 8, 8), ((ITextureRegion)atlas[1]).SourceRect);
+    }
+
+    [Fact]
+    public void Sense_BridgesSmallGutters()
+    {
+        // A sprite (8 tall) with a 2-pixel transparent break above
+        // a 3-pixel shadow tail. With default minRowGutter=1 the
+        // algorithm splits into two bands; with minRowGutter=3 a
+        // 2-pixel gap is below threshold so the gap is bridged and
+        // we get one region covering both pieces.
+        var bmp = CreateImage(8, 16);
+        FillRect(bmp, 0, 0, 8, 8);
+        FillRect(bmp, 0, 10, 8, 3); // shadow tail after a 2-row gutter
+
+        using var split = TextureCatalog.Sense(bmp);
+        Assert.Equal(2, split.Count);
+
+        using var merged = TextureCatalog.Sense(bmp, minRowGutter: 3);
+        Assert.Equal(1, merged.Count);
+        Assert.Equal(new Rect(0, 0, 8, 13), ((ITextureRegion)merged[0]).SourceRect);
     }
 
     [Fact]

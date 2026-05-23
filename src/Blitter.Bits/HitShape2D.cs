@@ -13,6 +13,11 @@ public delegate void HitShapeVisitor2D(ReadOnlySpan<HitPrimitive2D> primitives);
 /// </summary>
 public abstract class HitShape2D
 {
+    // Lazily materialized siblings forming a Klein-4 family under FlipMode XOR.
+    // Set in one shot the first time Flipped is called on any family member.
+    private HitShape2D? _flipH, _flipV, _flipHV;
+    private bool _familyBound;
+
     /// <summary>
     /// Local-space bounding circle used for the broad-phase reject.
     /// </summary>
@@ -41,6 +46,62 @@ public abstract class HitShape2D
     public abstract HitShape2D Translate(Vector2 offset);
 
     /// <summary>
+    /// Returns a sibling whose local geometry is mirrored according
+    /// to <paramref name="flip"/>. Repeated calls return the same
+    /// cached instance; the four flip variants of any shape are
+    /// interned together so flipping a sibling never allocates.
+    /// </summary>
+    public virtual HitShape2D Flipped(FlipMode flip)
+    {
+        if (flip == FlipMode.None)
+            return this;
+        if (!_familyBound)
+        {
+            // Materialize the other three members and cross-wire so any
+            // member's _flipX field points at the correct family member.
+            // Composition follows the Klein-4 group: state ^ flip.
+            var h = CreateFlipped(FlipMode.Horizontal);
+            var v = CreateFlipped(FlipMode.Vertical);
+            var hv = CreateFlipped(FlipMode.Both);
+            BindFamily(this, h, v, hv);
+        }
+        return flip switch
+        {
+            FlipMode.Horizontal => _flipH!,
+            FlipMode.Vertical => _flipV!,
+            FlipMode.Both => _flipHV!,
+            _ => throw new ArgumentOutOfRangeException(nameof(flip)),
+        };
+    }
+
+    /// <summary>
+    /// Constructs a new shape whose local geometry is mirrored
+    /// according to <paramref name="flip"/>. Implementations should
+    /// produce a plain mirrored sibling; <see cref="Flipped"/> handles
+    /// caching and family wiring.
+    /// </summary>
+    protected abstract HitShape2D CreateFlipped(FlipMode flip);
+
+    /// <summary>
+    /// Mirrors a local-space point under the given flip mode.
+    /// </summary>
+    protected static Vector2 Mirror(Vector2 p, FlipMode flip) => flip switch
+    {
+        FlipMode.Horizontal => new Vector2(-p.X, p.Y),
+        FlipMode.Vertical => new Vector2(p.X, -p.Y),
+        FlipMode.Both => new Vector2(-p.X, -p.Y),
+        _ => p,
+    };
+
+    private static void BindFamily(HitShape2D none, HitShape2D h, HitShape2D v, HitShape2D hv)
+    {
+        none._flipH = h;   none._flipV = v;    none._flipHV = hv;  none._familyBound = true;
+        h._flipH = none;   h._flipV = hv;      h._flipHV = v;      h._familyBound = true;
+        v._flipH = hv;     v._flipV = none;    v._flipHV = h;      v._familyBound = true;
+        hv._flipH = v;     hv._flipV = h;      hv._flipHV = none;  hv._familyBound = true;
+    }
+
+    /// <summary>
     /// Shared "no shape" sentinel — never hits anything.
     /// </summary>
     public static readonly HitShape2D None = new NoneShape();
@@ -52,6 +113,8 @@ public abstract class HitShape2D
         public override bool TestHitWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester) => false;
         public override void Visit(in Pose2D mine, HitShapeVisitor2D visitor) { }
         public override HitShape2D Translate(Vector2 offset) => this;
+        public override HitShape2D Flipped(FlipMode flip) => this;
+        protected override HitShape2D CreateFlipped(FlipMode flip) => this;
     }
 }
 
@@ -76,9 +139,8 @@ public readonly struct PosedHitShape2D
         HitShape2D shape,
         Vector2 position,
         float rotation = 0f,
-        float scale = 1f,
-        FlipMode flipped = FlipMode.None)
-        : this(shape, new Pose2D(position, rotation, scale, flipped)) { }
+        float scale = 1f)
+        : this(shape, new Pose2D(position, rotation, scale)) { }
 
     /// <summary>
     /// World-space broad-phase circle, computed from <see cref="HitShape2D.LocalBoundary"/> and the current pose.
@@ -162,6 +224,9 @@ public sealed class CircleHitShape2D : HitShape2D
 
     public override HitShape2D Translate(Vector2 offset) =>
         new CircleHitShape2D(LocalCenter + offset, LocalRadius);
+
+    protected override HitShape2D CreateFlipped(FlipMode flip) =>
+        new CircleHitShape2D(Mirror(LocalCenter, flip), LocalRadius);
 }
 
 /// <summary>
@@ -221,4 +286,7 @@ public sealed class CapsuleHitShape2D : HitShape2D
 
     public override HitShape2D Translate(Vector2 offset) =>
         new CapsuleHitShape2D(LocalEndA + offset, LocalEndB + offset, LocalRadius);
+
+    protected override HitShape2D CreateFlipped(FlipMode flip) =>
+        new CapsuleHitShape2D(Mirror(LocalEndA, flip), Mirror(LocalEndB, flip), LocalRadius);
 }

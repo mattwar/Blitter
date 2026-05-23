@@ -13,7 +13,8 @@ public static class AnimationCatalogFactories
         string Name,
         ImmutableArray<int> Frames,
         TimeSpan FrameDuration,
-        AnimationLoop Loop = AnimationLoop.Loop);
+        AnimationLoop Loop = AnimationLoop.Loop,
+        FlipMode Flip = FlipMode.None);
 
     /// <summary>
     /// Builds an <see cref="AnimationCatalog"/> by materializing
@@ -34,13 +35,13 @@ public static class AnimationCatalogFactories
                 throw new ArgumentException(
                     $"Sequence '{spec.Name}' has no frames.", nameof(specs));
 
-            var frames = ImmutableArray.CreateBuilder<Texture2D>(spec.Frames.Length);
+            var frames = ImmutableArray.CreateBuilder<AnimationFrame>(spec.Frames.Length);
             foreach (var i in spec.Frames)
             {
                 if ((uint)i >= (uint)atlas.Count)
                     throw new ArgumentOutOfRangeException(nameof(specs),
                         $"Sequence '{spec.Name}' references frame {i} outside the atlas range [0, {atlas.Count}).");
-                frames.Add(atlas[i]);
+                frames.Add(new AnimationFrame(atlas[i], spec.Flip));
             }
 
             seqs.Add(new KeyValuePair<string, AnimationSequence>(

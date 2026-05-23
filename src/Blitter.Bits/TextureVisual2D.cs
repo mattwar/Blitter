@@ -46,13 +46,13 @@ public sealed class TextureVisual2D : Visual2D
         var dest = new Rect(pose.Position.X - scaledWidth / 2f, pose.Position.Y - scaledHeight / 2f, scaledWidth, scaledHeight);
         bool tinted = tint != Color.White;
 
-        if (pose.Rotation != 0f || pose.Flipped != FlipMode.None)
+        if (pose.Rotation != 0f)
         {
             var rotationCenter = new Vector2(scaledWidth / 2f, scaledHeight / 2f);
             if (tinted)
-                renderer.DrawImageRotated(_texture, source, dest, pose.Rotation, rotationCenter, pose.Flipped, tint);
+                renderer.DrawImageRotated(_texture, source, dest, pose.Rotation, rotationCenter, FlipMode.None, tint);
             else
-                renderer.DrawImageRotated(_texture, source, dest, pose.Rotation, rotationCenter, pose.Flipped);
+                renderer.DrawImageRotated(_texture, source, dest, pose.Rotation, rotationCenter);
         }
         else
         {

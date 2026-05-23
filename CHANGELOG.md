@@ -28,8 +28,32 @@ All notable changes to this project will be documented in this file.
   `HitShape`; `AnimatedVisual2D` overrides it to return the shape of
   the current frame, so callers can stay ignorant of which subtype
   they hold.
+- `AnimationFrame` struct: per-frame `(Texture2D Texture, FlipMode Flip)`
+  pair, with implicit conversion from `Texture2D` for the no-flip
+  case. Lets a single artwork-direction sheet feed both "facing
+  right" and "facing left" sequences without duplicating frames.
+- `AnimationSequence(ImmutableArray<Texture2D>, …, FlipMode flip)`
+  convenience overload that wraps each texture as an
+  `AnimationFrame` with the given uniform flip.
+- `FlipMode.Both` (`Horizontal | Vertical`). `FlipMode` is now
+  `[Flags]`; the four values form a Klein four-group under XOR.
+- `HitShape2D.Flipped(FlipMode)`: returns a sibling shape whose
+  local geometry is mirrored. Symmetric shapes return `this`; other
+  shapes intern up to three siblings per canonical and cross-wire
+  them so flipping a sibling navigates back through the family
+  without allocating.
 
 ### Changed
+- `TextureCatalog.Sense` now partitions the sheet hierarchically:
+  horizontal bands first, then per-band columns. Handles sheets
+  whose rows are not perfectly column-aligned. New `minRegionWidth`
+  / `minRegionHeight` parameters discard sub-threshold runs, useful
+  for ignoring JPEG halos and antialias noise. `minRowGutter` /
+  `minColumnGutter` set the minimum transparent gap that counts as
+  a real separator — smaller breaks are bridged so shadows and
+  detached pieces stay part of the parent region. The
+  `includeEmptyCells` parameter is gone — the new algorithm only
+  ever produces non-empty regions.
 - `ImageBounds` extension helpers now accept any
   `IReadableTexture2D`, not just `Bitmap`.
 - `Atlas` renamed to `TextureCatalog`: an ordered, optionally-named
@@ -38,10 +62,21 @@ All notable changes to this project will be documented in this file.
   `TextureCatalog.FromRegions(image, …)`,
   `TextureCatalog.Grid(image, …)`, or `TextureCatalog.Sense(image, …)`.
   Only `Sense` requires a readable image.
-- `AnimationSequence.Frames` is now `ImmutableArray<Texture2D>`;
-  `FrameIndexAt` returns the position within the frame list and a
-  new `FrameAt` returns the frame texture. Catalog-built sequences
-  hold sliced frames over the source image.
+- `AnimationSequence.Frames` is now `ImmutableArray<AnimationFrame>`,
+  not `ImmutableArray<Texture2D>`. `FrameAt(TimeSpan)` returns an
+  `AnimationFrame`; texture is at `.Texture`. The original
+  texture-array ctor still works (textures convert implicitly into
+  `AnimationFrame` values).
+- `Pose2D` no longer carries a `Flipped` field. Pose is now purely
+  spatial (position, rotation, uniform scale). Flip lives with the
+  visual (per `AnimationFrame`) and the hit shape (`Flipped(FlipMode)`),
+  so the on-screen render and the collision shape stay in sync
+  without the pose having to broadcast it.
+- `Sprite2D.Flipped` removed for the same reason — set the flip on
+  the visual's animation frames (or use a flipped sequence) instead.
+- `AnimationCatalogFactories.Spec` gained a `FlipMode Flip` (default
+  `None`) that is applied uniformly to every frame in the generated
+  sequence.
 - `AnimationSequence` no longer carries a `Name`; the name lives
   with the catalog entry. Construct as
   `new AnimationSequence(frames, frameDuration, loop)`.

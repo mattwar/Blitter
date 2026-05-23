@@ -68,10 +68,11 @@ public class HitShapeTests
     [Fact]
     public void HorizontalFlip_Mirrors_Asymmetric_Circle()
     {
-        // Asymmetric circle: local center at (5, 0). Unflipped at world
-        // origin sits at (5, 0). Horizontal flip should land at (-5, 0).
+        // Asymmetric circle: local center at (5, 0). Un-flipped at world
+        // origin sits at (5, 0). The horizontally-flipped sibling lives
+        // at (-5, 0) in local space and so projects to (-5, 0) at origin.
         var shape = new CircleHitShape2D(new Vector2(5, 0), 1f);
-        var flipped = new PosedHitShape2D(shape, new Pose2D(Vector2.Zero, flipped: FlipMode.Horizontal));
+        var flipped = new PosedHitShape2D(shape.Flipped(FlipMode.Horizontal), new Pose2D(Vector2.Zero));
         Assert.Equal(-5f, flipped.BoundingCircle.Center.X, precision: 3);
         Assert.Equal(0f, flipped.BoundingCircle.Center.Y, precision: 3);
     }
@@ -80,7 +81,7 @@ public class HitShapeTests
     public void VerticalFlip_Mirrors_Asymmetric_Circle()
     {
         var shape = new CircleHitShape2D(new Vector2(0, 5), 1f);
-        var flipped = new PosedHitShape2D(shape, new Pose2D(Vector2.Zero, flipped: FlipMode.Vertical));
+        var flipped = new PosedHitShape2D(shape.Flipped(FlipMode.Vertical), new Pose2D(Vector2.Zero));
         Assert.Equal(0f, flipped.BoundingCircle.Center.X, precision: 3);
         Assert.Equal(-5f, flipped.BoundingCircle.Center.Y, precision: 3);
     }
@@ -93,7 +94,7 @@ public class HitShapeTests
         // +10 hits unflipped, misses flipped; at -10 the opposite.
         var capsule = new CapsuleHitShape2D(new Vector2(5, 0), new Vector2(15, 0), 1f);
         var unflipped = new PosedHitShape2D(capsule, new Pose2D(Vector2.Zero));
-        var flipped = new PosedHitShape2D(capsule, new Pose2D(Vector2.Zero, flipped: FlipMode.Horizontal));
+        var flipped = new PosedHitShape2D(capsule.Flipped(FlipMode.Horizontal), new Pose2D(Vector2.Zero));
         var probePos = Pose(new CircleHitShape2D(Vector2.Zero, 1f), new Vector2(10, 0));
         var probeNeg = Pose(new CircleHitShape2D(Vector2.Zero, 1f), new Vector2(-10, 0));
 
@@ -101,6 +102,32 @@ public class HitShapeTests
         Assert.False(unflipped.TestHit(probeNeg));
         Assert.False(flipped.TestHit(probePos));
         Assert.True(flipped.TestHit(probeNeg));
+    }
+
+    [Fact]
+    public void Flipping_A_Flipped_Shape_Returns_Through_Canonical()
+    {
+        // Klein-4 group: flipping H by H should land back on the canonical
+        // instance; flipping H by V should land on the H+V sibling. The
+        // family is interned, so repeated traversals return the same refs.
+        var canonical = new CapsuleHitShape2D(new Vector2(5, 0), new Vector2(15, 0), 1f);
+        var h = canonical.Flipped(FlipMode.Horizontal);
+        var v = canonical.Flipped(FlipMode.Vertical);
+        var hv = canonical.Flipped(FlipMode.Both);
+
+        Assert.Same(canonical, h.Flipped(FlipMode.Horizontal));
+        Assert.Same(canonical, v.Flipped(FlipMode.Vertical));
+        Assert.Same(canonical, hv.Flipped(FlipMode.Both));
+        Assert.Same(hv, h.Flipped(FlipMode.Vertical));
+        Assert.Same(v,  h.Flipped(FlipMode.Both));
+        Assert.Same(h,  v.Flipped(FlipMode.Both));
+    }
+
+    [Fact]
+    public void Flipped_None_Returns_Self()
+    {
+        var shape = new CircleHitShape2D(new Vector2(5, 0), 1f);
+        Assert.Same(shape, shape.Flipped(FlipMode.None));
     }
 
     private static PosedHitShape2D Pose(HitShape2D shape, Vector2 position) =>
@@ -162,6 +189,9 @@ public class HitShapeTests
 
         public override HitShape2D Translate(Vector2 offset) =>
             new TwoCircleShape(_a + offset, _b + offset, _r);
+
+        protected override HitShape2D CreateFlipped(FlipMode flip) =>
+            new TwoCircleShape(Mirror(_a, flip), Mirror(_b, flip), _r);
     }
 
     private sealed class CanaryHitTester : HitTester2D
