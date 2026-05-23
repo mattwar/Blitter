@@ -10,12 +10,14 @@ namespace Blitter.Bits;
 public sealed class TextureVisual2D : Visual2D
 {
     private readonly Texture2D _texture;
+    private readonly HitShapeCache _hitShapeCache;
     private BoundingCircle? _boundary;
 
-    public TextureVisual2D(Texture2D texture)
+    public TextureVisual2D(Texture2D texture, HitShapeCache? hitShapeCache = null)
     {
         ArgumentNullException.ThrowIfNull(texture);
         _texture = texture;
+        _hitShapeCache = hitShapeCache ?? HitShapeCache.Default;
     }
 
     public Texture2D Texture => _texture;
@@ -66,13 +68,7 @@ public sealed class TextureVisual2D : Visual2D
         c.IsEmpty ? c
         : new BoundingCircle(c.Center - new Vector2(size.Width / 2f, size.Height / 2f), c.Radius);
 
-    protected override HitShape2D DeriveHitShape()
-    {
-        if (_texture is not ReadableTexture2D readable)
-            return base.DeriveHitShape();
-        var opaqueShape = readable.ComputeOpaqueHitShape2D();
-        // Compute returned pixel-space coords (top-left origin); shift to visual-local (image-centered) coords.
-        var size = _texture.Size;
-        return opaqueShape.Translate(new Vector2(-size.Width / 2f, -size.Height / 2f));
-    }
+    /// <inheritdoc/>
+    public override HitShape2D HitShape =>
+        _hitShapeCache.GetOrCreateHitShape(_texture);
 }

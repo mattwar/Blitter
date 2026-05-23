@@ -95,11 +95,11 @@ atlasImage.DrawCanvas(canvas =>
     }
 });
 
-// Wrap the image in an Atlas so glyph cells can be looked up by
+// Wrap the image in an TextureCatalog so glyph cells can be looked up by
 // index instead of recomputing src rects on every blit. 
-// The Atlas takes ownership of the Texture2D (default), 
+// The TextureCatalog takes ownership of the Texture2D (default), 
 // so disposing the atlas releases everything.
-var atlasGrid = Atlas.Grid(atlasImage, AtlasCols, AtlasRows);
+var atlasGrid = TextureCatalog.Grid(atlasImage, AtlasCols, AtlasRows);
 
 // Confetti state. Each piece picks an atlas cell, a screen position,
 // a velocity, a rotation rate, and a scale.
@@ -140,7 +140,7 @@ await window.RunAsync(rd =>
         if (c.Pos.Y - c.Size > DesignH)
             c = SpawnConfetti(rng, initial: false);
 
-        // Source rect comes from the Atlas; destination is a square at
+        // Source rect comes from the TextureCatalog; destination is a square at
         // the confetti's position. The atlas Image's GPU texture is
         // uploaded once and reused for every blit.
         var dst = new Rect(c.Pos.X - c.Size * 0.5f, c.Pos.Y - c.Size * 0.5f, c.Size, c.Size);

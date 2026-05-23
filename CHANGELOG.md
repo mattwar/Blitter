@@ -18,37 +18,50 @@ All notable changes to this project will be documented in this file.
 - `TextureSegment2D` in `Blitter` is a non-readable region wrapper.
   `ReadableTextureSegment2D` adds CPU pixel reads. The renderer
   transparently unwraps either back to source + offset source rect.
+- `HitShapeCache`: per-texture cache of `HitShape2D` values shared
+  across visuals (`ConditionalWeakTable` keyed by `Texture2D`).
+  `HitShapeCache.Default` is the process-wide default; subclass and
+  override `ComputeHitShape` to customize derivation, then pass the
+  instance to `TextureVisual2D` / `AnimatedVisual2D` constructors.
+- `Visual2D.GetHitShapeAt(TimeSpan)`: virtual hook for time-keyed
+  hit-shape lookup. Static visuals ignore the time and return
+  `HitShape`; `AnimatedVisual2D` overrides it to return the shape of
+  the current frame, so callers can stay ignorant of which subtype
+  they hold.
 
 ### Changed
 - `ImageBounds` extension helpers now accept any
   `IReadableTexture2D`, not just `Bitmap`.
-- `Atlas` is an ordered, optionally-named collection of
-  `Texture2D`s with no `Image` property; entries may originate
-  from multiple sources. Build via `Atlas.FromRegions(image, …)`,
-  `Atlas.Grid(image, …)`, or `Atlas.Sense(image, …)`. Only `Sense`
-  requires a readable image.
+- `Atlas` renamed to `TextureCatalog`: an ordered, optionally-named
+  collection of `Texture2D`s with no `Image` property; entries may
+  originate from multiple sources. Build via
+  `TextureCatalog.FromRegions(image, …)`,
+  `TextureCatalog.Grid(image, …)`, or `TextureCatalog.Sense(image, …)`.
+  Only `Sense` requires a readable image.
 - `AnimationSequence.Frames` is now `ImmutableArray<Texture2D>`;
   `FrameIndexAt` returns the position within the frame list and a
-  new `FrameAt` returns the frame texture. Atlas-built sequences
-  hold sliced frames over the atlas image.
+  new `FrameAt` returns the frame texture. Catalog-built sequences
+  hold sliced frames over the source image.
 - `AnimationSequence` no longer carries a `Name`; the name lives
   with the catalog entry. Construct as
   `new AnimationSequence(frames, frameDuration, loop)`.
 - `AnimationAtlas` renamed to `AnimationCatalog` and decoupled from
-  `Atlas`. Catalog is an ordered collection of named
+  `TextureCatalog`. Catalog is an ordered collection of named
   `AnimationSequence`s (`Count` / `Names` / indexers / `Contains` /
   `TryGet`) built from
   `IEnumerable<KeyValuePair<string, AnimationSequence>>` — no
-  default state. Build from an atlas via
-  `atlas.ToAnimationCatalog(specs)` /
-  `atlas.ToSingleSequenceCatalog(frameDuration, …)` in
-  `AtlasAnimations`. `Spec` lives on that extension class.
+  default state. Build from a texture catalog via
+  `catalog.ToAnimationCatalog(specs)` /
+  `catalog.ToSingleSequenceCatalog(frameDuration, …)` in
+  `AnimationCatalogFactories`. `Spec` lives on that extension class.
 - `AnimatedVisual2D` now owns its initial state; pass it to the
   ctor (defaults to the catalog's first sequence). `Atlas` property
   renamed to `Catalog`.
-- `AnimatedVisual2D` derives a per-state `HitShape2D` from the
-  first frame of the current sequence (cached per state), assuming
-  a sequence's silhouette is stable within itself.
+- `Visual2D.HitShape` is now an abstract property and read-only; the
+  user-assignable setter and `InvalidateHitShape` are gone. Subclasses
+  override it directly (or supply a custom `HitShapeCache`).
+  Implementations are expected to cache and not allocate on every
+  call.
 
 - `SpriteImage2D` renamed to `Visual2D` and moved to `Blitter.Bits`;
   `TextureSpriteImage2D` → `TextureVisual2D`,

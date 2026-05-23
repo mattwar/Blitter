@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -11,7 +11,7 @@ namespace Blitter.Bits;
 /// </summary>
 public sealed class Font : IDisposable
 {
-    private readonly Atlas _atlas;
+    private readonly TextureCatalog _atlas;
     private readonly Bitmap _image;
     private readonly int _cellPixelW;
     private readonly int _cellPixelH;
@@ -19,9 +19,9 @@ public sealed class Font : IDisposable
     private readonly int _rows;
 
     // Codepoint -> atlas slot. Hot-path lookup; avoids the per-rune
-    // string allocation that going through Atlas's name map would cost.
-    // The Atlas name map ("A" -> 0, "♥" -> 95, ...) exists alongside
-    // this for external introspection (font.Atlas["A"]).
+    // string allocation that going through TextureCatalog's name map would cost.
+    // The TextureCatalog name map ("A" -> 0, "?" -> 95, ...) exists alongside
+    // this for external introspection (font.TextureCatalog["A"]).
     private readonly Dictionary<int, int> _runeToSlot;
 
     // Caches the textured-quad mesh built for each string passed to
@@ -43,7 +43,7 @@ public sealed class Font : IDisposable
     public int GlyphCount => _runeToSlot.Count;
 
     /// <summary>The backing atlas, in case the caller wants to inspect or draw it directly.</summary>
-    public Atlas Atlas => _atlas;
+    public TextureCatalog TextureCatalog => _atlas;
 
     /// <summary>True if the font has a baked glyph for the given codepoint.</summary>
     public bool Contains(Rune rune) => _runeToSlot.ContainsKey(rune.Value);
@@ -199,7 +199,7 @@ public sealed class Font : IDisposable
             // Build the atlas image by driving a Skia canvas over a
             // transparent SKBitmap, then snapshotting the pixels into a
             // Blitter Image. Build the codepoint->slot map and the
-            // Atlas name map ("A" -> 0, "♥" -> 95, ...) in the same pass.
+            // TextureCatalog name map ("A" -> 0, "?" -> 95, ...) in the same pass.
             var info = new SKImageInfo(atlasW, atlasH, SKColorType.Rgba8888, SKAlphaType.Unpremul);
             using var bmp = new SKBitmap(info);
             _runeToSlot = new Dictionary<int, int>(n);
@@ -209,7 +209,7 @@ public sealed class Font : IDisposable
             using (var canvas = new SKCanvas(bmp))
             using (var paint = new SKPaint
             {
-                // Atlas glyphs are baked white; tint is multiplied in at
+                // TextureCatalog glyphs are baked white; tint is multiplied in at
                 // draw time. The font's Color is preserved as the default
                 // tint when the caller doesn't supply one.
                 Color = SKColors.White,
@@ -248,7 +248,7 @@ public sealed class Font : IDisposable
 
             var image = bmp.ToImage();
             _image = image;
-            _atlas = Atlas.FromRegions(image, rects, nameMap);
+            _atlas = TextureCatalog.FromRegions(image, rects, nameMap);
         }
         finally
         {
@@ -339,7 +339,7 @@ public sealed class Font : IDisposable
 
     private Mesh<TextureVertex3D> BuildTextMesh(string text)
     {
-        // UVs are derived from the Atlas's pixel rects (single source of
+        // UVs are derived from the TextureCatalog's pixel rects (single source of
         // truth for cell placement) divided by atlas dimensions.
         float atlasW = _image.Size.Width;
         float atlasH = _image.Size.Height;

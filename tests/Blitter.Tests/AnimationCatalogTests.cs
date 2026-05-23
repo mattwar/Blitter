@@ -74,9 +74,9 @@ public class AnimationCatalogTests
             new AnimationCatalog(Array.Empty<KeyValuePair<string, AnimationSequence>>()));
     }
 
-    private static Atlas MakeAtlas(int frames)
+    private static TextureCatalog MakeAtlas(int frames)
     {
         var bmp = Bitmap.Create(frames * 4, 4);
-        return Atlas.Grid(bmp, frames, 1);
+        return TextureCatalog.Grid(bmp, frames, 1);
     }
 }

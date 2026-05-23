@@ -3,7 +3,7 @@ using Blitter.Bits;
 
 namespace Blitter.Tests;
 
-public class AtlasTests
+public class TextureCatalogTests
 {
     private static Bitmap CreateImage(int w = 16, int h = 16) =>
         Bitmap.Create(w, h, PixelFormat.RGBA8888);
@@ -13,7 +13,7 @@ public class AtlasTests
     {
         var image = CreateImage();
         var rects = new[] { new Rect(0, 0, 8, 8), new Rect(8, 0, 8, 8) };
-        using var atlas = Atlas.FromRegions(image, rects);
+        using var atlas = TextureCatalog.FromRegions(image, rects);
 
         Assert.Equal(2, atlas.Count);
         Assert.Equal(rects[0], ((ITextureRegion)atlas[0]).SourceRect);
@@ -24,7 +24,7 @@ public class AtlasTests
     [Fact]
     public void Indexer_OutOfRange_Throws()
     {
-        using var atlas = Atlas.FromRegions(CreateImage(), [new Rect(0, 0, 4, 4)]);
+        using var atlas = TextureCatalog.FromRegions(CreateImage(), [new Rect(0, 0, 4, 4)]);
         Assert.Throws<IndexOutOfRangeException>(() => atlas[1]);
     }
 
@@ -33,7 +33,7 @@ public class AtlasTests
     {
         var rects = new[] { new Rect(0, 0, 4, 4), new Rect(4, 0, 4, 4) };
         var names = new Dictionary<string, int> { ["alpha"] = 0, ["beta"] = 1 };
-        using var atlas = Atlas.FromRegions(CreateImage(), rects, names);
+        using var atlas = TextureCatalog.FromRegions(CreateImage(), rects, names);
 
         Assert.Equal(rects[0], ((ITextureRegion)atlas["alpha"]).SourceRect);
         Assert.Equal(rects[1], ((ITextureRegion)atlas["beta"]).SourceRect);
@@ -45,14 +45,14 @@ public class AtlasTests
     public void NameLookup_Missing_Throws()
     {
         var names = new Dictionary<string, int> { ["a"] = 0 };
-        using var atlas = Atlas.FromRegions(CreateImage(), [new Rect(0, 0, 4, 4)], names);
+        using var atlas = TextureCatalog.FromRegions(CreateImage(), [new Rect(0, 0, 4, 4)], names);
         Assert.Throws<KeyNotFoundException>(() => atlas["nope"]);
     }
 
     [Fact]
     public void NameLookup_WithoutMap_Throws()
     {
-        using var atlas = Atlas.FromRegions(CreateImage(), [new Rect(0, 0, 4, 4)]);
+        using var atlas = TextureCatalog.FromRegions(CreateImage(), [new Rect(0, 0, 4, 4)]);
         Assert.Throws<InvalidOperationException>(() => atlas["x"]);
     }
 
@@ -60,7 +60,7 @@ public class AtlasTests
     public void TryGetIndex_Resolves()
     {
         var names = new Dictionary<string, int> { ["a"] = 0, ["b"] = 1 };
-        using var atlas = Atlas.FromRegions(
+        using var atlas = TextureCatalog.FromRegions(
             CreateImage(),
             [new Rect(0, 0, 4, 4), new Rect(4, 0, 4, 4)],
             names);
@@ -76,7 +76,7 @@ public class AtlasTests
     {
         var names = new Dictionary<string, int> { ["a"] = 5 };
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => Atlas.FromRegions(CreateImage(), [new Rect(0, 0, 4, 4)], names));
+            () => TextureCatalog.FromRegions(CreateImage(), [new Rect(0, 0, 4, 4)], names));
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public class AtlasTests
     {
         // 16x16 image, 4x4 grid -> 4x4 cells
         var image = CreateImage(16, 16);
-        using var atlas = Atlas.Grid(image, columns: 4, rows: 4);
+        using var atlas = TextureCatalog.Grid(image, columns: 4, rows: 4);
 
         Assert.Equal(16, atlas.Count);
         Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
@@ -96,14 +96,14 @@ public class AtlasTests
     [Fact]
     public void Grid_RowMajor()
     {
-        using var atlas = Atlas.Grid(CreateImage(12, 8), columns: 3, rows: 2);
+        using var atlas = TextureCatalog.Grid(CreateImage(12, 8), columns: 3, rows: 2);
         Assert.Equal(new Rect(8, 4, 4, 4), ((ITextureRegion)atlas[5]).SourceRect); // row 1, col 2
     }
 
     [Fact]
     public void Grid_WithExplicitCellSize_UsesIt()
     {
-        using var atlas = Atlas.Grid(CreateImage(20, 20),
+        using var atlas = TextureCatalog.Grid(CreateImage(20, 20),
             columns: 4, rows: 4, cellWidth: 4, cellHeight: 4);
 
         Assert.Equal(16, atlas.Count);
@@ -114,17 +114,17 @@ public class AtlasTests
     public void Grid_InvalidArgs_Throws()
     {
         var img = CreateImage();
-        Assert.Throws<ArgumentOutOfRangeException>(() => Atlas.Grid(img, 0, 2));
-        Assert.Throws<ArgumentOutOfRangeException>(() => Atlas.Grid(img, 2, 0));
-        Assert.Throws<ArgumentOutOfRangeException>(() => Atlas.Grid(img, 2, 2, 0, 4));
-        Assert.Throws<ArgumentOutOfRangeException>(() => Atlas.Grid(img, 2, 2, 4, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TextureCatalog.Grid(img, 0, 2));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TextureCatalog.Grid(img, 2, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TextureCatalog.Grid(img, 2, 2, 0, 4));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TextureCatalog.Grid(img, 2, 2, 4, 0));
     }
 
     [Fact]
     public void Dispose_DefaultOwnsImage()
     {
         var image = CreateImage();
-        var atlas = Atlas.FromRegions(image, [new Rect(0, 0, 4, 4)]);
+        var atlas = TextureCatalog.FromRegions(image, [new Rect(0, 0, 4, 4)]);
         atlas.Dispose();
         Assert.True(image.IsDisposed);
     }
@@ -133,7 +133,7 @@ public class AtlasTests
     public void Dispose_DoesNotDisposeImageWhenNotOwned()
     {
         var image = CreateImage();
-        var atlas = Atlas.FromRegions(image, [new Rect(0, 0, 4, 4)], ownsImage: false);
+        var atlas = TextureCatalog.FromRegions(image, [new Rect(0, 0, 4, 4)], ownsImage: false);
         atlas.Dispose();
         Assert.False(image.IsDisposed);
         image.Dispose();
@@ -143,7 +143,7 @@ public class AtlasTests
     public void Dispose_Idempotent()
     {
         var image = CreateImage();
-        var atlas = Atlas.FromRegions(image, [new Rect(0, 0, 4, 4)]);
+        var atlas = TextureCatalog.FromRegions(image, [new Rect(0, 0, 4, 4)]);
         atlas.Dispose();
         atlas.Dispose();
     }
@@ -156,7 +156,7 @@ public class AtlasTests
         FillRect(bmp, 5, 0, 4, 4);
         FillRect(bmp, 10, 0, 4, 4);
 
-        using var atlas = Atlas.Sense(bmp);
+        using var atlas = TextureCatalog.Sense(bmp);
 
         Assert.Equal(3, atlas.Count);
         Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
@@ -173,7 +173,7 @@ public class AtlasTests
         FillRect(bmp, 0, 6, 4, 4);
         FillRect(bmp, 6, 6, 4, 4);
 
-        using var atlas = Atlas.Sense(bmp);
+        using var atlas = TextureCatalog.Sense(bmp);
 
         Assert.Equal(4, atlas.Count);
         Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
@@ -189,7 +189,7 @@ public class AtlasTests
         FillRect(bmp, 0, 0, 4, 4);
         FillRect(bmp, 6, 6, 4, 4);
 
-        using var atlas = Atlas.Sense(bmp);
+        using var atlas = TextureCatalog.Sense(bmp);
 
         Assert.Equal(2, atlas.Count);
         Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
@@ -203,7 +203,7 @@ public class AtlasTests
         FillRect(bmp, 0, 0, 4, 4);
         FillRect(bmp, 6, 6, 4, 4);
 
-        using var atlas = Atlas.Sense(bmp, includeEmptyCells: true);
+        using var atlas = TextureCatalog.Sense(bmp, includeEmptyCells: true);
 
         Assert.Equal(4, atlas.Count);
         Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
@@ -216,7 +216,7 @@ public class AtlasTests
     public void Sense_AllTransparent_ReturnsEmpty()
     {
         var bmp = CreateImage(8, 8);
-        using var atlas = Atlas.Sense(bmp);
+        using var atlas = TextureCatalog.Sense(bmp);
         Assert.Equal(0, atlas.Count);
     }
 
@@ -225,9 +225,9 @@ public class AtlasTests
     {
         var bmp = CreateImage(8, 4);
         FillRect(bmp, 0, 0, 4, 4, new Color(255, 255, 255, 128));
-        using var sensedAbove = Atlas.Sense(bmp, alphaThreshold: 200);
+        using var sensedAbove = TextureCatalog.Sense(bmp, alphaThreshold: 200);
         Assert.Equal(0, sensedAbove.Count);
-        using var sensedBelow = Atlas.Sense(bmp, alphaThreshold: 64);
+        using var sensedBelow = TextureCatalog.Sense(bmp, alphaThreshold: 64);
         Assert.Equal(1, sensedBelow.Count);
         Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)sensedBelow[0]).SourceRect);
     }

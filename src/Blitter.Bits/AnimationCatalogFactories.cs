@@ -4,9 +4,9 @@ namespace Blitter.Bits;
 
 /// <summary>
 /// Extension methods that build <see cref="AnimationCatalog"/>s from
-/// an <see cref="Atlas"/>'s frames.
+/// an <see cref="TextureCatalog"/>'s frames.
 /// </summary>
-public static class AtlasAnimations
+public static class AnimationCatalogFactories
 {
     /// <summary>A description of one sequence to build from atlas frames.</summary>
     public sealed record Spec(
@@ -20,7 +20,7 @@ public static class AtlasAnimations
     /// <paramref name="specs"/> against the frames of <paramref name="atlas"/>.
     /// </summary>
     public static AnimationCatalog ToAnimationCatalog(
-        this Atlas atlas,
+        this TextureCatalog atlas,
         IEnumerable<Spec> specs)
     {
         ArgumentNullException.ThrowIfNull(atlas);
@@ -56,7 +56,7 @@ public static class AtlasAnimations
     /// over the given (or all) atlas frames.
     /// </summary>
     public static AnimationCatalog ToSingleSequenceCatalog(
-        this Atlas atlas,
+        this TextureCatalog atlas,
         TimeSpan frameDuration,
         AnimationLoop loop = AnimationLoop.Loop,
         ReadOnlySpan<int> frames = default,
@@ -67,7 +67,7 @@ public static class AtlasAnimations
         if (frames.IsEmpty)
         {
             if (atlas.Count == 0)
-                throw new ArgumentException("Atlas has no frames.", nameof(atlas));
+                throw new ArgumentException("TextureCatalog has no frames.", nameof(atlas));
             var builder = ImmutableArray.CreateBuilder<int>(atlas.Count);
             for (int i = 0; i < atlas.Count; i++) builder.Add(i);
             ix = builder.MoveToImmutable();

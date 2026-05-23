@@ -8,7 +8,7 @@ public class AnimatedVisual2DTests
     public void Default_State_Plays_First_Sequence()
     {
         using var bmp = Bitmap.Create(16, 4);
-        var atlas = Atlas.Grid(bmp, 4, 1);
+        var atlas = TextureCatalog.Grid(bmp, 4, 1);
         var aa = atlas.ToAnimationCatalog([
             new("walk", [0, 1, 2, 3], TimeSpan.FromSeconds(1)),
         ]);
@@ -23,7 +23,7 @@ public class AnimatedVisual2DTests
     public void State_Change_Restarts_Sequence()
     {
         using var bmp = Bitmap.Create(32, 4);
-        var atlas = Atlas.Grid(bmp, 8, 1);
+        var atlas = TextureCatalog.Grid(bmp, 8, 1);
         var aa = atlas.ToAnimationCatalog([
             new("idle", [0, 1], TimeSpan.FromSeconds(1)),
             new("attack", [4, 5, 6, 7], TimeSpan.FromSeconds(1)),
@@ -43,7 +43,7 @@ public class AnimatedVisual2DTests
     public void Unknown_State_Throws()
     {
         using var bmp = Bitmap.Create(8, 4);
-        var atlas = Atlas.Grid(bmp, 2, 1);
+        var atlas = TextureCatalog.Grid(bmp, 2, 1);
         var aa = atlas.ToAnimationCatalog([
             new("idle", [0, 1], TimeSpan.FromSeconds(1)),
         ]);
@@ -53,20 +53,20 @@ public class AnimatedVisual2DTests
     }
 
     [Fact]
-    public void WithOffset_Desyncs_Playback()
+    public void WithPhaseOffset_Desyncs_Playback()
     {
         using var bmp = Bitmap.Create(16, 4);
-        var atlas = Atlas.Grid(bmp, 4, 1);
+        var atlas = TextureCatalog.Grid(bmp, 4, 1);
         var aa = atlas.ToAnimationCatalog([
             new("walk", [0, 1, 2, 3], TimeSpan.FromSeconds(1)),
         ]);
         var a = new AnimatedVisual2D(aa);
-        var b = a.WithOffset(TimeSpan.FromSeconds(2));
+        var b = a.WithPhaseOffset(TimeSpan.FromSeconds(2));
 
         Assert.Equal(0, a.FrameIndexAt(TimeSpan.FromSeconds(0)));
         Assert.Equal(2, b.FrameIndexAt(TimeSpan.FromSeconds(0)));
-        Assert.Equal(TimeSpan.Zero, a.Offset);
-        Assert.Equal(TimeSpan.FromSeconds(2), b.Offset);
+        Assert.Equal(TimeSpan.Zero, a.PhaseOffset);
+        Assert.Equal(TimeSpan.FromSeconds(2), b.PhaseOffset);
         Assert.Same(a.Catalog, b.Catalog);
     }
 
@@ -74,7 +74,7 @@ public class AnimatedVisual2DTests
     public void IsAtEnd_Tracks_Once_Sequences()
     {
         using var bmp = Bitmap.Create(12, 4);
-        var atlas = Atlas.Grid(bmp, 3, 1);
+        var atlas = TextureCatalog.Grid(bmp, 3, 1);
         var aa = atlas.ToAnimationCatalog([
             new("idle", [0, 1], TimeSpan.FromSeconds(1), AnimationLoop.Loop),
             new("attack", [0, 1, 2], TimeSpan.FromSeconds(1), AnimationLoop.Once),

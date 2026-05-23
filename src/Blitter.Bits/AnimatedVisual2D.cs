@@ -10,7 +10,7 @@ namespace Blitter.Bits;
 public sealed class AnimatedVisual2D : Visual2D
 {
     private readonly AnimationCatalog _catalog;
-    private readonly Dictionary<string, HitShape2D> _shapeCache = new(StringComparer.Ordinal);
+    private readonly HitShapeCache _hitShapeCache;
     private BoundingCircle? _boundary;
 
     // Local playback clock: the elapsed value that the current sequence treats as
@@ -21,12 +21,12 @@ public sealed class AnimatedVisual2D : Visual2D
     private TimeSpan _sequenceStartElapsed;
     private bool _resetPending;
 
-    public AnimatedVisual2D(AnimationCatalog catalog, TimeSpan offset = default)
-        : this(catalog, catalog?.Names[0]!, offset)
+    public AnimatedVisual2D(AnimationCatalog catalog, TimeSpan phaseOffset = default, HitShapeCache? hitShapeCache = null)
+        : this(catalog, catalog?.Names[0]!, phaseOffset, hitShapeCache)
     {
     }
 
-    public AnimatedVisual2D(AnimationCatalog catalog, string initialState, TimeSpan offset = default)
+    public AnimatedVisual2D(AnimationCatalog catalog, string initialState, TimeSpan phaseOffset = default, HitShapeCache? hitShapeCache = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentException.ThrowIfNullOrEmpty(initialState);
@@ -35,15 +35,17 @@ public sealed class AnimatedVisual2D : Visual2D
         _catalog = catalog;
         _state = initialState;
         _current = seq;
-        Offset = offset;
+        PhaseOffset = phaseOffset;
+        _hitShapeCache = hitShapeCache ?? HitShapeCache.Default;
     }
 
-    private AnimatedVisual2D(AnimationCatalog catalog, string state, AnimationSequence current, TimeSpan offset)
+    private AnimatedVisual2D(AnimationCatalog catalog, string state, AnimationSequence current, TimeSpan phaseOffset, HitShapeCache hitShapeCache)
     {
         _catalog = catalog;
         _state = state;
         _current = current;
-        Offset = offset;
+        PhaseOffset = phaseOffset;
+        _hitShapeCache = hitShapeCache;
     }
 
     /// <summary>Catalog of sequences this visual draws from.</summary>
@@ -63,9 +65,6 @@ public sealed class AnimatedVisual2D : Visual2D
             _state = value;
             _current = seq;
             _resetPending = true;
-            // Re-derive (or fetch from cache) on next access; a custom HitShape
-            // explicitly assigned by the caller does not survive state changes.
-            InvalidateHitShape();
         }
     }
 
@@ -73,7 +72,9 @@ public sealed class AnimatedVisual2D : Visual2D
     public override IReadOnlyList<string> States =>
         _catalog.Names;
 
-    /// <summary>Sequence currently selected by <see cref="State"/>.</summary>
+    /// <summary>
+    /// The <see cref="AnimationSequence"/> currently selected by <see cref="State"/>.
+    /// </summary>
     public AnimationSequence CurrentSequence =>
         _current;
 
@@ -81,37 +82,48 @@ public sealed class AnimatedVisual2D : Visual2D
     /// Phase offset added to local sequence time before picking a frame.
     /// Useful for starting a second host's animation out of phase.
     /// </summary>
-    public TimeSpan Offset { get; }
+    public TimeSpan PhaseOffset { get; }
 
     /// <summary>
-    /// Returns a copy of this visual with a different phase
-    /// <paramref name="offset"/>.
+    /// Returns a copy of this visual with a different
+    /// <paramref name="phaseOffset"/>.
     /// </summary>
-    public AnimatedVisual2D WithOffset(TimeSpan offset) =>
-        new(_catalog, _state, _current, offset);
+    public AnimatedVisual2D WithPhaseOffset(TimeSpan phaseOffset) =>
+        new(_catalog, _state, _current, phaseOffset, _hitShapeCache);
 
     /// <summary>
-    /// Index into the current sequence's frame list at the given host
-    /// <paramref name="elapsed"/> time.
+    /// Index into the current sequence's frame list at the given host <paramref name="elapsed"/> time.
     /// </summary>
     public int FrameIndexAt(TimeSpan elapsed) =>
         _current.FrameIndexAt(LocalTime(elapsed));
 
-    /// <summary>Texture drawn for the current frame at the given time.</summary>
+    /// <summary>
+    /// Texture drawn for the current frame at the given time.
+    /// </summary>
     public Texture2D FrameAt(TimeSpan elapsed) =>
         _current.FrameAt(LocalTime(elapsed));
 
-    /// <summary>True if the current sequence is <see cref="AnimationLoop.Once"/>
-    /// and has reached its last frame.</summary>
+    /// <summary>
+    /// True if the current sequence is <see cref="AnimationLoop.Once"/> and has reached its last frame.
+    /// </summary>
     public bool IsAtEnd(TimeSpan elapsed) =>
         _current.IsAtEnd(LocalTime(elapsed));
 
-    /// <summary>
-    /// Bounding circle covering the largest frame across every sequence
-    /// in the catalog.
-    /// </summary>
-    public override BoundingCircle Boundary => _boundary ??= ComputeBoundary();
+    /// <inheritdoc/>
+    public override BoundingCircle Boundary => 
+        _boundary ??= ComputeBoundary();
 
+    /// <inheritdoc/>
+    public override HitShape2D HitShape =>
+        _hitShapeCache.GetOrCreateHitShape(_current.Frames[0]);
+
+    /// <inheritdoc/>
+    public override HitShape2D GetHitShapeAt(TimeSpan elapsed) =>
+        _hitShapeCache.GetOrCreateHitShape(_current.FrameAt(LocalTime(elapsed)));
+
+    /// <summary>
+    /// Computes the overall bounding circle for this visual by examining the sizes of all frames
+    /// </summary>
     private BoundingCircle ComputeBoundary()
     {
         float maxR2 = 0f;
@@ -129,32 +141,7 @@ public sealed class AnimatedVisual2D : Visual2D
         return new BoundingCircle(Vector2.Zero, MathF.Sqrt(maxR2));
     }
 
-    /// <summary>
-    /// Derives a hit shape from the first frame of the current sequence,
-    /// caching the result per state. Assumes a sequence's silhouette does
-    /// not change materially across its own frames.
-    /// </summary>
-    protected override HitShape2D DeriveHitShape()
-    {
-        if (_shapeCache.TryGetValue(_state, out var cached))
-            return cached;
-
-        var first = _current.Frames[0];
-        HitShape2D shape;
-        if (first is ReadableTexture2D readable)
-        {
-            var sz = first.Size;
-            shape = readable.ComputeOpaqueHitShape2D()
-                .Translate(new Vector2(-sz.Width / 2f, -sz.Height / 2f));
-        }
-        else
-        {
-            shape = base.DeriveHitShape();
-        }
-        _shapeCache[_state] = shape;
-        return shape;
-    }
-
+    /// <inheritdoc/>
     public override void Draw(Renderer2D renderer, in Pose2D pose, Color tint, TimeSpan elapsed)
     {
         var frame = _current.FrameAt(LocalTime(elapsed));
@@ -193,6 +180,6 @@ public sealed class AnimatedVisual2D : Visual2D
             _sequenceStartElapsed = elapsed;
             _resetPending = false;
         }
-        return elapsed - _sequenceStartElapsed + Offset;
+        return elapsed - _sequenceStartElapsed + PhaseOffset;
     }
 }

@@ -3,7 +3,7 @@ namespace Blitter.Bits;
 /// <summary>
 /// An ordered collection of <see cref="Texture2D"/>s with optional names.
 /// </summary>
-public sealed class Atlas : IDisposable
+public sealed class TextureCatalog : IDisposable
 {
     private readonly Texture2D[] _textures;
     private readonly Dictionary<string, int>? _names;
@@ -36,23 +36,23 @@ public sealed class Atlas : IDisposable
         get
         {
             if (_names is null)
-                throw new InvalidOperationException("Atlas has no name map.");
+                throw new InvalidOperationException("TextureCatalog has no name map.");
             return _textures[_names[name]];
         }
     }
 
     /// <summary>
-    /// Constructs an <see cref="Atlas"/> from a set of textures and an optional name-to-index map.
+    /// Constructs an <see cref="TextureCatalog"/> from a set of textures and an optional name-to-index map.
     /// Caller retains ownership of <paramref name="textures"/>; the atlas disposes nothing.
     /// </summary>
-    public Atlas(
+    public TextureCatalog(
         ReadOnlySpan<Texture2D> textures,
         IReadOnlyDictionary<string, int>? names = null)
         : this(textures, names, owned: null)
     {
     }
 
-    private Atlas(
+    private TextureCatalog(
         ReadOnlySpan<Texture2D> textures,
         IReadOnlyDictionary<string, int>? names,
         IDisposable[]? owned)
@@ -90,7 +90,7 @@ public sealed class Atlas : IDisposable
     /// Builds an atlas from a single image and a list of sub-rects.
     /// Each rect becomes a slice of <paramref name="image"/>.
     /// </summary>
-    public static Atlas FromRegions(
+    public static TextureCatalog FromRegions(
         Texture2D image,
         ReadOnlySpan<Rect> regions,
         IReadOnlyDictionary<string, int>? names = null,
@@ -100,13 +100,13 @@ public sealed class Atlas : IDisposable
         var segs = new Texture2D[regions.Length];
         for (int i = 0; i < regions.Length; i++)
             segs[i] = image.Slice(regions[i]);
-        return new Atlas(segs, names, ownsImage ? [image] : null);
+        return new TextureCatalog(segs, names, ownsImage ? [image] : null);
     }
 
     /// <summary>
     /// Creates an atlas by splitting an image into a uniform grid of regions.
     /// </summary>
-    public static Atlas Grid(Texture2D image, int columns, int rows, bool ownsImage = true)
+    public static TextureCatalog Grid(Texture2D image, int columns, int rows, bool ownsImage = true)
     {
         ArgumentNullException.ThrowIfNull(image);
         if (columns <= 0) throw new ArgumentOutOfRangeException(nameof(columns));
@@ -119,7 +119,7 @@ public sealed class Atlas : IDisposable
     /// Creates an atlas by splitting an image into a uniform grid of regions
     /// with explicit cell dimensions.
     /// </summary>
-    public static Atlas Grid(
+    public static TextureCatalog Grid(
         Texture2D image,
         int columns,
         int rows,
@@ -154,7 +154,7 @@ public sealed class Atlas : IDisposable
     /// and the opaque bands between them become the cells. 
     /// Regions are numbered in row-major order (top-to-bottom, left-to-right).
     /// </summary>
-    public static Atlas Sense(
+    public static TextureCatalog Sense(
         ReadableTexture2D image,
         byte alphaThreshold = 0,
         bool includeEmptyCells = false,

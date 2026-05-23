@@ -114,6 +114,12 @@ public readonly struct BoundingCircle : IEquatable<BoundingCircle>
         return new BoundingCircle(newCenter, Radius * maxScale);
     }
 
+    /// <summary>
+    /// Returns the <see cref="BoundingCircle"/> that bounds this circle after applying <paramref name="pose"/>.
+    /// </summary>
+    public BoundingCircle Transform(in Pose2D pose) =>
+        IsEmpty ? Empty : new BoundingCircle(pose.Transform(Center), Radius * pose.Scale);
+
     public bool Equals(BoundingCircle other) => Center.Equals(other.Center) && Radius == other.Radius;
     public override bool Equals(object? obj) => obj is BoundingCircle c && Equals(c);
     public override int GetHashCode() => HashCode.Combine(Center, Radius);
