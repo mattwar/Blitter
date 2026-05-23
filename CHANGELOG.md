@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `RepeatingImageLayer2D` in `Blitter.Blocks`: a `Layer2D` that
+  tiles a single image horizontally to cover the viewport, anchored
+  at a configurable `BottomY`. Combine with `ParallaxFactor` to
+  build parallax background stacks.
+- `MoonScroller` sample: parallax side-scroller built from six
+  background plates and a walking space man, demonstrating
+  `RepeatingImageLayer2D` + `Scene2D` + `CameraFollow2D`.
+- `AnimatedSpaceMan` sample: animated sprite demo with idle / walk
+  / jump / power states, baked left-facing sequences via
+  `FlipMode.Horizontal`, moon-gravity jump physics, and a fading
+  drop-shadow.
 - `ReadableTexture2D` abstract base in `Blitter` for textures that
   support CPU pixel reads via `GetPixel`. `Bitmap` now derives from
   it.
