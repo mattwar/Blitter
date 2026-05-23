@@ -69,11 +69,13 @@ All notable changes to this project will be documented in this file.
   `AnimationFrame` values).
 - `Pose2D` no longer carries a `Flipped` field. Pose is now purely
   spatial (position, rotation, uniform scale). Flip lives with the
-  visual (per `AnimationFrame`) and the hit shape (`Flipped(FlipMode)`),
-  so the on-screen render and the collision shape stay in sync
-  without the pose having to broadcast it.
-- `Sprite2D.Flipped` removed for the same reason — set the flip on
-  the visual's animation frames (or use a flipped sequence) instead.
+  visual (per `AnimationFrame`) and with the caller, threaded as a
+  `FlipMode` parameter on `Visual2D.Draw` and composed against the
+  current frame's flip via XOR.
+- `Sprite2D.Flipped` is now a runtime mirror: passed to the visual
+  at draw time and composed onto the hit shape via
+  `HitShape2D.Flipped`. Set it freely from behaviors to flip the
+  sprite without disturbing its underlying visual or pose.
 - `AnimationCatalogFactories.Spec` gained a `FlipMode Flip` (default
   `None`) that is applied uniformly to every frame in the generated
   sequence.

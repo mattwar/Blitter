@@ -151,7 +151,7 @@ public sealed class AnimatedVisual2D : Visual2D
     }
 
     /// <inheritdoc/>
-    public override void Draw(Renderer2D renderer, in Pose2D pose, Color tint, TimeSpan elapsed)
+    public override void Draw(Renderer2D renderer, in Pose2D pose, Color tint, TimeSpan elapsed, FlipMode flip = FlipMode.None)
     {
         var frame = _current.FrameAt(LocalTime(elapsed));
         var texture = frame.Texture;
@@ -165,14 +165,18 @@ public sealed class AnimatedVisual2D : Visual2D
             scaledH);
         var source = new Rect(0f, 0f, size.Width, size.Height);
         bool tinted = tint != Color.White;
+        // Authoring flip (from the frame) composed with runtime flip
+        // (from the caller). FlipMode is a Klein-4 group under XOR;
+        // applying H twice cancels back to identity.
+        var effectiveFlip = frame.Flip ^ flip;
 
-        if (pose.Rotation != 0f || frame.Flip != FlipMode.None)
+        if (pose.Rotation != 0f || effectiveFlip != FlipMode.None)
         {
             var rc = new Vector2(scaledW / 2f, scaledH / 2f);
             if (tinted)
-                renderer.DrawImageRotated(texture, source, dest, pose.Rotation, rc, frame.Flip, tint);
+                renderer.DrawImageRotated(texture, source, dest, pose.Rotation, rc, effectiveFlip, tint);
             else
-                renderer.DrawImageRotated(texture, source, dest, pose.Rotation, rc, frame.Flip);
+                renderer.DrawImageRotated(texture, source, dest, pose.Rotation, rc, effectiveFlip);
         }
         else
         {

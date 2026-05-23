@@ -41,9 +41,11 @@ public abstract class Visual2D
     public virtual HitShape2D GetHitShapeAt(TimeSpan elapsed) => HitShape;
 
     /// <summary>
-    /// Draws this visual with the specified pose, color tint and time.
+    /// Draws this visual with the specified pose, color tint, and time.
+    /// <paramref name="flip"/> is a runtime mirror applied on top of
+    /// any per-frame authoring flip (composed via XOR).
     /// </summary>
-    public abstract void Draw(Renderer2D renderer, in Pose2D pose, Color tint, TimeSpan elapsed);
+    public abstract void Draw(Renderer2D renderer, in Pose2D pose, Color tint, TimeSpan elapsed, FlipMode flip = FlipMode.None);
 
     /// <summary>
     /// Auto convert <see cref="Texture2D"/> to a <see cref="TextureVisual2D"/> so users can assign a texture

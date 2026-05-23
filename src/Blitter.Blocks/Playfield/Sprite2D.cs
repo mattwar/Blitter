@@ -31,6 +31,13 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// <summary>The scale factor to apply to the visual.</summary>
     public float Scale { get; set; } = 1f;
 
+    /// <summary>
+    /// Runtime mirror applied to the visual at draw time and to the
+    /// hit shape when collisions are evaluated. Composes with any
+    /// authoring flip on the visual's current animation frame.
+    /// </summary>
+    public FlipMode Flipped = FlipMode.None;
+
     /// <summary>Per-channel tint multiplied into the visual at draw time.
     /// Defaults to <see cref="Color.White"/> (no change).</summary>
     public Color Tint { get; set; } = Color.White;
@@ -76,13 +83,13 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// <summary>
     /// The sprite's world-space collision shape: the current
     /// <see cref="Visual"/>'s <see cref="Visual2D.HitShape"/>
-    /// combined with this sprite's <see cref="Center"/>,
-    /// <see cref="Rotation"/>, and <see cref="Scale"/>.
-    /// Override to substitute a different shape (still posed by
-    /// the sprite).
+    /// (mirrored by <see cref="Flipped"/>) combined with this
+    /// sprite's <see cref="Center"/>, <see cref="Rotation"/>, and
+    /// <see cref="Scale"/>. Override to substitute a different
+    /// shape (still posed by the sprite).
     /// </summary>
     public virtual PosedHitShape2D HitShape =>
-        new(Visual?.HitShape ?? HitShape2D.None, new Pose2D(Center, Rotation, Scale));
+        new((Visual?.HitShape ?? HitShape2D.None).Flipped(Flipped), new Pose2D(Center, Rotation, Scale));
 
     /// <summary>
     /// Bounding circle of the sprite for collision
@@ -136,7 +143,7 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer2D renderer)
     {
-        this.Visual?.Draw(renderer, new Pose2D(Center, Rotation, Scale), this.Tint, this.Age);
+        this.Visual?.Draw(renderer, new Pose2D(Center, Rotation, Scale), this.Tint, this.Age, this.Flipped);
     }
 
     /// <summary>
