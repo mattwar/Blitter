@@ -125,7 +125,7 @@ await window.RunAsync(rd =>
     // Show the atlas itself in the top-left so the source material is
     // obvious. Renders the whole image to a fixed-size destination.
     int previewSize = Math.Min(DesignW, DesignH) / 4;
-    rd.DrawImage(atlasGrid.Image, new Rect(20, 20, previewSize, previewSize));
+    rd.DrawImage(atlasImage, new Rect(20, 20, previewSize, previewSize));
 
     // Caption -- pure Renderer2D, no Skia involved.
     rd.DrawColor = new Color(180, 190, 210);
@@ -144,7 +144,7 @@ await window.RunAsync(rd =>
         // the confetti's position. The atlas Image's GPU texture is
         // uploaded once and reused for every blit.
         var dst = new Rect(c.Pos.X - c.Size * 0.5f, c.Pos.Y - c.Size * 0.5f, c.Size, c.Size);
-        atlasGrid.Draw(rd, c.AtlasIndex, dst);
+        rd.DrawImage(atlasGrid[c.AtlasIndex], dst);
     }
 });
 
