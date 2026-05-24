@@ -16,7 +16,7 @@ namespace Blitter.Blocks;
 /// <see cref="Slope"/>, <see cref="Rect"/>) so you don't have to think
 /// about winding.
 /// </remarks>
-public sealed class LineBarrier2D : Barrier2D
+public class LineBarrier2D : Barrier2D
 {
     public Vector2 Start { get; }
     public Vector2 End { get; }
@@ -82,47 +82,37 @@ public sealed class LineBarrier2D : Barrier2D
     /// Horizontal floor at <paramref name="y"/> from <paramref name="xLeft"/>
     /// to <paramref name="xRight"/>. Normal points up (toward -Y).
     /// </summary>
-    public static LineBarrier2D Floor(float xLeft, float xRight, float y, bool oneSided = false, string? tag = null)
+    public static LineBarrier2D Floor(float xLeft, float xRight, float y, bool oneSided = false)
         => new(new Vector2(xLeft, y), new Vector2(xRight, y), new Vector2(0f, -1f))
         {
             OneSided = oneSided,
-            Tag = tag,
         };
 
     /// <summary>
     /// Horizontal ceiling at <paramref name="y"/>. Normal points down (toward +Y).
     /// </summary>
-    public static LineBarrier2D Ceiling(float xLeft, float xRight, float y, string? tag = null)
-        => new(new Vector2(xLeft, y), new Vector2(xRight, y), new Vector2(0f, 1f))
-        {
-            Tag = tag,
-        };
+    public static LineBarrier2D Ceiling(float xLeft, float xRight, float y)
+        => new(new Vector2(xLeft, y), new Vector2(xRight, y), new Vector2(0f, 1f));
 
     /// <summary>
     /// Vertical wall at <paramref name="x"/> with sprites expected to stay on
     /// the left of it. Normal points -X.
     /// </summary>
-    public static LineBarrier2D WallLeft(float x, float yTop, float yBottom, string? tag = null)
-        => new(new Vector2(x, yTop), new Vector2(x, yBottom), new Vector2(-1f, 0f))
-        {
-            Tag = tag,
-        };
+    public static LineBarrier2D WallLeft(float x, float yTop, float yBottom)
+        => new(new Vector2(x, yTop), new Vector2(x, yBottom), new Vector2(-1f, 0f));
 
     /// <summary>
     /// Vertical wall at <paramref name="x"/> with sprites expected to stay on
     /// the right of it. Normal points +X.
     /// </summary>
-    public static LineBarrier2D WallRight(float x, float yTop, float yBottom, string? tag = null)
-        => new(new Vector2(x, yTop), new Vector2(x, yBottom), new Vector2(1f, 0f))
-        {
-            Tag = tag,
-        };
+    public static LineBarrier2D WallRight(float x, float yTop, float yBottom)
+        => new(new Vector2(x, yTop), new Vector2(x, yBottom), new Vector2(1f, 0f));
 
     /// <summary>
     /// Arbitrary segment whose outward normal is whichever of the two
     /// perpendiculars points toward <paramref name="solidFreeSide"/>.
     /// </summary>
-    public static LineBarrier2D Slope(Vector2 start, Vector2 end, Vector2 solidFreeSide, bool oneSided = false, string? tag = null)
+    public static LineBarrier2D Slope(Vector2 start, Vector2 end, Vector2 solidFreeSide, bool oneSided = false)
     {
         var d = end - start;
         var perp = new Vector2(-d.Y, d.X);
@@ -131,7 +121,6 @@ public sealed class LineBarrier2D : Barrier2D
         return new LineBarrier2D(start, end, perp)
         {
             OneSided = oneSided,
-            Tag = tag,
         };
     }
 
@@ -140,16 +129,16 @@ public sealed class LineBarrier2D : Barrier2D
     /// closed polyline of <see cref="LineBarrier2D"/>s, wound clockwise
     /// starting from the top-left so each segment's normal points outward.
     /// </summary>
-    public static LineBarrier2D[] Rect(float x, float y, float width, float height, string? tag = null)
+    public static LineBarrier2D[] Rect(float x, float y, float width, float height)
     {
         var x2 = x + width;
         var y2 = y + height;
         return
         [
-            new LineBarrier2D(new Vector2(x,  y ), new Vector2(x2, y )) { Tag = tag },
-            new LineBarrier2D(new Vector2(x2, y ), new Vector2(x2, y2)) { Tag = tag },
-            new LineBarrier2D(new Vector2(x2, y2), new Vector2(x,  y2)) { Tag = tag },
-            new LineBarrier2D(new Vector2(x,  y2), new Vector2(x,  y )) { Tag = tag },
+            new LineBarrier2D(new Vector2(x,  y ), new Vector2(x2, y )),
+            new LineBarrier2D(new Vector2(x2, y ), new Vector2(x2, y2)),
+            new LineBarrier2D(new Vector2(x2, y2), new Vector2(x,  y2)),
+            new LineBarrier2D(new Vector2(x,  y2), new Vector2(x,  y )),
         ];
     }
 

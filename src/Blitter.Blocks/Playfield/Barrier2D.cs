@@ -12,22 +12,17 @@ namespace Blitter.Blocks;
 public abstract class Barrier2D
 {
     /// <summary>
-    /// Optional free-form classifier (e.g. "wall", "deathzone",
-    /// "goal-line") so handlers can switch on intent without
-    /// subclassing.
-    /// </summary>
-    public string? Tag { get; init; }
-
-    /// <summary>
-    /// Optional caller-owned reference. Typed sibling to
-    /// <see cref="Tag"/> for when a string isn't enough.
-    /// </summary>
-    public object? UserData { get; init; }
-
-    /// <summary>
     /// True when <paramref name="circle"/> overlaps this barrier's
     /// shape. Called once per prop per tick during the playfield's
     /// collision pass.
     /// </summary>
     public abstract bool Intersects(BoundingCircle circle);
+
+    /// <summary>
+    /// Per-frame hook for animated barriers (flippers, moving platforms,
+    /// rotating obstacles). Called by the playfield before the sprite
+    /// update and collision passes, so updated geometry is what sprites
+    /// collide against this frame. Default is no-op.
+    /// </summary>
+    public virtual void Update(in UpdateContext2D context) { }
 }

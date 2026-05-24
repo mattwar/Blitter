@@ -11,9 +11,6 @@ namespace Blitter.Blocks;
 /// </summary>
 public sealed class StopAtBarrier2D : SpriteBehavior2D
 {
-    /// <summary>If set, only respond to barriers whose <see cref="Barrier2D.Tag"/> matches. Null = respond to all.</summary>
-    public string? OnlyTag { get; set; }
-
     /// <summary>
     /// True while the sprite is resting on a floor (a barrier whose
     /// outward normal points more up than sideways). Updated each frame
@@ -36,8 +33,6 @@ public sealed class StopAtBarrier2D : SpriteBehavior2D
     public override void OnHitBarrier(Sprite2D self, Barrier2D barrier, in UpdateContext2D context)
     {
         if (barrier is not LineBarrier2D line)
-            return;
-        if (OnlyTag is not null && line.Tag != OnlyTag)
             return;
 
         var normal = line.Normal;
