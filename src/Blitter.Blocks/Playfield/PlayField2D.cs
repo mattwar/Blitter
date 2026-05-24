@@ -227,6 +227,12 @@ public class PlayField2D : Layer2D
         _updating = true;
         try
         {
+            // Animated barriers (flippers, moving platforms, etc.) tick
+            // before sprites so this frame's sprite-vs-barrier pass sees
+            // the new geometry.
+            for (int i = 0; i < _barriers.Count; i++)
+                _barriers[i].Update(spriteContext);
+
             for (int i = 0; i < _sprites.Count; i++)
             {
                 var sprite = _sprites[i];

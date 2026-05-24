@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `CircleBarrier2D` in `Blitter.Blocks`: a circular barrier for
+  pinball bumpers, posts, and rounded corners.
+- `BounceAtBarrier2D` behavior reflects sprite velocity off
+  `LineBarrier2D` and `CircleBarrier2D` with configurable
+  `Restitution` and `TangentialDamping` plus an `OnBounce` callback.
+- `FlipperBarrier2D` in `Blitter.Blocks`: a pivoted capsule barrier
+  that swings between a rest angle and an active angle. Toggle
+  `Pressed` from input each frame; `BounceAtBarrier2D` reads its
+  angular velocity and kicks the ball off the moving surface.
+- `Barrier2D.Update(in UpdateContext2D)` virtual hook lets animated
+  barriers (flippers, moving platforms) tick before each frame's
+  collision pass. Default is a no-op.
+- `Pinball` sample: a bagatelle-style cabinet with bumpers,
+  slingshots, two shift-controlled flippers, and a procedurally-drawn
+  chrome ball (SkiaSharp radial gradient — no asset files).
+
+### Changed
+- `LineBarrier2D` and `CircleBarrier2D` are no longer sealed.
+  Subclass them to carry typed data (display tint, score value,
+  physical material) instead of stuffing it into untyped slots.
+
+### Removed
+- `Barrier2D.Tag` and `Barrier2D.UserData`, and the `OnlyTag`
+  filters on `StopAtBarrier2D` and `BounceAtBarrier2D`. Subclass
+  the barrier types instead — game-specific intent belongs in
+  game-specific types.
+- `tag:` parameters on `LineBarrier2D.Floor` / `Ceiling` /
+  `WallLeft` / `WallRight` / `Slope` / `Rect` factories.
 - `RepeatingImageLayer2D` in `Blitter.Blocks`: a `Layer2D` that
   tiles a single image horizontally to cover the viewport, anchored
   at a configurable `BottomY`. Combine with `ParallaxFactor` to
