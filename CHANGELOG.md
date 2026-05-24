@@ -10,12 +10,13 @@ All notable changes to this project will be documented in this file.
   at a configurable `BottomY`. Combine with `ParallaxFactor` to
   build parallax background stacks.
 - `MoonScroller` sample: parallax side-scroller built from six
-  background plates and a walking space man, demonstrating
-  `RepeatingImageLayer2D` + `Scene2D` + `CameraFollow2D`.
-- `AnimatedSpaceMan` sample: animated sprite demo with idle / walk
-  / jump / power states, baked left-facing sequences via
-  `FlipMode.Horizontal`, moon-gravity jump physics, and a fading
-  drop-shadow.
+  background plates and a walking, jumping space man, demonstrating
+  `RepeatingImageLayer2D` + `Scene2D` + `CameraFollow2D` with
+  horizontal-only follow and a moon-gravity jump arc + drop shadow.
+- `CameraFollow2D.FollowX` / `FollowY` toggles: opt either axis out
+  of dead-zone tracking and `WorldBounds` clamping. Defaults stay
+  `true` (no behavior change). Side-scrollers set `FollowY=false`
+  to keep the camera at a fixed Y while the target jumps.
 - `ReadableTexture2D` abstract base in `Blitter` for textures that
   support CPU pixel reads via `GetPixel`. `Bitmap` now derives from
   it.
