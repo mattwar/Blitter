@@ -87,7 +87,7 @@ Asteroid.Particles = debrisParticles;
 
 var rocket = new Rocket
 {
-    Image = rocketImage,
+    Visual = rocketImage,
     Center = new Vector2(WorldW / 2f, WorldH / 2f),
     Scale = 0.1f,
     Speed = 600f,
@@ -151,15 +151,13 @@ var playField = new PlayField2D([..asteroids, rocket])
     ShowWorldBounds = true,
 };
 
-// Heads-up display layer for debug info. Detaches the camera while
-// drawing so HUD text stays screen-locked instead of scrolling with
-// the world.
+// Custom layer for overlay text
 var hud = new CustomLayer2D
 {
     OnRender = rd =>
     {
         using var _ = rd.PushState();
-        rd.Camera = null;
+        rd.Camera = null; // detach camera so HUD is screen-locked
 
         // Speed readout under the score. The delegate runs every
         // frame, so just reading rocket.Speed here keeps the HUD
@@ -246,22 +244,22 @@ var hitDebug = new CustomLayer2D
         if (!showHitShape) return;
         using var _ = rd.PushState();
         rd.DrawColor = new Color(0, 255, 120, 220);
-        rocket.HitShape.Visit(HitShapeDebug.Draw(rd));
-        // Also outline the broad-phase circle in a dimmer color
+        rocket.HitShape.Visit(HitShapeDebug2D.Draw(rd));
+        // Also outline the bounding circle in a dimmer color
         // so we can see when the cheap reject would skip.
         rd.DrawColor = new Color(0, 200, 255, 90);
-        HitShapeDebug.DrawCircleOutline(rd, rocket.HitShape.BroadCircle.Center, rocket.HitShape.BroadCircle.Radius);
+        HitShapeDebug2D.DrawCircleOutline(rd, rocket.HitShape.BoundingCircle.Center, rocket.HitShape.BoundingCircle.Radius);
 
         // Same treatment for every asteroid currently on the field:
-        // magenta hit shape outline + dim broad circle.
-        var hitVisitor = HitShapeDebug.Draw(rd);
+        // magenta hit shape outline + dim bounding circle.
+        var hitVisitor = HitShapeDebug2D.Draw(rd);
         foreach (var sprite in playField.Sprites)
         {
             if (sprite is not Asteroid asteroid) continue;
             rd.DrawColor = new Color(255, 80, 200, 220);
             asteroid.HitShape.Visit(hitVisitor);
             rd.DrawColor = new Color(255, 120, 220, 70);
-            HitShapeDebug.DrawCircleOutline(rd, asteroid.HitShape.BroadCircle.Center, asteroid.HitShape.BroadCircle.Radius);
+            HitShapeDebug2D.DrawCircleOutline(rd, asteroid.HitShape.BoundingCircle.Center, asteroid.HitShape.BoundingCircle.Radius);
         }
     },
 };
@@ -332,7 +330,7 @@ static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
 
         var asteriod = new Asteroid
         {
-            Image = image,
+            Visual = image,
             Center = new Vector2(x, y),
             Scale = scale,
             Rotation = rotation,
@@ -354,47 +352,6 @@ sealed class Rocket : Sprite2D
     public TimeSpan StunUntil { get; set; }
     public bool IsStunned => Age < StunUntil;
 
-    // Cached capsule shape oriented along the rocket body. Lazy
-    // because Image isn't set in the ctor.
-    private HitShape? _rocketHitShape;
-
-    /// <summary>
-    /// Tight capsule along the rocket body, oriented by sprite
-    /// <see cref="Sprite2D.Rotation"/> and sized from the image's
-    /// opaque-pixel bounding rectangle.
-    /// </summary>
-    public override HitShape HitShape => _rocketHitShape ??= BuildHitShape();
-
-    private HitShape BuildHitShape()
-    {
-        // Pull the axis-aligned opaque bounds of the image. The
-        // largest capsule inscribed in that rectangle has body
-        // radius = half the short side and length-between-endpoints
-        // = long side - 2·radius; both cap-circles end up tangent
-        // to the short edges of the box.
-        if (Image is not TextureSpriteImage2D tsi || tsi.Texture is not Bitmap bmp)
-            return new CircleHitShape(this);
-        var bounds = bmp.ComputeOpaqueBounds();
-        if (bounds.IsEmpty)
-            return new CircleHitShape(this);
-
-        // ComputeOpaqueBounds is in image-pixel space (origin
-        // top-left); sprite-local has origin at the image center.
-        var (w, h) = bmp.Size;
-        var localCenter = bounds.Center - new Vector2(w / 2f, h / 2f);
-        var size = bounds.Size;
-        bool tall = size.Y >= size.X;
-        var bodyRadius = (tall ? size.X : size.Y) * 0.5f;
-        var halfLen = (tall ? size.Y : size.X) * 0.5f - bodyRadius;
-        var axis = tall ? new Vector2(0f, 1f) : new Vector2(1f, 0f);
-        return new CapsuleHitShape(
-            this,
-            localCenter - axis * halfLen,
-            localCenter + axis * halfLen,
-            bodyRadius
-            );
-    }
-    
     public Rocket()
     {
         this.Behaviors.AddRange([
@@ -668,7 +625,7 @@ sealed class Asteroid : Sprite2D
 
                 var shard = new Asteroid(childKind)
                 {
-                    Image = this.Image,
+                    Visual = this.Visual,
                     Center = this.Center,
                     Scale = newScale,
                     Rotation = Random.Shared.Next(0, 360),
@@ -739,21 +696,21 @@ sealed class RocketController : SpriteBehavior2D
 /// line draws. Lives in the sample so the engine doesn't pull in a
 /// rendering dependency for collision debug.
 /// </summary>
-static class HitShapeDebug
+static class HitShapeDebug2D
 {
     // Build a visitor that draws each primitive. Returned delegate is
     // fresh each call but a debug overlay isn't on the hot path.
-    public static HitShapeVisitor Draw(Renderer2D rd) => prims =>
+    public static HitShapeVisitor2D Draw(Renderer2D rd) => prims =>
     {
         for (int i = 0; i < prims.Length; i++)
         {
             var p = prims[i];
             switch (p.Kind)
             {
-                case HitKind.Circle:
+                case HitKind2D.Circle:
                     DrawCircleOutline(rd, p.P0, p.R);
                     break;
-                case HitKind.Capsule:
+                case HitKind2D.Capsule:
                     DrawCapsuleOutline(rd, p.P0, p.P1, p.R);
                     break;
             }

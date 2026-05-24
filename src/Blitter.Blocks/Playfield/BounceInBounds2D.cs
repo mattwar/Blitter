@@ -17,31 +17,35 @@ public class BounceInBounds2D : SpriteBehavior2D
     public override void Apply(Sprite2D target, in UpdateContext2D context)
     {
         var bounds = context.Bounds;
+        var v = Sprite2D.GetVelocity(target.Speed, target.Heading);
         var bounced = false;
 
         if (target.Center.X < bounds.X)
         {
-            target.ChangeVelocity(v => new Vector2(Math.Abs(v.X), v.Y));
+            v.X = MathF.Abs(v.X);
             bounced = true;
         }
         else if (target.Center.X > bounds.X + bounds.Width)
         {
-            target.ChangeVelocity(v => new Vector2(-Math.Abs(v.X), v.Y));
+            v.X = -MathF.Abs(v.X);
             bounced = true;
         }
 
         if (target.Center.Y < bounds.Y)
         {
-            target.ChangeVelocity(v => new Vector2(v.X, Math.Abs(v.Y)));
+            v.Y = MathF.Abs(v.Y);
             bounced = true;
         }
         else if (target.Center.Y > bounds.Y + bounds.Height)
         {
-            target.ChangeVelocity(v => new Vector2(v.X, -Math.Abs(v.Y)));
+            v.Y = -MathF.Abs(v.Y);
             bounced = true;
         }
 
-        if (bounced)
-            OnBounce?.Invoke(target);
+        if (!bounced)
+            return;
+
+        (target.Speed, target.Heading) = Sprite2D.GetSpeedAndHeading(v);
+        OnBounce?.Invoke(target);
     }
 }

@@ -4,7 +4,138 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- `RepeatingImageLayer2D` in `Blitter.Blocks`: a `Layer2D` that
+  tiles a single image horizontally to cover the viewport, anchored
+  at a configurable `BottomY`. Combine with `ParallaxFactor` to
+  build parallax background stacks.
+- `MoonScroller` sample: parallax side-scroller built from six
+  background plates and a walking, jumping space man, demonstrating
+  `RepeatingImageLayer2D` + `Scene2D` + `CameraFollow2D` with
+  horizontal-only follow and a moon-gravity jump arc + drop shadow.
+- `CameraFollow2D.FollowX` / `FollowY` toggles: opt either axis out
+  of dead-zone tracking and `WorldBounds` clamping. Defaults stay
+  `true` (no behavior change). Side-scrollers set `FollowY=false`
+  to keep the camera at a fixed Y while the target jumps.
+- `ReadableTexture2D` abstract base in `Blitter` for textures that
+  support CPU pixel reads via `GetPixel`. `Bitmap` now derives from
+  it.
+- `IReadableTexture2D` interface — the readable contract used by
+  `ImageBounds` and other consumers; implemented by
+  `ReadableTexture2D` and `ReadableTextureSegment2D`.
+- `ITextureRegion` interface — `Source` + `SourceRect` pair shared
+  by texture region wrappers; renderer uses it to unwrap regions.
+- `Texture2D.Slice(Rect)` returns a sub-rect view of an image,
+  `string.Substring`-style; readable images return readable slices.
+- `TextureSegment2D` in `Blitter` is a non-readable region wrapper.
+  `ReadableTextureSegment2D` adds CPU pixel reads. The renderer
+  transparently unwraps either back to source + offset source rect.
+- `HitShapeCache`: per-texture cache of `HitShape2D` values shared
+  across visuals (`ConditionalWeakTable` keyed by `Texture2D`).
+  `HitShapeCache.Default` is the process-wide default; subclass and
+  override `ComputeHitShape` to customize derivation, then pass the
+  instance to `TextureVisual2D` / `AnimatedVisual2D` constructors.
+- `Visual2D.GetHitShapeAt(TimeSpan)`: virtual hook for time-keyed
+  hit-shape lookup. Static visuals ignore the time and return
+  `HitShape`; `AnimatedVisual2D` overrides it to return the shape of
+  the current frame, so callers can stay ignorant of which subtype
+  they hold.
+- `AnimationFrame` struct: per-frame `(Texture2D Texture, FlipMode Flip)`
+  pair, with implicit conversion from `Texture2D` for the no-flip
+  case. Lets a single artwork-direction sheet feed both "facing
+  right" and "facing left" sequences without duplicating frames.
+- `AnimationSequence(ImmutableArray<Texture2D>, …, FlipMode flip)`
+  convenience overload that wraps each texture as an
+  `AnimationFrame` with the given uniform flip.
+- `FlipMode.Both` (`Horizontal | Vertical`). `FlipMode` is now
+  `[Flags]`; the four values form a Klein four-group under XOR.
+- `HitShape2D.Flipped(FlipMode)`: returns a sibling shape whose
+  local geometry is mirrored. Symmetric shapes return `this`; other
+  shapes intern up to three siblings per canonical and cross-wire
+  them so flipping a sibling navigates back through the family
+  without allocating.
+
 ### Changed
+- `TextureCatalog.Sense` now partitions the sheet hierarchically:
+  horizontal bands first, then per-band columns. Handles sheets
+  whose rows are not perfectly column-aligned. New `minRegionWidth`
+  / `minRegionHeight` parameters discard sub-threshold runs, useful
+  for ignoring JPEG halos and antialias noise. `minRowGutter` /
+  `minColumnGutter` set the minimum transparent gap that counts as
+  a real separator — smaller breaks are bridged so shadows and
+  detached pieces stay part of the parent region. The
+  `includeEmptyCells` parameter is gone — the new algorithm only
+  ever produces non-empty regions.
+- `ImageBounds` extension helpers now accept any
+  `IReadableTexture2D`, not just `Bitmap`.
+- `Atlas` renamed to `TextureCatalog`: an ordered, optionally-named
+  collection of `Texture2D`s with no `Image` property; entries may
+  originate from multiple sources. Build via
+  `TextureCatalog.FromRegions(image, …)`,
+  `TextureCatalog.Grid(image, …)`, or `TextureCatalog.Sense(image, …)`.
+  Only `Sense` requires a readable image.
+- `AnimationSequence.Frames` is now `ImmutableArray<AnimationFrame>`,
+  not `ImmutableArray<Texture2D>`. `FrameAt(TimeSpan)` returns an
+  `AnimationFrame`; texture is at `.Texture`. The original
+  texture-array ctor still works (textures convert implicitly into
+  `AnimationFrame` values).
+- `Pose2D` no longer carries a `Flipped` field. Pose is now purely
+  spatial (position, rotation, uniform scale). Flip lives with the
+  visual (per `AnimationFrame`) and with the caller, threaded as a
+  `FlipMode` parameter on `Visual2D.Draw` and composed against the
+  current frame's flip via XOR.
+- `Sprite2D.Flipped` is now a runtime mirror: passed to the visual
+  at draw time and composed onto the hit shape via
+  `HitShape2D.Flipped`. Set it freely from behaviors to flip the
+  sprite without disturbing its underlying visual or pose.
+- `AnimationCatalogFactories.Spec` gained a `FlipMode Flip` (default
+  `None`) that is applied uniformly to every frame in the generated
+  sequence.
+- `AnimationSequence` no longer carries a `Name`; the name lives
+  with the catalog entry. Construct as
+  `new AnimationSequence(frames, frameDuration, loop)`.
+- `AnimationAtlas` renamed to `AnimationCatalog` and decoupled from
+  `TextureCatalog`. Catalog is an ordered collection of named
+  `AnimationSequence`s (`Count` / `Names` / indexers / `Contains` /
+  `TryGet`) built from
+  `IEnumerable<KeyValuePair<string, AnimationSequence>>` — no
+  default state. Build from a texture catalog via
+  `catalog.ToAnimationCatalog(specs)` /
+  `catalog.ToSingleSequenceCatalog(frameDuration, …)` in
+  `AnimationCatalogFactories`. `Spec` lives on that extension class.
+- `AnimatedVisual2D` now owns its initial state; pass it to the
+  ctor (defaults to the catalog's first sequence). `Atlas` property
+  renamed to `Catalog`.
+- `Visual2D.HitShape` is now an abstract property and read-only; the
+  user-assignable setter and `InvalidateHitShape` are gone. Subclasses
+  override it directly (or supply a custom `HitShapeCache`).
+  Implementations are expected to cache and not allocate on every
+  call.
+
+- `SpriteImage2D` renamed to `Visual2D` and moved to `Blitter.Bits`;
+  `TextureSpriteImage2D` → `TextureVisual2D`,
+  `AnimatedSpriteImage2D` → `AnimatedVisual2D`. The type no longer
+  has any sprite/playfield coupling and is reusable from any host
+  (`Visual3D` will follow the same pattern).
+- `Sprite2D.Image` renamed to `Sprite2D.Visual`.
+- `HitShape`, `PosedHitShape`, `HitPrimitive`, `HitKind`, `Hitter`,
+  and `HitShapeVisitor` renamed with a `2D` suffix (e.g.
+  `HitShape2D`); `Hitter2D` further renamed to `HitTester2D`
+  (with `IntersectsHitter2D` → `IntersectsHitTester2D`). 3D
+  equivalents will follow.
+- `Visual2D.Draw` now takes `in Pose2D pose` and a
+  `TimeSpan elapsed` (the host's age) so animated visuals can pick
+  a frame.
+- `PosedHitShape2D` now honors `Pose2D.Flipped` in hit tests, so
+  asymmetric local shapes mirror correctly with their sprite.
+- `Bitmap.ComputeOpaqueHitShape` renamed to
+  `Bitmap.ComputeOpaqueHitShape2D`.
+- `HitShape2D.TestHit`, `TestHitWith`, and `Visit` now take
+  `in Pose2D mine` instead of `in PosedHitShape2D mine` (the
+  shape is always `this`).
+- `PosedHitShape2D.Intersects` removed; `TestHit` (with or
+  without a tester) now always runs the bounding-circle reject
+  before primitive dispatch.
 - `SpriteBehavior2D.Update` and `SceneBehavior2D.Update` renamed to
   `Apply` to reflect that a behavior mutates someone else's state.
 - `CustomSpriteBehavior2D.OnUpdate` / `CustomSceneBehavior2D.OnUpdate`
@@ -35,6 +166,29 @@ All notable changes to this project will be documented in this file.
   `Layers.Remove` remain for the rare case of dynamic layer changes.
 
 ### Added
+- `Atlas.Sense(Bitmap, ...)`: factory that detects a sprite sheet's
+  implicit grid from rows/columns of transparent gutters. Skips
+  empty cells (e.g. blanks in a diagonal layout) by default; pass
+  `includeEmptyCells: true` to keep them.
+- `AnimationSequence`: named, immutable sequence of atlas frame
+  indices with its own `FrameDuration` and `AnimationLoop`.
+- `AnimationAtlas`: bundles an `Atlas` with a set of named
+  `AnimationSequence`s and a `DefaultState`. `AnimationAtlas.Single`
+  is a convenience factory for the one-sequence case.
+- `AnimatedVisual2D`: a `Visual2D` that plays an `AnimationSequence`
+  from an `AnimationAtlas`. Setting `State` switches sequences and
+  restarts the new one from its first frame. Exposes `IsAtEnd` for
+  `Once` sequences and `WithOffset` to start a second host's
+  animation out of phase.
+- `Pose2D` struct (`Position`, `Rotation`, `Scale`, `Flipped`) used by
+  `Visual2D.Draw` and `PosedHitShape2D`.
+- `Visual2D.State` / `Visual2D.States` / `Visual2D.DefaultState`:
+  extension point for animated or multi-pose visuals. Single-state
+  implementations expose just `"default"`.
+- `Bitmap.ComputeOpaqueHitShape()`: fits a circle or capsule to the
+  opaque pixels and picks whichever covers them with less area.
+- `TextureVisual2D` now uses the fit shape as its default
+  `HitShape`, so elongated sprites get a tight capsule for free.
 - `WrapInBounds2D`: toroidal sprite wrap across the update bounds.
 - `SeekTarget2D`: steers a sprite toward a `Func<Vector2?>` target with
   `MaxTurnRate`, `Acceleration`, `MaxSpeed`, and `ArriveRadius`.

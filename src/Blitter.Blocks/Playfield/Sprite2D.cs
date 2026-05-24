@@ -10,8 +10,8 @@ namespace Blitter.Blocks;
 /// </summary>
 public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
 {
-    /// <summary>The image to render.</summary>
-    public SpriteImage2D? Image { get; set; }
+    /// <summary>The visual to render.</summary>
+    public Visual2D? Visual { get; set; }
 
     /// <summary>The position of the center of the sprite.</summary>
     public Vector2 Center { get; set; }
@@ -28,13 +28,17 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// <summary>How many degrees the sprite rotates in a second.</summary>
     public float RotationSpeed { get; set; }
 
-    /// <summary>The scale factor to apply to the image.</summary>
+    /// <summary>The scale factor to apply to the visual.</summary>
     public float Scale { get; set; } = 1f;
 
-    /// <summary>The flip mode to apply when rendering the image.</summary>
+    /// <summary>
+    /// Runtime mirror applied to the visual at draw time and to the
+    /// hit shape when collisions are evaluated. Composes with any
+    /// authoring flip on the visual's current animation frame.
+    /// </summary>
     public FlipMode Flipped = FlipMode.None;
 
-    /// <summary>Per-channel tint multiplied into the image at draw time.
+    /// <summary>Per-channel tint multiplied into the visual at draw time.
     /// Defaults to <see cref="Color.White"/> (no change).</summary>
     public Color Tint { get; set; } = Color.White;
 
@@ -77,21 +81,22 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
             : TimeSpan.Zero;
 
     /// <summary>
-    /// The collision boundary of the sprite. Default is a single
-    /// circle covering the sprite's image. Override to return a
-    /// shape with tighter or multi-primitive geometry (e.g. for
-    /// an elongated rocket).
+    /// The sprite's world-space collision shape: the current
+    /// <see cref="Visual"/>'s <see cref="Visual2D.HitShape"/>
+    /// (mirrored by <see cref="Flipped"/>) combined with this
+    /// sprite's <see cref="Center"/>, <see cref="Rotation"/>, and
+    /// <see cref="Scale"/>. Override to substitute a different
+    /// shape (still posed by the sprite).
     /// </summary>
-    public virtual HitShape HitShape => _hitShape ??= new CircleHitShape(this);
-    private HitShape? _hitShape;
+    public virtual PosedHitShape2D HitShape =>
+        new((Visual?.HitShape ?? HitShape2D.None).Flipped(Flipped), new Pose2D(Center, Rotation, Scale));
 
     /// <summary>
-    /// Broad-phase bounding circle of the sprite for collision
+    /// Bounding circle of the sprite for collision
     /// purposes; equivalent to <see cref="HitShape"/>'s
-    /// <see cref="HitShape.BroadCircle"/>. Kept as a convenience
-    /// for legacy callers and for the broad-phase reject path.
+    /// <see cref="PosedHitShape2D.BoundingCircle"/>.
     /// </summary>
-    public BoundingCircle HitCircle => HitShape.BroadCircle;
+    public BoundingCircle HitCircle => HitShape.BoundingCircle;
 
     public Sprite2D()
     {
@@ -138,7 +143,7 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer2D renderer)
     {
-        this.Image?.Draw(renderer, this.Center, this.Rotation, this.Scale, this.Flipped, this.Tint);
+        this.Visual?.Draw(renderer, new Pose2D(Center, Rotation, Scale), this.Tint, this.Age, this.Flipped);
     }
 
     /// <summary>
@@ -170,10 +175,4 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
         return (speed, heading);
     }
 
-    public void ChangeVelocity(Func<Vector2, Vector2> fn)
-    {
-        var v = GetVelocity(this.Speed, this.Heading);
-        v = fn(v);
-        (this.Speed, this.Heading) = GetSpeedAndHeading(v);
-    }
 }

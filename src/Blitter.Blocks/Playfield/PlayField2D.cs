@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+using Blitter.Bits;
 
 namespace Blitter.Blocks;
 
@@ -11,8 +11,20 @@ namespace Blitter.Blocks;
 /// </summary>
 public class PlayField2D : Layer2D
 {
-    private ImmutableList<Sprite2D> _sprites = ImmutableList<Sprite2D>.Empty;
-    private ImmutableList<Barrier2D> _barriers = ImmutableList<Barrier2D>.Empty;
+    // Live membership lists. Read-only views are exposed via
+    // Sprites/Barriers; outside callers must not mutate.
+    private readonly List<Sprite2D> _sprites = new();
+    private readonly List<Barrier2D> _barriers = new();
+
+    // While Update is iterating we can't mutate _sprites/_barriers
+    // directly. AddSprite/AddBarrier/RemoveBarrier called during the
+    // update push into these pending lists and the changes are
+    // applied at the end of the frame.
+    private readonly List<Sprite2D> _pendingAddSprites = new();
+    private readonly List<Sprite2D> _pendingRemoveSprites = new();
+    private readonly List<Barrier2D> _pendingAddBarriers = new();
+    private readonly List<Barrier2D> _pendingRemoveBarriers = new();
+    private bool _updating;
 
     public PlayField2D()
     {
@@ -26,29 +38,31 @@ public class PlayField2D : Layer2D
     public PlayField2D(IEnumerable<Sprite2D> sprites, IEnumerable<Barrier2D> barriers)
     {
         AdoptSprites(sprites);
-        _barriers = barriers.ToImmutableList();
+        foreach (var b in barriers)
+            _barriers.Add(b);
     }
 
     private void AdoptSprites(IEnumerable<Sprite2D> sprites)
     {
-        var list = sprites.ToImmutableList();
-        foreach (var s in list)
+        foreach (var s in sprites)
         {
             s._playField?.RemoveImmediate(s);
             s._playField = this;
             s._spawnedAt = Elapsed;
+            _sprites.Add(s);
         }
-        _sprites = list;
     }
 
-    /// <summary>The sprites currently in this playfield.</summary>
-    public ImmutableList<Sprite2D> Sprites => _sprites;
+    /// <summary>
+    /// The sprites currently in this playfield.
+    /// </summary>
+    public IReadOnlyList<Sprite2D> Sprites => _sprites;
 
     /// <summary>
     /// Static, non-sprite obstacles in this playfield. 
     /// Tested against every sprite's <see cref="Sprite2D.HitCircle"/> each tick.
     /// </summary>
-    public ImmutableList<Barrier2D> Barriers => _barriers;
+    public IReadOnlyList<Barrier2D> Barriers => _barriers;
 
     /// <summary>
     /// Total time accumulated from <see cref="UpdateContext2D"/> deltas passed through this playfield's <see cref="Update"/>.
@@ -74,37 +88,131 @@ public class PlayField2D : Layer2D
     /// </summary>
     public Color WorldBoundsColor { get; set; } = new Color(0, 200, 255, 255);
 
+    /// <summary>
+    /// Adds a sprite to the playfield.
+    /// </summary>
     public void AddSprite(Sprite2D sprite)
     {
         var existing = sprite._playField;
         if (existing == this)
+        {
+            // Already a member — cancel any pending removal so the
+            // sprite stays around past the current frame.
+            _pendingRemoveSprites.Remove(sprite);
             return;
+        }
         existing?.RemoveImmediate(sprite);
-
-        ImmutableInterlocked.Update(ref _sprites, (list, s) => list.Add(s), sprite);
         sprite._playField = this;
         sprite._spawnedAt = Elapsed;
+        if (_updating)
+        {
+            _pendingAddSprites.Add(sprite);           
+        }
+        else
+        {
+            _sprites.Add(sprite);
+        }
     }
 
+    /// <summary>
+    /// Removes a sprite from the playfield. 
+    /// Safe to call during <see cref="Update"/>; 
+    /// the actual removal is deferred to end of frame.
+    /// The normal way to retire a sprite is to set <see cref="Sprite2D.IsAlive"/> to <c>false</c>.
+    /// This method is for callers that need to evict a sprite
+    /// without killing it (e.g. reparenting to another playfield).
+    /// </summary>
+    public void RemoveSprite(Sprite2D sprite)
+    {
+        if (sprite._playField != this)
+            return;
+        if (_updating)
+        {
+            _pendingAddSprites.Remove(sprite);
+            _pendingRemoveSprites.Add(sprite);
+        }
+        else if (_sprites.Remove(sprite))
+        {
+            Detach(sprite, retired: true);
+        }
+    }
+
+    /// <summary>
+    /// Adds a barrier to the playfield.
+    /// </summary>
     public void AddBarrier(Barrier2D barrier)
-        => ImmutableInterlocked.Update(ref _barriers, (list, b) => list.Add(b), barrier);
+    {
+        if (_updating)
+        {
+            _pendingAddBarriers.Add(barrier);           
+        }
+        else
+        {
+            _barriers.Add(barrier);
+        }
+    }
 
+    /// <summary>
+    /// Adds multiple barriers to the playfield.
+    /// </summary>
     public void AddBarriers(IEnumerable<Barrier2D> barriers)
-        => ImmutableInterlocked.Update(ref _barriers, (list, bs) => list.AddRange(bs), barriers);
+    {
+        var sink = _updating ? _pendingAddBarriers : _barriers;
+        foreach (var b in barriers)
+        {
+            sink.Add(b);           
+        }
+    }
 
+    /// <summary>
+    /// Removes a barrier from the playfield.
+    /// </summary>
     public void RemoveBarrier(Barrier2D barrier)
-        => ImmutableInterlocked.Update(ref _barriers, (list, b) => list.Remove(b), barrier);
+    {
+        if (_updating)
+        {
+            _pendingRemoveBarriers.Add(barrier);
+        }
+        else
+        {
+            _barriers.Remove(barrier);
+        }
+    }
 
-    // Removes `sprite` from this playfield's list and clears its
-    // PlayField link. Used by the reparenting path on AddSprite.
-    // User-facing removal goes through `sprite.IsAlive = false`.
+    // Removes `sprite` from this playfield immediately, regardless of update state. 
+    // Used by the reparenting path on AddSprite where we can't wait until end-of-frame. 
+    // User-facing removal goes through `sprite.IsAlive = false` and is reaped via the pending pipeline.
     internal void RemoveImmediate(Sprite2D sprite)
     {
-        ImmutableInterlocked.Update(ref _sprites, list => list.Remove(sprite));
-        if (sprite._playField == this)
-            sprite._playField = null;
+        _pendingAddSprites.Remove(sprite);
+        _pendingRemoveSprites.Remove(sprite);
+        if (_sprites.Remove(sprite))
+            Detach(sprite, retired: false);
     }
 
+    // Clears the sprite's playfield link and, when `retired` is true,
+    // notifies the playfield via OnSpriteRetired. Reparenting paths
+    // pass retired=false so pool consumers don't try to recycle a
+    // sprite that's about to live in another playfield.
+    private void Detach(Sprite2D sprite, bool retired)
+    {
+        if (sprite._playField == this)
+            sprite._playField = null;
+        if (retired)
+            OnSpriteRetired(sprite);
+    }
+
+    /// <summary>
+    /// Called once for each sprite that leaves this playfield, either because
+    /// its <see cref="Sprite2D.IsAlive"/> went to <c>false</c> or because <see cref="RemoveSprite"/> evicted it. 
+    /// Not called when a sprite is reparented into another playfield.
+    /// Override to return the sprite to a pool, recycle resources, etc.
+    /// </summary>
+    protected virtual void OnSpriteRetired(Sprite2D sprite)
+    {
+    }
+
+    /// <inheritdoc/>
     public override void Update(in UpdateContext2D context)
     {
         Elapsed += context.ElapsedSinceLastUpdate;
@@ -116,101 +224,127 @@ public class PlayField2D : Layer2D
             ? context with { Bounds = wb }
             : context;
 
-        var sprites = _sprites;
-        var removeDead = false;
-
-        foreach (var sprite in sprites)
+        _updating = true;
+        try
         {
-            if (!sprite.IsAlive)
+            for (int i = 0; i < _sprites.Count; i++)
             {
-                removeDead = true;
-                continue;
+                var sprite = _sprites[i];
+                if (!sprite.IsAlive)
+                    continue;
+                sprite.Update(spriteContext);
             }
 
-            sprite.Update(spriteContext);
-
-            if (!sprite.IsAlive)
-                removeDead = true;
-        }
-
-        // sprite-vs-sprite collision
-        for (int i = 0; i < sprites.Count; i++)
-        {
-            var a = sprites[i];
-            if (!a.IsAlive || !a.CanBeHit)
-                continue;
-            var aShape = a.HitShape;
-            if (aShape.BroadCircle.Radius <= 0f)
-                continue;
-
-            for (int j = i + 1; j < sprites.Count; j++)
+            // sprite-vs-sprite collision
+            for (int i = 0; i < _sprites.Count; i++)
             {
-                if (!a.IsAlive)
-                    break;
-
-                var b = sprites[j];
-                if (!b.IsAlive || !b.CanBeHit)
+                var a = _sprites[i];
+                if (!a.IsAlive || !a.CanBeHit)
                     continue;
-                var bShape = b.HitShape;
-                if (bShape.BroadCircle.Radius <= 0f)
-                    continue;
-                if (!HitShape.Intersects(aShape, bShape))
+                var aShape = a.HitShape;
+                if (aShape.BoundingCircle.Radius <= 0f)
                     continue;
 
-                a.OnHitSprite(b, spriteContext);
-                if (a.IsAlive && b.IsAlive)
-                    b.OnHitSprite(a, spriteContext);
-            }
-        }
-
-        // sprite-vs-barrier collision
-        var barriers = _barriers;
-        if (barriers.Count > 0)
-        {
-            foreach (var sprite in sprites)
-            {
-                if (!sprite.IsAlive || !sprite.CanBeHit)
-                    continue;
-                var sc = sprite.HitCircle;
-                if (sc.Radius <= 0f)
-                    continue;
-
-                foreach (var barrier in barriers)
+                for (int j = i + 1; j < _sprites.Count; j++)
                 {
-                    if (!sprite.IsAlive)
+                    if (!a.IsAlive)
                         break;
-                    // Re-read each time: the previous barrier handler
-                    // may have moved the sprite.
-                    if (!barrier.Intersects(sprite.HitCircle))
+
+                    var b = _sprites[j];
+                    if (!b.IsAlive || !b.CanBeHit)
+                        continue;
+                    var bShape = b.HitShape;
+                    if (bShape.BoundingCircle.Radius <= 0f)
+                        continue;
+                    if (!aShape.TestHit(bShape))
                         continue;
 
-                    sprite.OnHitBarrier(barrier, spriteContext);
+                    a.OnHitSprite(b, spriteContext);
+                    if (a.IsAlive && b.IsAlive)
+                        b.OnHitSprite(a, spriteContext);
                 }
             }
-        }
 
-        // re-scan after collision/barrier handlers may have killed sprites
-        if (!removeDead)
-        {
-            foreach (var s in _sprites)
+            // sprite-vs-barrier collision
+            if (_barriers.Count > 0)
             {
-                if (!s.IsAlive)
+                for (int s = 0; s < _sprites.Count; s++)
                 {
-                    removeDead = true;
-                    break;
+                    var sprite = _sprites[s];
+                    if (!sprite.IsAlive || !sprite.CanBeHit)
+                        continue;
+                    var sc = sprite.HitCircle;
+                    if (sc.Radius <= 0f)
+                        continue;
+
+                    for (int k = 0; k < _barriers.Count; k++)
+                    {
+                        if (!sprite.IsAlive)
+                            break;
+                        var barrier = _barriers[k];
+                        // Re-read each time: the previous barrier handler
+                        // may have moved the sprite.
+                        if (!barrier.Intersects(sprite.HitCircle))
+                            continue;
+
+                        sprite.OnHitBarrier(barrier, spriteContext);
+                    }
                 }
             }
         }
-
-        if (removeDead)
+        finally
         {
-            ImmutableInterlocked.Update(ref _sprites, list => list.RemoveAll(s =>
+            _updating = false;
+        }
+
+        ApplyPendingChanges();
+    }
+
+    // Folds dead sprites, pending removes, and pending adds into the
+    // live lists. Called once at the end of Update so the update /
+    // collision passes see a stable snapshot.
+    private void ApplyPendingChanges()
+    {
+        if (_pendingRemoveSprites.Count > 0)
+        {
+            for (int i = _sprites.Count - 1; i >= 0; i--)
             {
-                if (s.IsAlive) return false;
-                if (s._playField == this)
-                    s._playField = null;
-                return true;
-            }));
+                var s = _sprites[i];
+                if (!_pendingRemoveSprites.Contains(s)) continue;
+                _sprites.RemoveAt(i);
+                Detach(s, retired: true);
+            }
+            _pendingRemoveSprites.Clear();
+        }
+
+        // Reap any sprite that died during this frame.
+        for (int i = _sprites.Count - 1; i >= 0; i--)
+        {
+            var s = _sprites[i];
+            if (s.IsAlive) continue;
+            _sprites.RemoveAt(i);
+            Detach(s, retired: true);
+        }
+
+        if (_pendingAddSprites.Count > 0)
+        {
+            _sprites.AddRange(_pendingAddSprites);
+            _pendingAddSprites.Clear();
+        }
+
+        if (_pendingRemoveBarriers.Count > 0)
+        {
+            for (int i = _barriers.Count - 1; i >= 0; i--)
+            {
+                if (_pendingRemoveBarriers.Contains(_barriers[i]))
+                    _barriers.RemoveAt(i);
+            }
+            _pendingRemoveBarriers.Clear();
+        }
+        if (_pendingAddBarriers.Count > 0)
+        {
+            _barriers.AddRange(_pendingAddBarriers);
+            _pendingAddBarriers.Clear();
         }
     }
 
@@ -218,9 +352,9 @@ public class PlayField2D : Layer2D
     {
         DrawBackground(renderer);
 
-        var sprites = _sprites;
-        foreach (var sprite in sprites)
+        for (int i = 0; i < _sprites.Count; i++)
         {
+            var sprite = _sprites[i];
             if (sprite.IsAlive)
                 sprite.Draw(renderer);
         }

@@ -46,4 +46,11 @@ public abstract class Texture2D : Texture, IDisposable
 
     /// <summary>Size of the (base level of the) image in pixels.</summary>
     public (int Width, int Height) Size => (Width, Height);
+
+    /// <summary>
+    /// Creates a texture that views the given sub-rectangle of this
+    /// image. Readable textures return a readable segment; other
+    /// textures return a non-readable one.
+    /// </summary>
+    public virtual Texture2D Slice(Rect region) => new TextureSegment2D(this, region);
 }

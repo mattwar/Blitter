@@ -44,6 +44,14 @@ public class CameraFollow2D : SpriteBehavior2D
     /// </summary>
     public Rect? WorldBounds { get; set; }
 
+    /// <summary>When false, the camera's X is left untouched.</summary>
+    public bool FollowX { get; set; } = true;
+
+    /// <summary>When false, the camera's Y is left untouched. Useful
+    /// for side-scrollers where a moving target shouldn't drag the
+    /// camera vertically.</summary>
+    public bool FollowY { get; set; } = true;
+
     public override void Apply(Sprite2D target, in UpdateContext2D context)
     {
         var cam = Camera;
@@ -63,11 +71,16 @@ public class CameraFollow2D : SpriteBehavior2D
 
         // Push the camera just enough to put the target back on the
         // dead-zone edge — no easing in v1.
-        if (t.X < p.X - halfDead.X) p.X = t.X + halfDead.X;
-        else if (t.X > p.X + halfDead.X) p.X = t.X - halfDead.X;
-
-        if (t.Y < p.Y - halfDead.Y) p.Y = t.Y + halfDead.Y;
-        else if (t.Y > p.Y + halfDead.Y) p.Y = t.Y - halfDead.Y;
+        if (FollowX)
+        {
+            if (t.X < p.X - halfDead.X) p.X = t.X + halfDead.X;
+            else if (t.X > p.X + halfDead.X) p.X = t.X - halfDead.X;
+        }
+        if (FollowY)
+        {
+            if (t.Y < p.Y - halfDead.Y) p.Y = t.Y + halfDead.Y;
+            else if (t.Y > p.Y + halfDead.Y) p.Y = t.Y - halfDead.Y;
+        }
 
         // Clamp so the viewport never shows outside the world. If an
         // axis of the world is smaller than the viewport, center on it
@@ -75,12 +88,18 @@ public class CameraFollow2D : SpriteBehavior2D
         if (WorldBounds is Rect wb)
         {
             var halfView = viewWorld * 0.5f;
-            p.X = wb.Width <= viewWorld.X
-                ? wb.X + wb.Width * 0.5f
-                : Math.Clamp(p.X, wb.X + halfView.X, wb.X + wb.Width - halfView.X);
-            p.Y = wb.Height <= viewWorld.Y
-                ? wb.Y + wb.Height * 0.5f
-                : Math.Clamp(p.Y, wb.Y + halfView.Y, wb.Y + wb.Height - halfView.Y);
+            if (FollowX)
+            {
+                p.X = wb.Width <= viewWorld.X
+                    ? wb.X + wb.Width * 0.5f
+                    : Math.Clamp(p.X, wb.X + halfView.X, wb.X + wb.Width - halfView.X);
+            }
+            if (FollowY)
+            {
+                p.Y = wb.Height <= viewWorld.Y
+                    ? wb.Y + wb.Height * 0.5f
+                    : Math.Clamp(p.Y, wb.Y + halfView.Y, wb.Y + wb.Height - halfView.Y);
+            }
         }
 
         cam.Position = p;

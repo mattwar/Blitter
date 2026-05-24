@@ -10,10 +10,10 @@ public static class ImageBounds
     /// <summary>
     /// Gets the minimum axis-aligned bounding rectangle that contains every pixel.
     /// </summary>
-    public static BoundingRect ComputeOpaqueBounds(this Bitmap image, byte alphaThreshold = 0)
+    public static BoundingRect ComputeOpaqueBounds(this IReadableTexture2D image, byte alphaThreshold = 0)
     {
         ArgumentNullException.ThrowIfNull(image);
-        var (w, h) = image.Size;
+        int w = image.Width, h = image.Height;
         if (w <= 0 || h <= 0) return BoundingRect.Empty;
 
         int minX = int.MaxValue, minY = int.MaxValue;
@@ -48,7 +48,7 @@ public static class ImageBounds
     /// Ritter's algorithm. Handles off-center / asymmetric shapes
     /// far better than the rect-circumscribing circle.
     /// </summary>
-    public static BoundingCircle ComputeOpaqueCircle(this Bitmap image, byte alphaThreshold = 0)
+    public static BoundingCircle ComputeOpaqueCircle(this IReadableTexture2D image, byte alphaThreshold = 0)
     {
         ArgumentNullException.ThrowIfNull(image);
         var bounds = image.ComputeOpaqueBounds(alphaThreshold);
@@ -117,14 +117,14 @@ public static class ImageBounds
     /// Computes a nominal set of axis-aligned bounding rectangles that cover every pixel.
     /// </summary>
     public static BoundingRect[] ComputeOpaqueRects(
-        this Bitmap image,
+        this IReadableTexture2D image,
         int cellSize = 8,
         byte alphaThreshold = 0)
     {
         ArgumentNullException.ThrowIfNull(image);
         ArgumentOutOfRangeException.ThrowIfLessThan(cellSize, 1);
 
-        var (w, h) = image.Size;
+        int w = image.Width, h = image.Height;
         if (w <= 0 || h <= 0) return Array.Empty<BoundingRect>();
 
         int cols = (w + cellSize - 1) / cellSize;
@@ -210,5 +210,75 @@ public static class ImageBounds
             if (!opaque[i] || consumed[i]) return false;
         }
         return true;
+    }
+
+    /// <summary>
+    /// Picks a good default <see cref="HitShape2D"/> for the image's
+    /// opaque pixels (in image-pixel space, origin top-left). Returns
+    /// a <see cref="CircleHitShape2D"/> for round/blocky silhouettes and
+    /// a <see cref="CapsuleHitShape2D"/> for elongated ones, choosing
+    /// whichever covers the opaque pixels with the smaller area.
+    /// </summary>
+    public static HitShape2D ComputeOpaqueHitShape2D(this IReadableTexture2D image, byte alphaThreshold = 0)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        var bounds = image.ComputeOpaqueBounds(alphaThreshold);
+        if (bounds.IsEmpty) return HitShape2D.None;
+
+        var circle = image.ComputeOpaqueCircle(alphaThreshold);
+
+        var size = bounds.Size;
+        bool tall = size.Y > size.X;
+        float longSide = tall ? size.Y : size.X;
+        float shortSide = tall ? size.X : size.Y;
+
+        // For nearly-square silhouettes the inscribed capsule degenerates
+        // to a circle. Skip the capsule fit and return the tight circle.
+        if (longSide < shortSide * 1.4f)
+            return new CircleHitShape2D(circle.Center, circle.Radius);
+
+        // Start with the capsule inscribed in the AABB along the long
+        // axis (endpoints offset from center by half-long - half-short).
+        // Then widen the radius until every opaque pixel is inside.
+        var axis = tall ? new Vector2(0, 1) : new Vector2(1, 0);
+        var center = bounds.Center;
+        float halfL = longSide * 0.5f - shortSide * 0.5f;
+        var endA = center - axis * halfL;
+        var endB = center + axis * halfL;
+        float radius = shortSide * 0.5f;
+
+        int xMin = (int)bounds.Min.X, yMin = (int)bounds.Min.Y;
+        int xMax = (int)bounds.Max.X, yMax = (int)bounds.Max.Y;
+        for (int y = yMin; y < yMax; y++)
+        {
+            for (int x = xMin; x < xMax; x++)
+            {
+                if (image.GetPixel(x, y).A <= alphaThreshold) continue;
+                var p = new Vector2(x + 0.5f, y + 0.5f);
+                float d = DistancePointToSegment(p, endA, endB);
+                if (d > radius) radius = d;
+            }
+        }
+        // Half-pixel diagonal pad so the full pixel (not just its center) is enclosed.
+        radius += MathF.Sqrt(0.5f);
+
+        // Compare enclosing area; the circle already wraps every opaque
+        // pixel (Ritter), so prefer it when the capsule isn't tighter.
+        float circleArea = MathF.PI * circle.Radius * circle.Radius;
+        float capArea = MathF.PI * radius * radius + 2f * radius * (halfL * 2f);
+        return circleArea <= capArea
+            ? new CircleHitShape2D(circle.Center, circle.Radius)
+            : new CapsuleHitShape2D(endA, endB, radius);
+    }
+
+    private static float DistancePointToSegment(Vector2 p, Vector2 a, Vector2 b)
+    {
+        var ab = b - a;
+        var lenSq = ab.LengthSquared();
+        if (lenSq <= float.Epsilon) return Vector2.Distance(p, a);
+        var t = Vector2.Dot(p - a, ab) / lenSq;
+        if (t < 0f) t = 0f;
+        else if (t > 1f) t = 1f;
+        return Vector2.Distance(p, a + t * ab);
     }
 }
