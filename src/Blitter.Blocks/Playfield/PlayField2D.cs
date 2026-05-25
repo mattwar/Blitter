@@ -115,6 +115,15 @@ public class PlayField2D : Layer2D
     }
 
     /// <summary>
+    /// Adds multiple sprites to the playfield.
+    /// </summary>
+    public void AddSprites(IEnumerable<Sprite2D> sprites)
+    {
+        foreach (var s in sprites)
+            AddSprite(s);
+    }
+
+    /// <summary>
     /// Removes a sprite from the playfield. 
     /// Safe to call during <see cref="Update"/>; 
     /// the actual removal is deferred to end of frame.
@@ -212,6 +221,16 @@ public class PlayField2D : Layer2D
     {
     }
 
+    /// <summary>
+    /// Maximum number of physics substeps per frame. When the fastest
+    /// sprite would move more than half its hit radius in one frame,
+    /// the playfield runs the per-frame update loop multiple times
+    /// with proportionally smaller deltas so a fast circle can't
+    /// jump over a zero-width line barrier without some substep
+    /// catching the overlap. 1 disables substepping.
+    /// </summary>
+    public int MaxSubsteps { get; set; } = 8;
+
     /// <inheritdoc/>
     public override void Update(in UpdateContext2D context)
     {
@@ -220,82 +239,25 @@ public class PlayField2D : Layer2D
         // Substitute world bounds for the viewport when configured so
         // behaviors that consult context.Bounds (BounceInBounds2D,
         // edge-spawning, etc.) operate in world space.
-        var spriteContext = WorldBounds is Rect wb
+        var frameContext = WorldBounds is Rect wb
             ? context with { Bounds = wb }
             : context;
+
+        // Global substepping: every sprite and barrier gets the same
+        // number of substeps with the same per-substep dt, so frame
+        // determinism is preserved. Cost is 1 step in the common case.
+        var dt = (float)frameContext.ElapsedSinceLastUpdate.TotalSeconds;
+        int substeps = ComputeSubstepCount(dt);
+        var subContext = substeps > 1
+            ? frameContext with { ElapsedSinceLastUpdate = frameContext.ElapsedSinceLastUpdate / substeps }
+            : frameContext;
 
         _updating = true;
         try
         {
-            // Animated barriers (flippers, moving platforms, etc.) tick
-            // before sprites so this frame's sprite-vs-barrier pass sees
-            // the new geometry.
-            for (int i = 0; i < _barriers.Count; i++)
-                _barriers[i].Update(spriteContext);
-
-            for (int i = 0; i < _sprites.Count; i++)
+            for (int s = 0; s < substeps; s++)
             {
-                var sprite = _sprites[i];
-                if (!sprite.IsAlive)
-                    continue;
-                sprite.Update(spriteContext);
-            }
-
-            // sprite-vs-sprite collision
-            for (int i = 0; i < _sprites.Count; i++)
-            {
-                var a = _sprites[i];
-                if (!a.IsAlive || !a.CanBeHit)
-                    continue;
-                var aShape = a.HitShape;
-                if (aShape.BoundingCircle.Radius <= 0f)
-                    continue;
-
-                for (int j = i + 1; j < _sprites.Count; j++)
-                {
-                    if (!a.IsAlive)
-                        break;
-
-                    var b = _sprites[j];
-                    if (!b.IsAlive || !b.CanBeHit)
-                        continue;
-                    var bShape = b.HitShape;
-                    if (bShape.BoundingCircle.Radius <= 0f)
-                        continue;
-                    if (!aShape.TestHit(bShape))
-                        continue;
-
-                    a.OnHitSprite(b, spriteContext);
-                    if (a.IsAlive && b.IsAlive)
-                        b.OnHitSprite(a, spriteContext);
-                }
-            }
-
-            // sprite-vs-barrier collision
-            if (_barriers.Count > 0)
-            {
-                for (int s = 0; s < _sprites.Count; s++)
-                {
-                    var sprite = _sprites[s];
-                    if (!sprite.IsAlive || !sprite.CanBeHit)
-                        continue;
-                    var sc = sprite.HitCircle;
-                    if (sc.Radius <= 0f)
-                        continue;
-
-                    for (int k = 0; k < _barriers.Count; k++)
-                    {
-                        if (!sprite.IsAlive)
-                            break;
-                        var barrier = _barriers[k];
-                        // Re-read each time: the previous barrier handler
-                        // may have moved the sprite.
-                        if (!barrier.Intersects(sprite.HitCircle))
-                            continue;
-
-                        sprite.OnHitBarrier(barrier, spriteContext);
-                    }
-                }
+                RunOneStep(subContext);               
             }
         }
         finally
@@ -304,6 +266,121 @@ public class PlayField2D : Layer2D
         }
 
         ApplyPendingChanges();
+    }
+
+    // Estimate the substep count needed to keep the fastest sprite's
+    // per-substep displacement under half the smallest hit radius.
+    // Uses the sprite's current Speed as the velocity proxy — that's
+    // the value Motion2D will integrate during this frame.
+    private int ComputeSubstepCount(float dt)
+    {
+        if (dt <= 0f || MaxSubsteps <= 1)
+            return 1;
+
+        float maxStep = 0f;
+        float minRadius = float.PositiveInfinity;
+        for (int i = 0; i < _sprites.Count; i++)
+        {
+            var s = _sprites[i];
+            if (!s.IsAlive || !s.CanBeHit)
+                continue;
+            var r = s.HitCircle.Radius;
+            if (r <= 0f)
+                continue;
+            if (r < minRadius)
+                minRadius = r;
+            var step = MathF.Abs(s.Speed) * dt;
+            if (step > maxStep)
+                maxStep = step;
+        }
+
+        if (!float.IsFinite(minRadius) || minRadius <= 0f)
+            return 1;
+        var budget = 0.5f * minRadius;
+        if (maxStep <= budget)
+            return 1;
+        int n = (int)MathF.Ceiling(maxStep / budget);
+        return Math.Clamp(n, 1, MaxSubsteps);
+    }
+
+    private void RunOneStep(in UpdateContext2D spriteContext)
+    {
+        // Animated barriers (flippers, moving platforms, etc.) tick
+        // before sprites so this frame's sprite-vs-barrier pass sees
+        // the new geometry.
+        for (int i = 0; i < _barriers.Count; i++)
+            _barriers[i].Update(spriteContext);
+
+        for (int i = 0; i < _sprites.Count; i++)
+        {
+            var sprite = _sprites[i];
+            if (!sprite.IsAlive)
+                continue;
+            sprite.Update(spriteContext);
+        }
+
+        // sprite-vs-sprite collision
+        for (int i = 0; i < _sprites.Count; i++)
+        {
+            var a = _sprites[i];
+            if (!a.IsAlive || !a.CanBeHit)
+                continue;
+            var aShape = a.HitShape;
+            if (aShape.BoundingCircle.Radius <= 0f)
+                continue;
+
+            for (int j = i + 1; j < _sprites.Count; j++)
+            {
+                if (!a.IsAlive)
+                    break;
+
+                var b = _sprites[j];
+                if (!b.IsAlive || !b.CanBeHit)
+                    continue;
+                var bShape = b.HitShape;
+                if (bShape.BoundingCircle.Radius <= 0f)
+                    continue;
+                if (!aShape.TestHit(bShape))
+                    continue;
+
+                a.OnHitSprite(b, spriteContext);
+                if (a.IsAlive && b.IsAlive)
+                    b.OnHitSprite(a, spriteContext);
+            }
+        }
+
+        // sprite-vs-barrier collision
+        if (_barriers.Count > 0)
+        {
+            for (int s = 0; s < _sprites.Count; s++)
+            {
+                var sprite = _sprites[s];
+                if (!sprite.IsAlive || !sprite.CanBeHit)
+                    continue;
+                var sc = sprite.HitCircle;
+                if (sc.Radius <= 0f)
+                    continue;
+
+                for (int k = 0; k < _barriers.Count; k++)
+                {
+                    if (!sprite.IsAlive)
+                        break;
+                    var barrier = _barriers[k];
+                    // Re-read each time: the previous barrier handler
+                    // may have moved the sprite.
+                    if (!barrier.Intersects(sprite.HitCircle))
+                        continue;
+
+                    // Barrier reacts first so any state change it
+                    // makes (re-arming, lowering a drop target,
+                    // swapping its Material) is visible to the
+                    // sprite's bounce resolution on the same frame.
+                    barrier.OnHitSprite(sprite, spriteContext);
+                    if (sprite.IsAlive)
+                        sprite.OnHitBarrier(barrier, spriteContext);
+                }
+            }
+        }
     }
 
     // Folds dead sprites, pending removes, and pending adds into the
@@ -357,6 +434,11 @@ public class PlayField2D : Layer2D
     protected override void DrawContent(Renderer2D renderer)
     {
         DrawBackground(renderer);
+
+        // Barriers draw behind sprites so the ball, paddle, etc. sit
+        // on top of bumpers, flippers, and other props.
+        for (int i = 0; i < _barriers.Count; i++)
+            _barriers[i].Draw(renderer);
 
         for (int i = 0; i < _sprites.Count; i++)
         {

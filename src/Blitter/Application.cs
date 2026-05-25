@@ -53,6 +53,31 @@ public class Application : IDisposable
     /// </summary>
     public bool IsShutdown => _disposed;
 
+    private bool _suppressAccessibilityShortcuts;
+
+    /// <summary>
+    /// When set to <c>true</c>, suppresses the OS-level accessibility
+    /// shortcut hotkeys (Sticky Keys, Filter Keys, Toggle Keys on
+    /// Windows) so they don't hijack input during gameplay. The
+    /// original system state is captured the first time this is set
+    /// and restored when set back to <c>false</c> or when the
+    /// application shuts down. No-op on non-Windows platforms.
+    /// </summary>
+    public bool SuppressAccessibilityShortcuts
+    {
+        get => _suppressAccessibilityShortcuts;
+        set
+        {
+            if (value == _suppressAccessibilityShortcuts) return;
+            _suppressAccessibilityShortcuts = value;
+            if (OperatingSystem.IsWindows())
+            {
+                if (value) WindowsAccessibility.Disable();
+                else WindowsAccessibility.Restore();
+            }
+        }
+    }
+
     private readonly TaskCompletionSource _shutdownTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -85,6 +110,9 @@ public class Application : IDisposable
 
         if (Interlocked.CompareExchange(ref _disposed, true, false) == false)
         {
+            if (_suppressAccessibilityShortcuts && OperatingSystem.IsWindows())
+                WindowsAccessibility.Restore();
+
             foreach (var window in _windows)
             {
                 window.Dispose();
@@ -657,6 +685,22 @@ public class Application : IDisposable
             case SDL.EventType.KeyboardAdded:
             case SDL.EventType.KeyboardRemoved:
             case SDL.EventType.TextEditingCandidates:
+                break;
+
+            // audio device events. SDL invalidates streams bound to
+            // a removed device internally; if we keep using their ids
+            // we hit ExecutionEngineException deep inside SDL native
+            // code (PutAudioStreamData, SetAudioStreamGain, etc.).
+            // Route to Audio so it can tear the shared device down
+            // and reopen on next play. Format-changed is informational
+            // only — SDL keeps streams alive across format changes.
+            case SDL.EventType.AudioDeviceRemoved:
+                if (!e.ADevice.Recording)
+                    Audio.OnPlaybackDeviceLost(e.ADevice.Which);
+                break;
+            case SDL.EventType.AudioDeviceFormatChanged:
+                break;
+            case SDL.EventType.AudioDeviceAdded:
                 break;
 
             // window events
