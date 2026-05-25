@@ -63,6 +63,7 @@ public class AudioStream : IDisposable
     {
         if (!IsDisposed)
         {
+            AudioThread.Assert();
             var id = Interlocked.Exchange(ref _streamId, 0);
             if (id != 0)
             {
@@ -89,17 +90,23 @@ public class AudioStream : IDisposable
     {
         get
         {
-            return IsDisposed 
+            AudioThread.Assert();
+            var id = _streamId;
+            return id == 0
                 ? 0f
-                : SDL.GetAudioStreamGain(_streamId);
+                : SDL.GetAudioStreamGain(id);
         }
         set
         {
             if (value < 0.0f || value > 1.0f)
                 throw new ArgumentOutOfRangeException(nameof(value), "Volume must be between 0.0 and 1.0");
-            if (!IsDisposed)
+            AudioThread.Assert();
+            // Snapshot the id once so a concurrent Dispose can't zero
+            // it between the guard and the SDL call.
+            var id = _streamId;
+            if (id != 0)
             {
-                SDL.SetAudioStreamGain(_streamId, value);
+                SDL.SetAudioStreamGain(id, value);
             }
         }
     }
@@ -108,9 +115,11 @@ public class AudioStream : IDisposable
     {
         get
         {
-            return IsDisposed
+            AudioThread.Assert();
+            var id = _streamId;
+            return id == 0
                 ? 0
-                : SDL.GetAudioStreamQueued(_streamId);
+                : SDL.GetAudioStreamQueued(id);
         }
     }
 
@@ -121,18 +130,22 @@ public class AudioStream : IDisposable
     {
         get
         {
-            return IsDisposed
+            AudioThread.Assert();
+            var id = _streamId;
+            return id == 0
                 ? true
-                : SDL.AudioStreamDevicePaused(_streamId);
+                : SDL.AudioStreamDevicePaused(id);
         }
         set
         {
-            if (IsDisposed)
+            AudioThread.Assert();
+            var id = _streamId;
+            if (id == 0)
                 return;
             if (value)
-                SDL.PauseAudioStreamDevice(_streamId);
+                SDL.PauseAudioStreamDevice(id);
             else
-                SDL.ResumeAudioStreamDevice(_streamId);
+                SDL.ResumeAudioStreamDevice(id);
         }
     }
 
@@ -142,9 +155,11 @@ public class AudioStream : IDisposable
     /// <exception cref="ObjectDisposedException"></exception>
     public void Clear()
     {
-        if (IsDisposed)
+        AudioThread.Assert();
+        var id = _streamId;
+        if (id == 0)
             return;
-        SDL.ClearAudioStream(_streamId);
+        SDL.ClearAudioStream(id);
     }
 
     /// <summary>
@@ -152,9 +167,11 @@ public class AudioStream : IDisposable
     /// </summary>
     public void Flush()
     {
-        if (IsDisposed)
+        AudioThread.Assert();
+        var id = _streamId;
+        if (id == 0)
             return;
-        SDL.FlushAudioStream(_streamId);
+        SDL.FlushAudioStream(id);
     }
 
     /// <summary>
@@ -162,12 +179,20 @@ public class AudioStream : IDisposable
     /// </summary>
     public void Queue(Sound data)
     {
+        AudioThread.Assert();
+        // Snapshot the id once so a concurrent Dispose() can't zero it
+        // between our IsDisposed check and the SDL call below. SDL
+        // copies the bytes into its own queue before returning, so the
+        // `fixed` pin only needs to hold for the duration of the call.
+        var id = _streamId;
+        if (id == 0)
+            return;
         unsafe
         {
             var span = data.Data.Span;
             fixed (byte* pData = span)
             {
-                SDL.PutAudioStreamData(_streamId, (nint)pData, span.Length);
+                SDL.PutAudioStreamData(id, (nint)pData, span.Length);
             }
         }
     }

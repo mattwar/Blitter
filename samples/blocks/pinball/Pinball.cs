@@ -20,6 +20,8 @@ using Blitter.Blocks;
 
 using SkiaSharp;
 
+//Audio.Enabled = false;
+
 const int W = 720;
 const int H = 960;
 
@@ -33,7 +35,7 @@ var plungerSpawn = new Vector2(W / 2f, 70f);
 
 var window = new Window2D(W, H)
 {
-    Title = "Pinball — Space drop, Shift flippers, Esc quit",
+    Title = "Pinball Blaster",
     BackgroundColor = new Color(8, 12, 24),
     FullScreen = true,
     CloseKey = Key.Escape,

@@ -1,11 +1,12 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 
 namespace Blitter.Devices;
 
 /// <summary>
 /// An opened audio device that can play audio streams.
 /// </summary>
-public class LogicalPlaybackDevice : AudioPlaybackDevice
+public class LogicalPlaybackDevice : AudioPlaybackDevice, IDisposable
 {
     private ImmutableList<AudioStream> _streams = ImmutableList<AudioStream>.Empty;
 
@@ -20,15 +21,24 @@ public class LogicalPlaybackDevice : AudioPlaybackDevice
     {
         if (!IsDisposed)
         {
-            var id = Interlocked.Exchange(ref _deviceId, 0);
-            if (id != 0)
+            // Acquire the pool lock so we can't tear down a stream
+            // that another thread is mid-call against inside
+            // PlayAsync. Without this, a parallel
+            // SetAudioStreamGain / PutAudioStreamData on a stream we
+            // just destroyed crashes the CLR with
+            // ExecutionEngineException.
+            lock (_poolLock)
             {
-                foreach (var stream in _streams)
+                var id = Interlocked.Exchange(ref _deviceId, 0);
+                if (id != 0)
                 {
-                    stream.Dispose();
-                }
+                    foreach (var stream in _streams)
+                    {
+                        stream.Dispose();
+                    }
 
-                SDL.CloseAudioDevice(id);
+                    SDL.CloseAudioDevice(id);
+                }
             }
         }
     }
@@ -54,12 +64,10 @@ public class LogicalPlaybackDevice : AudioPlaybackDevice
     }
 
     /// <summary>
-    /// The user-facing master volume of the audio device, from 0.0
-    /// (silent) to 1.0 (full volume). The actual SDL device gain
-    /// also has an automatic attenuation applied that scales with
-    /// the number of concurrent streams (equal-loudness 1/sqrt(N)
-    /// mix law), so several overlapping plays don't sum to a
-    /// clipping signal.
+    /// The user-facing master volume of the audio device, from 0.0 (silent) to 1.0 (full volume). 
+    /// The actual SDL device gain also has an automatic attenuation applied that scales with
+    /// the number of concurrent streams (equal-loudness 1/sqrt(N) mix law), 
+    /// so several overlapping plays don't sum to a clipping signal.
     /// </summary>
     public override float Volume
     {
@@ -77,9 +85,29 @@ public class LogicalPlaybackDevice : AudioPlaybackDevice
 
     private void ApplyEffectiveGain()
     {
+        AudioThread.Assert();
         if (_deviceId == 0)
             return;
-        var count = Math.Max(1, _streams.Count);
+        // Count slots that are still within their known playback
+        // window. SDL's queued-byte counts are unreliable for this
+        // (the same shortcoming that forced PlayAsync's
+        // known-duration scheduling in the first place), so we trust
+        // the slot's own busy-until timestamp set when its play was
+        // queued.
+        int active = 0;
+        long now = Stopwatch.GetTimestamp();
+        lock (_poolLock)
+        {
+            foreach (var bucket in _pool.Values)
+            {
+                for (int i = 0; i < bucket.Count; i++)
+                {
+                    if (bucket[i].BusyUntilTicks > now)
+                        active++;
+                }
+            }
+        }
+        var count = Math.Max(1, active);
         var gain = _userVolume / MathF.Sqrt(count);
         lock (_gainLock)
         {
@@ -95,27 +123,185 @@ public class LogicalPlaybackDevice : AudioPlaybackDevice
     }
 
     /// <summary>
+    /// Maximum number of pooled streams kept alive for fire-and-forget <see cref="PlayAsync"/>. 
+    /// Each distinct <see cref="AudioSpec"/> shares this cap. 
+    /// Pool slots are created lazily and never destroyed until the device itself disposes.
+    /// </summary>
+    public int PoolCapacity { get; set; } = 8;
+
+    /// <summary>
+    /// True when no pooled stream is currently within its known playback window. 
+    /// Used by <see cref="Audio"/> to defer disruptive rotation until ongoing sounds 
+    /// (long tracks like background music) have finished, so a rotation never cuts
+    /// audible audio.
+    /// </summary>
+    public bool IsQuiescent
+    {
+        get
+        {
+            long now = Stopwatch.GetTimestamp();
+            lock (_poolLock)
+            {
+                foreach (var bucket in _pool.Values)
+                {
+                    for (int i = 0; i < bucket.Count; i++)
+                    {
+                        if (bucket[i].BusyUntilTicks > now)
+                            return false;
+                    }
+                }
+            }
+            return true;
+        }
+    }
+
+    private sealed class PoolSlot
+    {
+        public required AudioStream Stream { get; init; }
+        // Stopwatch timestamp at/after which this slot is considered
+        // idle and free to reuse. Time-based rather than
+        // SDL_GetAudioStreamQueued-based because SDL3's queued-byte
+        // reporting can lag (or never reach zero) after a stream
+        // drains — the same issue that makes its completion callback
+        // unreliable.
+        public long BusyUntilTicks;
+        // Last gain value we wrote to this stream via SDL. Reused so
+        // we can skip redundant SDL_SetAudioStreamGain calls when the
+        // caller plays the same sound at the same volume repeatedly.
+        // The audio thread continuously reads the stream, so every
+        // gain write is a thread-race with SDL's mixer — minimizing
+        // them is both faster and safer.
+        public float LastVolume = float.NaN;
+    }
+
+    private readonly Dictionary<AudioSpec, List<PoolSlot>> _pool = new();
+    // Per-bucket round-robin cursor. Idle-slot search starts here so
+    // we spread plays evenly across the pool instead of hammering
+    // the first slot. Concentrated reuse on a single slot ages it
+    // disproportionately and exposes whatever per-stream rot SDL3
+    // accumulates.
+    private readonly Dictionary<AudioSpec, int> _poolCursor = new();
+    private readonly object _poolLock = new();
+    private int _pooledCount;
+
+    /// <summary>
     /// Play the specified audio data on the device.
     /// </summary>
     public override Task PlayAsync(Sound data, float volume = 1f)
     {
-        var stream = CreateStream(data.Spec);
-        stream.Volume = Math.Clamp(volume, 0f, 1f);
-        stream.Queue(data);
-        stream.Paused = false;
-
-        // SDL's "get more data" callback stops firing once the queue drains,
-        // so we can't reliably observe playback completion through it. Wait
-        // for the known length of the sample instead. A small slack covers
-        // SDL's own device-side buffer that keeps playing after the stream's
-        // queue hits zero.
+        AudioThread.Assert();
         var duration = GetPlaybackDuration(data);
         var slack = TimeSpan.FromMilliseconds(50);
-        return Task.Delay(duration + slack).ContinueWith(_ =>
+        var busyTicks = (long)((duration + slack).TotalSeconds * Stopwatch.Frequency);
+
+        AudioStream stream;
+        lock (_poolLock)
         {
-            if (!stream.IsDisposed)
-                stream.Dispose();
-        }, TaskScheduler.Default);
+            if (_deviceId == 0)
+                throw new InvalidOperationException("Device is disposed.");
+
+            if (!_pool.TryGetValue(data.Spec, out var bucket))
+            {
+                bucket = new List<PoolSlot>();
+                _pool[data.Spec] = bucket;
+            }
+
+            long now = Stopwatch.GetTimestamp();
+
+            // Find a slot whose busy-until window has elapsed,
+            // starting from the round-robin cursor so reuse spreads
+            // across the bucket.
+            PoolSlot? slot = null;
+            int n = bucket.Count;
+            if (n > 0)
+            {
+                _poolCursor.TryGetValue(data.Spec, out int cursor);
+                for (int k = 0; k < n; k++)
+                {
+                    int i = (cursor + k) % n;
+                    var s = bucket[i];
+                    if (!s.Stream.IsDisposed && s.BusyUntilTicks <= now)
+                    {
+                        slot = s;
+                        _poolCursor[data.Spec] = (i + 1) % n;
+                        break;
+                    }
+                }
+            }
+
+            if (slot == null)
+            {
+                if (_pooledCount < PoolCapacity)
+                {
+                    // Pool isn't full yet for this device — add a new
+                    // slot. New streams stay bound for the device's
+                    // lifetime; subsequent plays reuse them.
+                    var newStream = CreateStream(data.Spec);
+                    slot = new PoolSlot { Stream = newStream };
+                    bucket.Add(slot);
+                    _pooledCount++;
+                    // SDL opens devices unpaused by default, but call
+                    // resume defensively at first-slot creation. Pause
+                    // is per-device, not per-stream, so calling it on
+                    // every play is wasted SDL work.
+                    newStream.Paused = false;
+                }
+                else
+                {
+                    // Pool full and every slot is still mid-play.
+                    // Rather than going silent, steal the slot whose
+                    // remaining window is shortest — its tail gets
+                    // cut off but the new play is heard. Keeps audio
+                    // responsive during sustained bursts.
+                    long minBusy = long.MaxValue;
+                    for (int i = 0; i < bucket.Count; i++)
+                    {
+                        var s = bucket[i];
+                        if (s.Stream.IsDisposed) continue;
+                        if (s.BusyUntilTicks < minBusy)
+                        {
+                            minBusy = s.BusyUntilTicks;
+                            slot = s;
+                        }
+                    }
+                    if (slot == null)
+                        return Task.CompletedTask;
+                    // Trim any leftover queue bytes before re-queuing
+                    // so the new sound starts cleanly.
+                    slot.Stream.Clear();
+                }
+            }
+
+            slot.BusyUntilTicks = now + busyTicks;
+            stream = slot.Stream;
+
+            // Configure under the pool lock so concurrent plays can't
+            // both claim the same idle slot and trample each other's
+            // queue contents mid-write. Skip the gain write when it
+            // hasn't changed since the slot's last play — every
+            // SDL_SetAudioStreamGain races with SDL's audio thread
+            // reading the stream, and most plays use the same volume.
+            var clampedVolume = Math.Clamp(volume, 0f, 1f);
+            if (clampedVolume != slot.LastVolume)
+            {
+                stream.Volume = clampedVolume;
+                slot.LastVolume = clampedVolume;
+            }
+            stream.Queue(data);
+        }
+
+        ApplyEffectiveGain();
+
+        // The returned task completes when this play's busy window
+        // ends. We deliberately do NOT recompute the 1/sqrt(N) mix
+        // gain on completion — the next play recomputes it from its
+        // own start-of-play call (slots whose BusyUntilTicks have
+        // elapsed are excluded), so the only audible difference is
+        // that the first play after a long silence is mixed against
+        // the trailing attenuation from the prior burst. That's
+        // both inaudible in practice and avoids half the
+        // SDL_SetAudioDeviceGain traffic.
+        return Task.Delay(duration + slack);
     }
 
     private static TimeSpan GetPlaybackDuration(Sound data)
@@ -139,6 +325,7 @@ public class LogicalPlaybackDevice : AudioPlaybackDevice
 
     public AudioStream CreateStream(AudioSpec sourceSpec, AudioDataRequested? onDataRequested = null)
     {
+        AudioThread.Assert();
         var destSpec = this.Spec;
         if ((uint)destSpec.Format == 0)
             throw new InvalidOperationException(

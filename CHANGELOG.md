@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `Audio.DeviceRotationPlayCount` periodically tears down and reopens
+  the SDL audio subsystem to work around an SDL3/WASAPI heap crash
+  inside `PutAudioStreamData` during sustained playback. Rotation is
+  deferred until the device is quiescent so ongoing sounds aren't cut.
 - `Application.SuppressAccessibilityShortcuts` disables the Windows
   Sticky/Filter/Toggle Keys hotkeys for the lifetime of the app so
   Shift×5 and right-Shift-hold don't interrupt gameplay. No-op on
@@ -55,6 +59,11 @@ All notable changes to this project will be documented in this file.
   physical material) instead of stuffing it into untyped slots.
 - `SwingArmBarrier2D` is no longer sealed; subclass to override
   `Draw` with a custom flipper visual.
+- `Audio.PlayAsync` now reuses a pool of long-lived SDL audio
+  streams (one per `AudioSpec`, up to 32 total) instead of creating
+  and destroying a stream per play. Eliminates SDL stream-lifecycle
+  churn that could cause heap corruption after long sessions with
+  many concurrent sound effects.
 
 ### Removed
 - `Barrier2D.Tag` and `Barrier2D.UserData`, and the `OnlyTag`

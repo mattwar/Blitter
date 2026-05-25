@@ -687,6 +687,22 @@ public class Application : IDisposable
             case SDL.EventType.TextEditingCandidates:
                 break;
 
+            // audio device events. SDL invalidates streams bound to
+            // a removed device internally; if we keep using their ids
+            // we hit ExecutionEngineException deep inside SDL native
+            // code (PutAudioStreamData, SetAudioStreamGain, etc.).
+            // Route to Audio so it can tear the shared device down
+            // and reopen on next play. Format-changed is informational
+            // only — SDL keeps streams alive across format changes.
+            case SDL.EventType.AudioDeviceRemoved:
+                if (!e.ADevice.Recording)
+                    Audio.OnPlaybackDeviceLost(e.ADevice.Which);
+                break;
+            case SDL.EventType.AudioDeviceFormatChanged:
+                break;
+            case SDL.EventType.AudioDeviceAdded:
+                break;
+
             // window events
             case SDL.EventType.WindowCloseRequested:
             case SDL.EventType.WindowDestroyed:
