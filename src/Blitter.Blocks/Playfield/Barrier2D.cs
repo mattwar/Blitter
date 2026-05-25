@@ -19,10 +19,36 @@ public abstract class Barrier2D
     public abstract bool Intersects(BoundingCircle circle);
 
     /// <summary>
-    /// Per-frame hook for animated barriers (flippers, moving platforms,
-    /// rotating obstacles). Called by the playfield before the sprite
-    /// update and collision passes, so updated geometry is what sprites
-    /// collide against this frame. Default is no-op.
+    /// Called by <see cref="PlayField2D"/> once per tick.
+    /// Useful for barriers that are animated or have variable properties over time.
     /// </summary>
     public virtual void Update(in UpdateContext2D context) { }
+
+    /// <summary>
+    /// Render this barrier.
+    /// By default, barriers don't have a visual representation.
+    /// </summary>
+    public virtual void Draw(Renderer2D renderer) { }
+
+    /// <summary>
+    /// Called when the <paramref name="hitter"/> collided with this barrier.
+    /// </summary>
+    public virtual void OnHitSprite(Sprite2D hitter, in UpdateContext2D context) { }
+
+    /// <summary>
+    /// Physical character of this barrier (elasticity, friction, kick).
+    /// Read by <see cref="BarrierBounce2D"/> and composed with the
+    /// behavior's ball-side knobs to determine each bounce. Default is
+    /// <see cref="BarrierMaterial.Ideal"/>.
+    /// </summary>
+    public virtual BarrierMaterial Material { get; set; } = BarrierMaterial.Ideal;
+
+    /// <summary>
+    /// Surface velocity at <paramref name="point"/> in world units per
+    /// second. Animated barriers (flippers, moving platforms) override
+    /// to add their motion to the bounce. Default returns
+    /// <see cref="System.Numerics.Vector2.Zero"/>.
+    /// </summary>
+    public virtual System.Numerics.Vector2 SurfaceVelocityAt(System.Numerics.Vector2 point)
+        => System.Numerics.Vector2.Zero;
 }

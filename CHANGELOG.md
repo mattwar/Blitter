@@ -5,30 +5,60 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `Application.SuppressAccessibilityShortcuts` disables the Windows
+  Sticky/Filter/Toggle Keys hotkeys for the lifetime of the app so
+  Shift×5 and right-Shift-hold don't interrupt gameplay. No-op on
+  non-Windows platforms; original system state is restored on
+  shutdown.
+- `SwingArmBarrier2D.OnPressed` / `OnReleased` virtual callbacks fire
+  on edge transitions of `Pressed` for play-sound / particle hooks.
 - `CircleBarrier2D` in `Blitter.Blocks`: a circular barrier for
   pinball bumpers, posts, and rounded corners.
-- `BounceAtBarrier2D` behavior reflects sprite velocity off
+- `BarrierBounce2D` behavior reflects sprite velocity off
   `LineBarrier2D` and `CircleBarrier2D` with configurable
   `Restitution` and `TangentialDamping` plus an `OnBounce` callback.
-- `FlipperBarrier2D` in `Blitter.Blocks`: a pivoted capsule barrier
+- `SwingArmBarrier2D` in `Blitter.Blocks`: a pivoted capsule barrier
   that swings between a rest angle and an active angle. Toggle
-  `Pressed` from input each frame; `BounceAtBarrier2D` reads its
+  `Pressed` from input each frame; `BarrierBounce2D` reads its
   angular velocity and kicks the ball off the moving surface.
 - `Barrier2D.Update(in UpdateContext2D)` virtual hook lets animated
   barriers (flippers, moving platforms) tick before each frame's
   collision pass. Default is a no-op.
+- `Barrier2D.Draw(Renderer2D)` virtual lets a barrier render itself;
+  `PlayField2D` draws barriers between background and sprites.
+  Default is a no-op, so collision-only barriers cost nothing.
+- `Barrier2D.OnHitSprite(Sprite2D, in UpdateContext2D)` virtual fires
+  before the sprite resolves contact, so state changes affect this
+  frame's bounce. For score, sound, flash, or drop-target reactions.
+  Default is a no-op.
+- `BarrierMaterial` record struct + `Barrier2D.Material` virtual:
+  per-barrier elasticity, friction, and active kick speed. Presets
+  for `Ideal`, `Metal`, `Wood`, `Concrete`, `Dirt`, `Grass`, `Sand`,
+  `Rubber`, `Felt`, `Pillow`, `Ice`, `OilSlick`, and `Trampoline`.
+  `BarrierBounce2D` composes the ball-side knobs with the barrier
+  material.
+- `Barrier2D.SurfaceVelocityAt(Vector2)` virtual generalizes the
+  flipper's moving-surface kick so any animated barrier can
+  participate in the bounce. Default returns zero.
 - `Pinball` sample: a bagatelle-style cabinet with bumpers,
   slingshots, two shift-controlled flippers, and a procedurally-drawn
   chrome ball (SkiaSharp radial gradient — no asset files).
 
 ### Changed
+- `PlayField2D` runs adaptive global substepping for sprite
+  collisions: when the fastest sprite would move more than half its
+  hit radius in one frame, the per-frame update loop runs N times
+  with `dt/N` so a fast circle can't tunnel through a zero-width
+  `LineBarrier2D`. Cap with `PlayField2D.MaxSubsteps` (default 8).
 - `LineBarrier2D` and `CircleBarrier2D` are no longer sealed.
   Subclass them to carry typed data (display tint, score value,
   physical material) instead of stuffing it into untyped slots.
+- `SwingArmBarrier2D` is no longer sealed; subclass to override
+  `Draw` with a custom flipper visual.
 
 ### Removed
 - `Barrier2D.Tag` and `Barrier2D.UserData`, and the `OnlyTag`
-  filters on `StopAtBarrier2D` and `BounceAtBarrier2D`. Subclass
+  filters on `BarrierStop2D` and `BarrierBounce2D`. Subclass
   the barrier types instead — game-specific intent belongs in
   game-specific types.
 - `tag:` parameters on `LineBarrier2D.Floor` / `Ceiling` /

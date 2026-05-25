@@ -4,17 +4,18 @@ namespace Blitter.Blocks;
 
 /// <summary>
 /// On contact with a barrier, snaps the sprite out of penetration along
-/// the contact normal and reflects velocity scaled by
-/// <see cref="Restitution"/>. The pinball counterpart to
-/// <see cref="StopAtBarrier2D"/>. Handles <see cref="LineBarrier2D"/>
-/// and <see cref="CircleBarrier2D"/>.
+/// the contact normal and reflects velocity. Final bounce composes the
+/// behavior's ball-side <see cref="Restitution"/> /
+/// <see cref="TangentialDamping"/> with the barrier's
+/// <see cref="Barrier2D.Material"/>. Handles <see cref="LineBarrier2D"/>,
+/// <see cref="CircleBarrier2D"/>, and <see cref="SwingArmBarrier2D"/>.
 /// </summary>
-public sealed class BounceAtBarrier2D : SpriteBehavior2D
+public sealed class BarrierBounce2D : SpriteBehavior2D
 {
-    /// <summary>Normal-component velocity scale after reflection. 1 = perfectly elastic, 0 = no bounce (matches <see cref="StopAtBarrier2D"/>).</summary>
+    /// <summary>Ball-side elastic coefficient. Multiplied with the barrier's <see cref="BarrierMaterial.Restitution"/>. 1 = perfectly elastic, 0 = sticks.</summary>
     public float Restitution { get; set; } = 1f;
 
-    /// <summary>Tangent-component velocity scale after reflection. Below 1 simulates surface friction.</summary>
+    /// <summary>Ball-side tangent velocity retention. Multiplied with <c>(1 - barrier.Material.Friction)</c>. 1 = frictionless ball, &lt; 1 = ball-side surface drag.</summary>
     public float TangentialDamping { get; set; } = 1f;
 
     /// <summary>Called after a successful bounce. Args: sprite, barrier, contact normal.</summary>
@@ -28,14 +29,12 @@ public sealed class BounceAtBarrier2D : SpriteBehavior2D
         if (penetration > 0f)
             self.Center += normal * penetration;
 
-        // Moving barriers (flippers, etc.) contribute their surface
-        // velocity to the bounce so they actually kick the ball
-        // instead of just elastically reflecting it. Stationary
-        // barriers report zero, so this collapses to the
-        // textbook reflection.
-        var vSurface = barrier is FlipperBarrier2D flipper
-            ? flipper.SurfaceVelocityAt(self.Center - normal * self.HitCircle.Radius)
-            : Vector2.Zero;
+        // Surface velocity at the contact point. Stationary barriers
+        // report zero so this collapses to the textbook reflection;
+        // moving barriers (flippers, etc.) contribute their motion.
+        var contactPoint = self.Center - normal * self.HitCircle.Radius;
+        var vSurface = barrier.SurfaceVelocityAt(contactPoint);
+        var mat = barrier.Material;
 
         var vBall = Sprite2D.GetVelocity(self.Speed, self.Heading);
         var vRel = vBall - vSurface;
@@ -44,8 +43,15 @@ public sealed class BounceAtBarrier2D : SpriteBehavior2D
         {
             var vN = normal * along;
             var vT = vRel - vN;
-            vRel = vT * TangentialDamping - vN * Restitution;
+            // Compose ball-side and barrier-side material: behavior
+            // values are the ball's defaults, barrier values modulate
+            // them per-surface.
+            var normalScale = Restitution * mat.Restitution;
+            var tangentMul = TangentialDamping * (1f - mat.Friction);
+            vRel = vT * tangentMul - vN * normalScale;
             vBall = vRel + vSurface;
+            if (mat.KickSpeed != 0f)
+                vBall += normal * mat.KickSpeed;
             (self.Speed, self.Heading) = Sprite2D.GetSpeedAndHeading(vBall);
         }
 
@@ -97,12 +103,12 @@ public sealed class BounceAtBarrier2D : SpriteBehavior2D
                 penetration = (disc.Radius + radius) - dist;
                 return true;
             }
-            case FlipperBarrier2D flipper:
+            case SwingArmBarrier2D flipper:
             {
                 // Capsule = closest-point-on-segment + fat radius. Same
                 // math as the line case but with the flipper's capsule
                 // radius folded into the combined collision radius.
-                var (closest, _) = FlipperBarrier2D.ClosestPointOnSegment(
+                var (closest, _) = SwingArmBarrier2D.ClosestPointOnSegment(
                     flipper.Pivot, flipper.Tip, center);
                 var delta = center - closest;
                 var distSq = Vector2.Dot(delta, delta);

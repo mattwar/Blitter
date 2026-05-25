@@ -9,7 +9,7 @@ namespace Blitter.Blocks;
 /// (sliding along the barrier) is preserved, so this works for floors,
 /// walls, and ceilings simultaneously.
 /// </summary>
-public sealed class StopAtBarrier2D : SpriteBehavior2D
+public sealed class BarrierStop2D : SpriteBehavior2D
 {
     /// <summary>
     /// True while the sprite is resting on a floor (a barrier whose
