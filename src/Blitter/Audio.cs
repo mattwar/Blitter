@@ -180,10 +180,10 @@ public static class Audio
                     // Synchronous on the app thread: dispose the
                     // device, bounce the subsystem refcount to zero
                     // so SDL discards accumulated audio state, then
-                    // reinit. The play that triggered rotation gets
-                    // dropped — its target device is about to be
-                    // destroyed — but subsequent plays open a fresh
-                    // device transparently via GetSharedPlaybackDevice.
+                    // reinit and play on the fresh device. Rotation
+                    // still waits for quiescence, so no audible tail
+                    // is cut, but the play that happened to arrive at
+                    // the first idle moment is no longer dropped.
                     toDispose.Dispose();
                     if (_audioSubsystemInitialized)
                     {
@@ -191,7 +191,7 @@ public static class Audio
                         _audioSubsystemInitialized = false;
                     }
                     EnsureInit();
-                    return Task.CompletedTask;
+                    device = GetSharedPlaybackDevice();
                 }
             }
         }
