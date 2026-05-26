@@ -18,6 +18,22 @@ public sealed class Sound
     public AudioSpec Spec { get; }
     public ReadOnlyMemory<byte> Data { get; }
 
+    /// <summary>
+    /// The playback duration of this sound based on its PCM data and format.
+    /// </summary>
+    public TimeSpan Duration
+    {
+        get
+        {
+            int bitsPerSample = (int)((uint)Spec.Format & 0xFF);
+            int bytesPerFrame = Math.Max(1, (bitsPerSample / 8) * Math.Max(1, Spec.Channels));
+            int frames = Data.Length / bytesPerFrame;
+            if (Spec.Frequency <= 0)
+                return TimeSpan.Zero;
+            return TimeSpan.FromSeconds((double)frames / Spec.Frequency);
+        }
+    }
+
     public Sound(AudioSpec spec, ReadOnlyMemory<byte> data)
     {
         this.Spec = spec;

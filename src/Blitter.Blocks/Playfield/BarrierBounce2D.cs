@@ -82,9 +82,22 @@ public sealed class BarrierBounce2D : SpriteBehavior2D
                     closest = line.Start + ab * t;
                 }
                 var delta = center - closest;
-                var dist = MathF.Sqrt(Vector2.Dot(delta, delta));
-                normal = line.Normal;
-                penetration = radius - dist;
+                var distSq = Vector2.Dot(delta, delta);
+                if (distSq <= float.Epsilon)
+                {
+                    // Sprite center sits exactly on the segment: no
+                    // unambiguous side. Fall back to the winding-derived
+                    // normal so the bounce still resolves consistently.
+                    normal = line.Normal;
+                }
+                else
+                {
+                    // Contact normal points from the surface toward the
+                    // sprite, so two-sided segments bounce correctly from
+                    // either side.
+                    normal = delta / MathF.Sqrt(distSq);
+                }
+                penetration = radius - MathF.Sqrt(distSq);
                 return true;
             }
             case CircleBarrier2D disc:

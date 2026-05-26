@@ -12,6 +12,7 @@ using System.Numerics;
 using Blitter;
 using Blitter.Bits;
 using Blitter.Blocks;
+using SkiaSharp;
 
 // Fixed design surface. The renderer letterboxes this into whatever
 // the actual window size is, so the playfield stays a constant
@@ -71,6 +72,8 @@ var gameOverDuration = TimeSpan.FromSeconds(3);
 var rocketImage = Bitmap.Load(Asset.GetPathRelativeToCaller("rocket.png"));
  // make rocket's background transparent
 rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0));
+var flameImage = Bitmap.Load(Asset.GetPathRelativeToCaller("flame.png"));
+flameImage.SetAlpha(0, flameImage.GetPixel(0, 0));
 
 // create meteor field - small static obstacles for the rocket to hit
 var asteroidImage = Bitmap.Load(Asset.GetPathRelativeToCaller("asteroid.png"));
@@ -88,6 +91,7 @@ Asteroid.Particles = debrisParticles;
 var rocket = new Rocket
 {
     Visual = rocketImage,
+    FlameVisual = flameImage,
     Center = new Vector2(WorldW / 2f, WorldH / 2f),
     Scale = 0.1f,
     Speed = 600f,
@@ -346,6 +350,21 @@ static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
 
 sealed class Rocket : Sprite2D
 {
+    public Visual2D? FlameVisual { get; set; }
+
+    public TimeSpan FlameUntil { get; private set; }
+    public bool IsFlameVisible => Age < FlameUntil;
+
+    public TimeSpan ShieldUntil { get; private set; }
+    public bool IsShieldVisible => Age < ShieldUntil;
+
+    private const int ShieldVisualSize = 256;
+    private const float ShieldDrawDiameterScale = 2.35f;
+
+    // Pre-painted shield image, created once and reused every frame.
+    // The image is oriented nose-up (heading=0) and rotated in Draw().
+    private static readonly Visual2D ShieldVisual = MakeShieldVisual(ShieldVisualSize);
+
     // Set by SmashAsteroidBehavior on a radioactive hit. While
     // Age < StunUntil the rocket spins freely, ignores input, and
     // bounces off asteroids instead of smashing them.
@@ -386,6 +405,173 @@ sealed class Rocket : Sprite2D
         if (Random.Shared.Next(2) == 0) rate = -rate;
         this.RotationSpeed = rate;
     }
+
+    public void ShowFlameFor(TimeSpan duration)
+    {
+        if (duration <= TimeSpan.Zero)
+            return;
+
+        var until = Age + duration;
+        if (until > FlameUntil)
+            FlameUntil = until;
+    }
+
+    public void TriggerShieldFlash(TimeSpan duration = default)
+    {
+        if (duration == default)
+            duration = TimeSpan.FromMilliseconds(150);
+
+        var until = Age + duration;
+        if (until > ShieldUntil)
+            ShieldUntil = until;
+    }
+
+    public override void Draw(Renderer2D renderer)
+    {
+        var pose = new Pose2D(Center, Rotation, Scale);
+
+        if (IsFlameVisible)
+            FlameVisual?.Draw(renderer, pose, Color.White, Age, Flipped);
+
+        Visual?.Draw(renderer, pose, Tint, Age, Flipped);
+
+        // Shield image drawn at the bounding circle size, rotated with the heading.
+        if (IsShieldVisible)
+        {
+            const float ShieldDuration = 0.15f;
+            var shieldAge = (float)(Age - (ShieldUntil - TimeSpan.FromSeconds(ShieldDuration))).TotalSeconds;
+            var alpha = Math.Clamp(1f - shieldAge / ShieldDuration, 0f, 1f);
+            var shieldRadius = HitShape.BoundingCircle.Radius;
+            var shieldScale = (shieldRadius * ShieldDrawDiameterScale) / ShieldVisualSize;
+            var shieldPose = new Pose2D(Center, Heading, shieldScale);
+            var tint = new Color(255, 255, 255, (byte)(255 * alpha));
+            ShieldVisual.Draw(renderer, shieldPose, tint, Age, Flipped);
+        }
+    }
+
+    private static Visual2D MakeShieldVisual(int size)
+    {
+        var bitmap = Bitmap.Create(size, size);
+        bitmap.DrawCanvas(canvas =>
+        {
+            canvas.Clear(SKColors.Transparent);
+            float cx = size / 2f;
+            float cy = size / 2f;
+            float r = size / 2f - 2f;
+            var circle = new SKRect(cx - r, cy - r, cx + r, cy + r);
+
+            canvas.SaveLayer();
+
+            // Outer halo sits a bit forward so the front rim reads brighter than the back.
+            using (var paint = new SKPaint
+            {
+                IsAntialias = true,
+                Shader = SKShader.CreateRadialGradient(
+                    center: new SKPoint(cx, cy - r * 0.18f),
+                    radius: r * 1.05f,
+                    colors:
+                    [
+                        new SKColor(80, 180, 255, 0),
+                        new SKColor(100, 210, 255, 35),
+                        new SKColor(90, 200, 255, 135),
+                        new SKColor(55, 145, 235, 190),
+                        new SKColor(25, 90, 210, 0),
+                    ],
+                    colorPos: [0f, 0.52f, 0.70f, 0.84f, 1f],
+                    mode: SKShaderTileMode.Clamp),
+            })
+            {
+                canvas.DrawOval(circle, paint);
+            }
+
+            // Core glow is concentrated on the front half so the shield reads as a lit hemisphere.
+            using (var paint = new SKPaint
+            {
+                IsAntialias = true,
+                Shader = SKShader.CreateRadialGradient(
+                    center: new SKPoint(cx, cy - r * 0.42f),
+                    radius: r * 0.95f,
+                    colors:
+                    [
+                        new SKColor(220, 245, 255, 210),
+                        new SKColor(120, 210, 255, 150),
+                        new SKColor(70, 165, 235, 60),
+                        new SKColor(20, 90, 210, 0),
+                    ],
+                    colorPos: [0f, 0.26f, 0.58f, 1f],
+                    mode: SKShaderTileMode.Clamp),
+            })
+            {
+                canvas.DrawOval(circle, paint);
+            }
+
+            // A thin forward rim helps the shield read larger without filling in the back edge.
+            using (var paint = new SKPaint
+            {
+                IsAntialias = true,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = r * 0.10f,
+                Shader = SKShader.CreateLinearGradient(
+                    new SKPoint(cx, cy - r),
+                    new SKPoint(cx, cy + r),
+                    [
+                        new SKColor(200, 235, 255, 210),
+                        new SKColor(100, 190, 255, 110),
+                        new SKColor(40, 120, 220, 0),
+                    ],
+                    [0f, 0.45f, 1f],
+                    SKShaderTileMode.Clamp),
+            })
+            {
+                canvas.DrawOval(circle, paint);
+            }
+
+            // Small specular highlight dot near the nose.
+            using (var paint = new SKPaint
+            {
+                IsAntialias = true,
+                Shader = SKShader.CreateRadialGradient(
+                    center: new SKPoint(cx, cy - r * 0.58f),
+                    radius: r * 0.18f,
+                    colors:
+                    [
+                        new SKColor(255, 255, 255, 235),
+                        new SKColor(255, 255, 255, 0),
+                    ],
+                    colorPos: [0f, 1f],
+                    mode: SKShaderTileMode.Clamp),
+            })
+            {
+                canvas.DrawCircle(cx, cy - r * 0.58f, r * 0.18f, paint);
+            }
+
+            // Alpha mask keeps the front strong and lets the shield die off around the back,
+            // so it reads like a partial lit sphere instead of a complete glowing ball.
+            using (var paint = new SKPaint
+            {
+                BlendMode = SKBlendMode.DstIn,
+                IsAntialias = true,
+                Shader = SKShader.CreateLinearGradient(
+                    new SKPoint(cx, cy - r),
+                    new SKPoint(cx, cy + r),
+                    [
+                        new SKColor(255, 255, 255, 255),
+                        new SKColor(255, 255, 255, 230),
+                        new SKColor(255, 255, 255, 110),
+                        new SKColor(255, 255, 255, 20),
+                        new SKColor(255, 255, 255, 0),
+                    ],
+                    [0f, 0.38f, 0.62f, 0.82f, 1f],
+                    SKShaderTileMode.Clamp),
+            })
+            {
+                canvas.DrawOval(circle, paint);
+            }
+
+            canvas.Restore();
+        });
+        return new TextureVisual2D(bitmap);
+    }
 }
 
 sealed class AsteroidSmasher : SpriteBehavior2D
@@ -424,6 +610,12 @@ sealed class AsteroidSmasher : SpriteBehavior2D
         if (other is not Asteroid asteroid)
             return;
 
+        // Shield flash on any collision (before deflect/stun/smash logic)
+        if (self is Rocket rocketShield)
+        {
+            rocketShield.TriggerShieldFlash();
+        }
+
         // Cooldown after a deflect so we don't re-trigger every
         // frame while the rocket is still overlapping this rock.
         if (asteroid.Age < asteroid.HitCooldownUntil)
@@ -432,7 +624,7 @@ sealed class AsteroidSmasher : SpriteBehavior2D
         // Capture impact speed before applying momentum loss so the
         // smash-threshold check reflects how fast the player was
         // actually going at the moment of contact.
-        float impactSpeed = self is Rocket r0 ? r0.Speed : 0f;
+        float impactSpeed = self is Rocket r ? r.Speed : 0f;
 
         // Any hit costs momentum — scaled by the asteroid's mass so
         // the big rocks really pull you up short. Player has to lean
@@ -514,7 +706,7 @@ sealed class AsteroidSmasher : SpriteBehavior2D
         // controls, and bounces off rather than smashing asteroids
         // until the stun wears off.
         if (asteroid.Kind == AsteriodKind.Radioactive
-            && self is Rocket r)
+            && self is Rocket rocketStun)
         {
             // Radioactive hit breaks any combo streak — no chaining
             // through a penalty.
@@ -522,7 +714,7 @@ sealed class AsteroidSmasher : SpriteBehavior2D
             _comboExpiresAt = TimeSpan.Zero;
 
             var stunDuration = TimeSpan.FromSeconds(4 * asteroid.Scale);
-            r.Stun(stunDuration);
+            rocketStun.Stun(stunDuration);
             Audio.Play(_radioactiveAlarm, volume: .2f);
 
             // Bigger rocks hurt more; round to tens — same shape as
@@ -664,23 +856,60 @@ sealed class RocketController : SpriteBehavior2D
 {
     private readonly FrameInput _input;
 
-    public RocketController(FrameInput input) => _input = input;
+    // Turn feel tuning.
+    private const float MaxTurnRateDegPerSec = 240f;
+    private const float TurnAccelDegPerSec2 = 1200f;
+    private const float TurnDecelDegPerSec2 = 1800f;
+    private const float TapTurnKickDegPerSec = 85f;
+
+    // Signed turn rate in deg/s. Negative = left, positive = right.
+    private float _turnRateDegPerSec;
+
+    public RocketController(FrameInput input)
+    {
+        _input = input;
+    } 
 
     public override void Apply(Sprite2D rocket, in UpdateContext2D context)
     {
         // No control input during stun.
         if (rocket is Rocket { IsStunned: true })
+        {
+            _turnRateDegPerSec = 0f;
+            return;
+        }
+
+        var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
+        if (dt <= 0f)
             return;
 
-        if (_input.IsDown(Key.Left))
-            rocket.Heading = (rocket.Heading + 350f) % 360f;
+        var leftDown = _input.IsDown(Key.Left);
+        var rightDown = _input.IsDown(Key.Right);
 
-        if (_input.IsDown(Key.Right))
-            rocket.Heading = (rocket.Heading + 10f) % 360f;
+        float targetTurnRate = 0f;
+        if (leftDown && !rightDown)
+            targetTurnRate = -MaxTurnRateDegPerSec;
+        else if (rightDown && !leftDown)
+            targetTurnRate = MaxTurnRateDegPerSec;
+
+        // Snap toward target while held; otherwise decay back to zero.
+        var maxStep = (targetTurnRate == 0f ? TurnDecelDegPerSec2 : TurnAccelDegPerSec2) * dt;
+        _turnRateDegPerSec = MoveToward(_turnRateDegPerSec, targetTurnRate, maxStep);
+
+        // Tap response: a short press injects an immediate turn kick.
+        if (_input.WasJustPressed(Key.Left))
+            _turnRateDegPerSec -= TapTurnKickDegPerSec;
+        if (_input.WasJustPressed(Key.Right))
+            _turnRateDegPerSec += TapTurnKickDegPerSec;
+
+        _turnRateDegPerSec = Math.Clamp(_turnRateDegPerSec, -MaxTurnRateDegPerSec, MaxTurnRateDegPerSec);
+        rocket.Heading = WrapDegrees(rocket.Heading + _turnRateDegPerSec * dt);
 
         if (_input.WasJustPressed(Key.Up))
         {
             rocket.Speed = Math.Clamp(rocket.Speed + 50f, 0f, 1000f);
+            if (rocket is Rocket r)
+                r.ShowFlameFor(Sounds.RoarUp.Duration);
             Audio.Play(Sounds.RoarUp, volume: .25f);
         }
         if (_input.WasJustPressed(Key.Down))
@@ -688,6 +917,19 @@ sealed class RocketController : SpriteBehavior2D
             rocket.Speed = Math.Clamp(rocket.Speed - 50f, 0f, 1000f);
             Audio.Play(Sounds.RoarDown, volume: .25f);
         }
+    }
+
+    private static float MoveToward(float current, float target, float maxStep)
+    {
+        if (current < target)
+            return Math.Min(current + maxStep, target);
+        return Math.Max(current - maxStep, target);
+    }
+
+    private static float WrapDegrees(float deg)
+    {
+        deg %= 360f;
+        return deg < 0f ? deg + 360f : deg;
     }
 }
 

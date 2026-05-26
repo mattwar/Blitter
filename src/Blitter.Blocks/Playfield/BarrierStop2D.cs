@@ -35,7 +35,6 @@ public sealed class BarrierStop2D : SpriteBehavior2D
         if (barrier is not LineBarrier2D line)
             return;
 
-        var normal = line.Normal;
         var center = self.Center;
 
         // Closest point on segment to circle center -> penetration depth.
@@ -56,11 +55,19 @@ public sealed class BarrierStop2D : SpriteBehavior2D
 
         var radius = self.HitCircle.Radius;
         var delta = center - closest;
-        var dist = MathF.Sqrt(Vector2.Dot(delta, delta));
+        var distSq = Vector2.Dot(delta, delta);
+        var dist = MathF.Sqrt(distSq);
+
+        // Contact normal points from the surface toward the sprite so
+        // two-sided segments push out correctly from either side. When
+        // the sprite center sits exactly on the segment, fall back to
+        // the winding-derived normal.
+        Vector2 normal = distSq > float.Epsilon
+            ? delta / dist
+            : line.Normal;
+
         if (dist < radius)
         {
-            // Push out along outward normal so the sprite rests on the
-            // surface rather than inside it.
             self.Center = center + normal * (radius - dist);
         }
 
