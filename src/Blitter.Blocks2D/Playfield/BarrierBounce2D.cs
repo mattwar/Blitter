@@ -29,7 +29,7 @@ public sealed class BarrierBounce2D : SpriteBehavior2D
         // Normal convention: TryGetContact returns normal from b → a;
         // here a = self.HitShape, b = barrier.HitShape, so `contact.Normal`
         // points from the barrier surface toward the sprite.
-        if (!ContactHitTester2D.Instance.TryGetContact(self.HitShape, barrier.HitShape, out var contact))
+        if (!self.HitShape.TryGetContact(barrier.HitShape, out var contact))
             return;
 
         var normal = contact.Normal;

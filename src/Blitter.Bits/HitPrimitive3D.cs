@@ -31,6 +31,11 @@ public enum HitKind3D : byte
     /// An oriented rectangle ("wall").
     /// </summary>
     Wall,
+
+    /// <summary>
+    /// A single triangle (three world-space vertices).
+    /// </summary>
+    Triangle,
 }
 
 /// <summary>
@@ -69,6 +74,12 @@ public readonly struct HitPrimitive3D
         Q = q;
     }
 
+    /// <summary>
+    /// Converts a <see cref="BoundingSphere"/> to a sphere primitive. 
+    /// </summary>
+    public static implicit operator HitPrimitive3D(BoundingSphere sphere) =>
+        Sphere(sphere.Center, sphere.Radius);
+
     /// <summary>Builds a sphere primitive.</summary>
     public static HitPrimitive3D Sphere(Vector3 center, float radius) =>
         new(HitKind3D.Sphere, center, default, radius, Quaternion.Identity);
@@ -98,6 +109,15 @@ public readonly struct HitPrimitive3D
     /// </summary>
     public static HitPrimitive3D Wall(Vector3 center, Vector2 halfExtents, Quaternion rotation) =>
         new(HitKind3D.Wall, center, new Vector3(halfExtents, 0f), 0f, rotation);
+
+    /// <summary>
+    /// Builds a triangle primitive from three world-space vertices.
+    /// Winding determines the outward normal (right-hand rule on
+    /// <c>v0 → v1 → v2</c>).
+    /// </summary>
+    public static HitPrimitive3D Triangle(Vector3 v0, Vector3 v1, Vector3 v2) =>
+        // v0/v1 in P0/P1; v2 packed into Q.X/Y/Z (Q.W unused).
+        new(HitKind3D.Triangle, v0, v1, 0f, new Quaternion(v2.X, v2.Y, v2.Z, 0f));
 
     /// <summary>
     /// Reads this primitive as a sphere. The caller is expected to have
@@ -153,6 +173,15 @@ public readonly struct HitPrimitive3D
         return (P0, new Vector2(P1.X, P1.Y), Q);
     }
 
+    /// <summary>
+    /// Reads this primitive as a triangle of three world-space vertices.
+    /// </summary>
+    public (Vector3 V0, Vector3 V1, Vector3 V2) AsTriangle()
+    {
+        if (Kind != HitKind3D.Triangle) throw WrongKind(HitKind3D.Triangle);
+        return (P0, P1, new Vector3(Q.X, Q.Y, Q.Z));
+    }
+
     private InvalidOperationException WrongKind(HitKind3D expected) =>
         new($"HitPrimitive3D is a {Kind}, not a {expected}.");
 
@@ -167,6 +196,7 @@ public readonly struct HitPrimitive3D
             (HitKind3D.Sphere, HitKind3D.Cylinder) => SphereCylinder(in this, in other),
             (HitKind3D.Sphere, HitKind3D.Box) => SphereBox(in this, in other),
             (HitKind3D.Sphere, HitKind3D.Wall) => SphereWall(in this, in other),
+            (HitKind3D.Sphere, HitKind3D.Triangle) => SphereTriangle(in this, in other),
 
             // Capsule row (asymmetric pairs reuse the row above).
             (HitKind3D.Capsule, HitKind3D.Sphere) => SphereCapsule(in other, in this),
@@ -194,6 +224,9 @@ public readonly struct HitPrimitive3D
             (HitKind3D.Wall, HitKind3D.Sphere) => SphereWall(in other, in this),
             (HitKind3D.Wall, HitKind3D.Capsule) => CapsuleWall(in other, in this),
             (HitKind3D.Wall, HitKind3D.Cylinder) => CylinderWall(in other, in this),
+
+            // Triangle row — only sphere×triangle is closed-form so far.
+            (HitKind3D.Triangle, HitKind3D.Sphere) => SphereTriangle(in other, in this),
 
             _ => false,
         };
@@ -271,6 +304,13 @@ public readonly struct HitPrimitive3D
         float dy = local.Y - cy;
         float dz = local.Z;
         return dx * dx + dy * dy + dz * dz <= sphere.R * sphere.R;
+    }
+
+    private static bool SphereTriangle(in HitPrimitive3D sphere, in HitPrimitive3D tri)
+    {
+        var v2 = new Vector3(tri.Q.X, tri.Q.Y, tri.Q.Z);
+        var closest = Geometry3D.ClosestPointOnTriangle(sphere.P0, tri.P0, tri.P1, v2);
+        return Vector3.DistanceSquared(sphere.P0, closest) <= sphere.R * sphere.R;
     }
 
     // ---- Capsule ----
@@ -384,6 +424,8 @@ public readonly struct HitPrimitive3D
                 return SphereCapsuleContact(in this, in other, out contact);
             case (HitKind3D.Sphere, HitKind3D.Cylinder):
                 return SphereCylinderContact(in this, in other, out contact);
+            case (HitKind3D.Sphere, HitKind3D.Triangle):
+                return SphereTriangleContact(in this, in other, out contact);
 
             // Reverse direction: swap args, then flip the normal.
             case (HitKind3D.Box, HitKind3D.Sphere):
@@ -407,6 +449,12 @@ public readonly struct HitPrimitive3D
             case (HitKind3D.Cylinder, HitKind3D.Sphere):
             {
                 bool hit = SphereCylinderContact(in other, in this, out contact);
+                if (hit) contact = contact.Flipped();
+                return hit;
+            }
+            case (HitKind3D.Triangle, HitKind3D.Sphere):
+            {
+                bool hit = SphereTriangleContact(in other, in this, out contact);
                 if (hit) contact = contact.Flipped();
                 return hit;
             }
@@ -552,6 +600,37 @@ public readonly struct HitPrimitive3D
         // radius — same approximation as <see cref="Intersects"/>.
         // Slightly rounded contact near the flat caps; exact on the body.
         return SphereCapsuleContact(in sphere, in cyl, out contact);
+    }
+
+    private static bool SphereTriangleContact(in HitPrimitive3D sphere, in HitPrimitive3D tri, out HitContact3D contact)
+    {
+        var v0 = tri.P0;
+        var v1 = tri.P1;
+        var v2 = new Vector3(tri.Q.X, tri.Q.Y, tri.Q.Z);
+        var closest = Geometry3D.ClosestPointOnTriangle(sphere.P0, v0, v1, v2);
+        var d = sphere.P0 - closest;
+        float distSq = d.LengthSquared();
+        if (distSq > sphere.R * sphere.R)
+        {
+            contact = default;
+            return false;
+        }
+        Vector3 normal;
+        if (distSq > 1e-12f)
+        {
+            normal = d / MathF.Sqrt(distSq);
+        }
+        else
+        {
+            // Sphere center on the triangle plane: use the triangle's
+            // outward face normal (right-hand winding).
+            var face = Vector3.Cross(v1 - v0, v2 - v0);
+            float fl = face.LengthSquared();
+            normal = fl > 1e-12f ? face / MathF.Sqrt(fl) : Vector3.UnitY;
+        }
+        float pen = sphere.R - MathF.Sqrt(distSq);
+        contact = new HitContact3D(normal, closest, pen);
+        return true;
     }
 
     private static Vector3 ClosestPointOnSegment(Vector3 p, Vector3 a, Vector3 b)

@@ -940,22 +940,18 @@ sealed class RocketController : SpriteBehavior2D
 /// </summary>
 static class HitShapeDebug2D
 {
-    // Build a visitor that draws each primitive. Returned delegate is
+    // Build an action that draws each primitive. Returned delegate is
     // fresh each call but a debug overlay isn't on the hot path.
-    public static HitShapeVisitor2D Draw(Renderer2D rd) => prims =>
+    public static HitPrimitiveAction2D Draw(Renderer2D rd) => (in HitPrimitive2D p) =>
     {
-        for (int i = 0; i < prims.Length; i++)
+        switch (p.Kind)
         {
-            var p = prims[i];
-            switch (p.Kind)
-            {
-                case HitKind2D.Circle:
-                    DrawCircleOutline(rd, p.P0, p.R);
-                    break;
-                case HitKind2D.Capsule:
-                    DrawCapsuleOutline(rd, p.P0, p.P1, p.R);
-                    break;
-            }
+            case HitKind2D.Circle:
+                DrawCircleOutline(rd, p.P0, p.R);
+                break;
+            case HitKind2D.Capsule:
+                DrawCapsuleOutline(rd, p.P0, p.P1, p.R);
+                break;
         }
     };
 

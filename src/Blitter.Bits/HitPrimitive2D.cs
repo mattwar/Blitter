@@ -74,6 +74,15 @@ public readonly struct HitPrimitive2D
     }
 
     /// <summary>
+    /// Implicit conversion from a <see cref="BoundingCircle"/> to a
+    /// circle primitive. Lets compound shapes reuse the existing
+    /// circle pair-test math to broad-phase prune against another
+    /// shape's <see cref="PosedHitShape2D.BoundingCircle"/>.
+    /// </summary>
+    public static implicit operator HitPrimitive2D(BoundingCircle circle) =>
+        Circle(circle.Center, circle.Radius);
+
+    /// <summary>
     /// Builds a circle primitive centered on <paramref name="center"/>
     /// with radius <paramref name="radius"/>.
     /// </summary>

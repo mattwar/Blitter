@@ -3,14 +3,20 @@ using System.Numerics;
 namespace Blitter.Bits;
 
 /// <summary>
-/// A delegate that accepts the posed primitives of a <see cref="HitShape2D"/>.
+/// A delegate that receives one posed primitive of a <see cref="HitShape2D"/>.
 /// </summary>
-public delegate void HitShapeVisitor2D(ReadOnlySpan<HitPrimitive2D> primitives);
+public delegate void HitPrimitiveAction2D(in HitPrimitive2D primitive);
 
 /// <summary>
-/// An abstraction of a 2D collision boundary, 
-/// in image-local (bitmap) coordinates (origin at image center, unrotated, unscaled).
+/// An abstraction of a 2D collision boundary, in image-local (bitmap)
+/// coordinates (origin at image center, unrotated, unscaled).
 /// </summary>
+/// <remarks>
+/// Hit-testing is callback-driven and allocation-free: each shape walks
+/// its own primitives one at a time, delegating each to the other
+/// shape's primitive overload or, at the leaves, to a
+/// <see cref="HitTester2D"/> that runs the primitive-vs-primitive math.
+/// </remarks>
 public abstract class HitShape2D
 {
     // Lazily materialized siblings forming a Klein-4 family under FlipMode XOR.
@@ -18,58 +24,48 @@ public abstract class HitShape2D
     private HitShape2D? _flipH, _flipV, _flipHV;
     private bool _familyBound;
 
-    /// <summary>
-    /// Local-space bounding circle used for the broad-phase reject.
-    /// </summary>
+    /// <summary>Local-space bounding circle used for the broad-phase reject.</summary>
     public abstract BoundingCircle LocalBoundary { get; }
 
     /// <summary>
-    /// Returns true if this shaped, posed by <paramref name="mine"/>, 
-    /// hits the <paramref name="other"/> shape, using <paramref name="tester"/>.
+    /// How many primitives this shape emits per hit-test pass.
+    /// Compound shapes consult this on the <em>other</em> shape to
+    /// decide whether a per-primitive broad-phase prune is worthwhile.
+    /// </summary>
+    public abstract int PrimitiveCount { get; }
+
+    /// <summary>
+    /// True when this shape, posed by <paramref name="mine"/>, hits the
+    /// <paramref name="other"/> posed shape.
     /// </summary>
     public abstract bool TestHit(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester);
 
     /// <summary>
-    /// Returns true if this shaped, posed by <paramref name="mine"/>, 
-    /// hits any of the primitives in <paramref name="other"/>, using <paramref name="tester"/>.
+    /// True when this shape, posed by <paramref name="mine"/>, hits the
+    /// single primitive <paramref name="otherPrim"/>.
     /// </summary>
-    public abstract bool TestHitWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester);
+    public abstract bool TestHit(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester);
 
     /// <summary>
-    /// Computes a closed-form contact between this shape (posed by
-    /// <paramref name="mine"/>) and <paramref name="other"/>, using
-    /// <paramref name="tester"/>. Convention:
-    /// <see cref="HitContact2D.Normal"/> points from
-    /// <paramref name="other"/> toward this shape. Default impl
-    /// returns <see langword="false"/> — concrete shapes override.
+    /// Computes the deepest closed-form contact between this shape
+    /// (posed by <paramref name="mine"/>) and <paramref name="other"/>.
+    /// Convention: <see cref="HitContact2D.Normal"/> points from
+    /// <paramref name="other"/> toward this shape.
     /// </summary>
-    public virtual bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, ContactHitTester2D tester, out HitContact2D contact)
-    {
-        contact = default;
-        return false;
-    }
+    public abstract bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester, out HitContact2D contact);
 
     /// <summary>
-    /// Computes a closed-form contact between this shape (posed by
-    /// <paramref name="mine"/>) and the primitives in
-    /// <paramref name="other"/>. Convention: normal points from
-    /// <paramref name="other"/> toward this shape. Default impl
-    /// returns <see langword="false"/>.
+    /// Computes the deepest closed-form contact between this shape
+    /// (posed by <paramref name="mine"/>) and the single primitive
+    /// <paramref name="otherPrim"/>. Normal points from
+    /// <paramref name="otherPrim"/> toward this shape.
     /// </summary>
-    public virtual bool TryGetContactWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, ContactHitTester2D tester, out HitContact2D contact)
-    {
-        contact = default;
-        return false;
-    }
+    public abstract bool TryGetContact(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester, out HitContact2D contact);
 
-    /// <summary>
-    /// Calls the <paramref name="visitor"/> with the posed primitives of this shape.
-    /// </summary>
-    public abstract void Visit(in Pose2D mine, HitShapeVisitor2D visitor);
+    /// <summary>Hands every posed primitive of this shape to <paramref name="action"/>, one at a time.</summary>
+    public abstract void Visit(in Pose2D mine, HitPrimitiveAction2D action);
 
-    /// <summary>
-    /// Copies this <see cref="HitShape2D"/> with the center position adjusted.
-    /// </summary>
+    /// <summary>Copies this <see cref="HitShape2D"/> with the center position adjusted.</summary>
     public abstract HitShape2D Translate(Vector2 offset);
 
     /// <summary>
@@ -109,9 +105,7 @@ public abstract class HitShape2D
     /// </summary>
     protected abstract HitShape2D CreateFlipped(FlipMode flip);
 
-    /// <summary>
-    /// Mirrors a local-space point under the given flip mode.
-    /// </summary>
+    /// <summary>Mirrors a local-space point under the given flip mode.</summary>
     protected static Vector2 Mirror(Vector2 p, FlipMode flip) => flip switch
     {
         FlipMode.Horizontal => new Vector2(-p.X, p.Y),
@@ -128,17 +122,26 @@ public abstract class HitShape2D
         hv._flipH = v;     hv._flipV = h;      hv._flipHV = none;  hv._familyBound = true;
     }
 
-    /// <summary>
-    /// Shared "no shape" sentinel — never hits anything.
-    /// </summary>
+    /// <summary>Shared "no shape" sentinel — never hits anything.</summary>
     public static readonly HitShape2D None = new NoneShape();
 
     private sealed class NoneShape : HitShape2D
     {
         public override BoundingCircle LocalBoundary => BoundingCircle.Empty;
+        public override int PrimitiveCount => 0;
         public override bool TestHit(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester) => false;
-        public override bool TestHitWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester) => false;
-        public override void Visit(in Pose2D mine, HitShapeVisitor2D visitor) { }
+        public override bool TestHit(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester) => false;
+        public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester, out HitContact2D contact)
+        {
+            contact = default;
+            return false;
+        }
+        public override bool TryGetContact(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester, out HitContact2D contact)
+        {
+            contact = default;
+            return false;
+        }
+        public override void Visit(in Pose2D mine, HitPrimitiveAction2D action) { }
         public override HitShape2D Translate(Vector2 offset) => this;
         public override HitShape2D Flipped(FlipMode flip) => this;
         protected override HitShape2D CreateFlipped(FlipMode flip) => this;
@@ -183,9 +186,11 @@ public readonly struct PosedHitShape2D
         }
     }
 
-    /// <summary>
-    /// True when this posed shape hits the <paramref name="other"/>, using <paramref name="tester"/>.
-    /// </summary>
+    /// <summary>True when this posed shape hits <paramref name="other"/> using <see cref="HitTester2D.Default"/>.</summary>
+    public bool TestHit(in PosedHitShape2D other) =>
+        TestHit(in other, HitTester2D.Default);
+
+    /// <summary>True when this posed shape hits <paramref name="other"/>.</summary>
     public bool TestHit(in PosedHitShape2D other, HitTester2D tester)
     {
         if (!BoundingCircle.Intersects(other.BoundingCircle))
@@ -194,32 +199,35 @@ public readonly struct PosedHitShape2D
     }
 
     /// <summary>
-    /// True when this posed shape hits the <paramref name="other"/>, using the default hit tester.
-    /// </summary>
-    public bool TestHit(in PosedHitShape2D other) =>
-        TestHit(in other, IntersectsHitTester2D.Instance);
-
-    /// <summary>
-    /// True when this posed shape contacts <paramref name="other"/>;
-    /// <paramref name="contact"/> reports the deepest contact found.
-    /// Convention: <see cref="HitContact2D.Normal"/> points from
-    /// <paramref name="other"/> toward this shape.
+    /// Reports the deepest contact between this posed shape and
+    /// <paramref name="other"/> using <see cref="HitTester2D.Default"/>.
     /// </summary>
     public bool TryGetContact(in PosedHitShape2D other, out HitContact2D contact) =>
-        ContactHitTester2D.Instance.TryGetContact(in this, in other, out contact);
+        TryGetContact(in other, HitTester2D.Default, out contact);
 
     /// <summary>
-    /// Hands this shape's current posed primitives to
-    /// <paramref name="visitor"/>. Off the collision hot path
-    /// (debug rendering, gizmos, tests).
+    /// Reports the deepest contact between this posed shape and
+    /// <paramref name="other"/>. Normal points from
+    /// <paramref name="other"/> toward this shape.
     /// </summary>
-    public void Visit(HitShapeVisitor2D visitor) =>
-        Shape.Visit(in Pose, visitor);
+    public bool TryGetContact(in PosedHitShape2D other, HitTester2D tester, out HitContact2D contact)
+    {
+        if (!BoundingCircle.Intersects(other.BoundingCircle))
+        {
+            contact = default;
+            return false;
+        }
+        return Shape.TryGetContact(in Pose, in other, tester, out contact);
+    }
+
+    /// <summary>Hands this shape's current posed primitives to <paramref name="action"/>, one at a time.</summary>
+    public void Visit(HitPrimitiveAction2D action) =>
+        Shape.Visit(in Pose, action);
 }
 
 /// <summary>
-/// A <see cref="HitShape2D"/> that is a single circle.
-/// The center and radius are in image-local coordinates.
+/// A <see cref="HitShape2D"/> that is a single circle. The center and
+/// radius are in image-local coordinates.
 /// </summary>
 public sealed class CircleHitShape2D : HitShape2D
 {
@@ -234,40 +242,39 @@ public sealed class CircleHitShape2D : HitShape2D
 
     public override BoundingCircle LocalBoundary => new(LocalCenter, LocalRadius);
 
+    public override int PrimitiveCount => 1;
+
     public override bool TestHit(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester)
     {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        return tester.TestHit(span, in other);
+        var p = Pose(in mine);
+        return other.Shape.TestHit(in other.Pose, in p, tester);
     }
 
-    public override bool TestHitWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester)
+    public override bool TestHit(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester)
     {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        return tester.TestHit(other, span);
+        var p = Pose(in mine);
+        return tester.TestHit(in p, in otherPrim);
     }
 
-    public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, ContactHitTester2D tester, out HitContact2D contact)
+    public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester, out HitContact2D contact)
     {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        return tester.TryGetContact(span, in other, out contact);
+        var p = Pose(in mine);
+        if (other.Shape.TryGetContact(in other.Pose, in p, tester, out contact))
+        {
+            contact = contact.Flipped();
+            return true;
+        }
+        return false;
     }
 
-    public override bool TryGetContactWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, ContactHitTester2D tester, out HitContact2D contact)
+    public override bool TryGetContact(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester, out HitContact2D contact)
     {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        return tester.TryGetContact(other, span, out contact);
+        var p = Pose(in mine);
+        return tester.TryGetContact(in p, in otherPrim, out contact);
     }
 
-    public override void Visit(in Pose2D mine, HitShapeVisitor2D visitor)
-    {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        visitor(span);
-    }
+    public override void Visit(in Pose2D mine, HitPrimitiveAction2D action) =>
+        action(Pose(in mine));
 
     private HitPrimitive2D Pose(in Pose2D pose) =>
         HitPrimitive2D.Circle(pose.Transform(LocalCenter), LocalRadius * pose.Scale);
@@ -307,40 +314,39 @@ public sealed class CapsuleHitShape2D : HitShape2D
         }
     }
 
+    public override int PrimitiveCount => 1;
+
     public override bool TestHit(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester)
     {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        return tester.TestHit(span, in other);
+        var p = Pose(in mine);
+        return other.Shape.TestHit(in other.Pose, in p, tester);
     }
 
-    public override bool TestHitWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester)
+    public override bool TestHit(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester)
     {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        return tester.TestHit(other, span);
+        var p = Pose(in mine);
+        return tester.TestHit(in p, in otherPrim);
     }
 
-    public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, ContactHitTester2D tester, out HitContact2D contact)
+    public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester, out HitContact2D contact)
     {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        return tester.TryGetContact(span, in other, out contact);
+        var p = Pose(in mine);
+        if (other.Shape.TryGetContact(in other.Pose, in p, tester, out contact))
+        {
+            contact = contact.Flipped();
+            return true;
+        }
+        return false;
     }
 
-    public override bool TryGetContactWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, ContactHitTester2D tester, out HitContact2D contact)
+    public override bool TryGetContact(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester, out HitContact2D contact)
     {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        return tester.TryGetContact(other, span, out contact);
+        var p = Pose(in mine);
+        return tester.TryGetContact(in p, in otherPrim, out contact);
     }
 
-    public override void Visit(in Pose2D mine, HitShapeVisitor2D visitor)
-    {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        visitor(span);
-    }
+    public override void Visit(in Pose2D mine, HitPrimitiveAction2D action) =>
+        action(Pose(in mine));
 
     private HitPrimitive2D Pose(in Pose2D pose) =>
         HitPrimitive2D.Capsule(
@@ -380,40 +386,39 @@ public sealed class BoxHitShape2D : HitShape2D
     public override BoundingCircle LocalBoundary =>
         new(LocalCenter, LocalHalfExtents.Length());
 
+    public override int PrimitiveCount => 1;
+
     public override bool TestHit(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester)
     {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        return tester.TestHit(span, in other);
+        var p = Pose(in mine);
+        return other.Shape.TestHit(in other.Pose, in p, tester);
     }
 
-    public override bool TestHitWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester)
+    public override bool TestHit(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester)
     {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        return tester.TestHit(other, span);
+        var p = Pose(in mine);
+        return tester.TestHit(in p, in otherPrim);
     }
 
-    public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, ContactHitTester2D tester, out HitContact2D contact)
+    public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester, out HitContact2D contact)
     {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        return tester.TryGetContact(span, in other, out contact);
+        var p = Pose(in mine);
+        if (other.Shape.TryGetContact(in other.Pose, in p, tester, out contact))
+        {
+            contact = contact.Flipped();
+            return true;
+        }
+        return false;
     }
 
-    public override bool TryGetContactWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, ContactHitTester2D tester, out HitContact2D contact)
+    public override bool TryGetContact(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester, out HitContact2D contact)
     {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        return tester.TryGetContact(other, span, out contact);
+        var p = Pose(in mine);
+        return tester.TryGetContact(in p, in otherPrim, out contact);
     }
 
-    public override void Visit(in Pose2D mine, HitShapeVisitor2D visitor)
-    {
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = Pose(in mine);
-        visitor(span);
-    }
+    public override void Visit(in Pose2D mine, HitPrimitiveAction2D action) =>
+        action(Pose(in mine));
 
     private HitPrimitive2D Pose(in Pose2D pose) =>
         HitPrimitive2D.Box(
@@ -473,27 +478,27 @@ public sealed class SegmentHitShape2D : HitShape2D
         }
     }
 
+    public override int PrimitiveCount => 1;
+
     public override bool TestHit(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester)
     {
         var (a, b) = PoseEndpoints(in mine);
         if (OneSided && !IsOnOutwardSide(other.BoundingCircle.Center, a, b))
             return false;
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = HitPrimitive2D.Capsule(a, b, 0f);
-        return tester.TestHit(span, in other);
+        var p = HitPrimitive2D.Capsule(a, b, 0f);
+        return other.Shape.TestHit(in other.Pose, in p, tester);
     }
 
-    public override bool TestHitWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester)
+    public override bool TestHit(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester)
     {
         var (a, b) = PoseEndpoints(in mine);
-        if (OneSided && other.Length > 0 && !IsOnOutwardSide(PrimitiveCenter(other[0]), a, b))
+        if (OneSided && !IsOnOutwardSide(PrimitiveCenter(in otherPrim), a, b))
             return false;
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = HitPrimitive2D.Capsule(a, b, 0f);
-        return tester.TestHit(other, span);
+        var p = HitPrimitive2D.Capsule(a, b, 0f);
+        return tester.TestHit(in p, in otherPrim);
     }
 
-    public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, ContactHitTester2D tester, out HitContact2D contact)
+    public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester, out HitContact2D contact)
     {
         var (a, b) = PoseEndpoints(in mine);
         if (OneSided && !IsOnOutwardSide(other.BoundingCircle.Center, a, b))
@@ -501,30 +506,32 @@ public sealed class SegmentHitShape2D : HitShape2D
             contact = default;
             return false;
         }
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = HitPrimitive2D.Capsule(a, b, 0f);
-        return tester.TryGetContact(span, in other, out contact);
+        var p = HitPrimitive2D.Capsule(a, b, 0f);
+        if (other.Shape.TryGetContact(in other.Pose, in p, tester, out contact))
+        {
+            contact = contact.Flipped();
+            return true;
+        }
+        return false;
     }
 
-    public override bool TryGetContactWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, ContactHitTester2D tester, out HitContact2D contact)
+    public override bool TryGetContact(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester, out HitContact2D contact)
     {
         var (a, b) = PoseEndpoints(in mine);
-        if (OneSided && other.Length > 0 && !IsOnOutwardSide(PrimitiveCenter(other[0]), a, b))
+        if (OneSided && !IsOnOutwardSide(PrimitiveCenter(in otherPrim), a, b))
         {
             contact = default;
             return false;
         }
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = HitPrimitive2D.Capsule(a, b, 0f);
-        return tester.TryGetContact(other, span, out contact);
+        var p = HitPrimitive2D.Capsule(a, b, 0f);
+        return tester.TryGetContact(in p, in otherPrim, out contact);
     }
 
-    public override void Visit(in Pose2D mine, HitShapeVisitor2D visitor)
+    public override void Visit(in Pose2D mine, HitPrimitiveAction2D action)
     {
         var (a, b) = PoseEndpoints(in mine);
-        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
-        span[0] = HitPrimitive2D.Capsule(a, b, 0f);
-        visitor(span);
+        var p = HitPrimitive2D.Capsule(a, b, 0f);
+        action(in p);
     }
 
     public override HitShape2D Translate(Vector2 offset) =>
@@ -551,5 +558,3 @@ public sealed class SegmentHitShape2D : HitShape2D
         _ => p.P0,
     };
 }
-
-

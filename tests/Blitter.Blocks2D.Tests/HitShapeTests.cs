@@ -33,8 +33,9 @@ public class HitShapeTests
         Assert.False(a.TestHit(in b, canary));
         Assert.Equal(0, canary.Calls); // broad-phase reject short-circuited dispatch
 
-        // Driving the tester directly bypasses the reject and reaches dispatch.
-        Assert.False(canary.TestHit(in a, in b));
+        // Skipping PosedHitShape2D's reject and going straight into the
+        // shape dispatch reaches the tester.
+        Assert.False(a.Shape.TestHit(in a.Pose, in b, canary));
         Assert.Equal(1, canary.Calls);
     }
 
@@ -160,31 +161,77 @@ public class HitShapeTests
             }
         }
 
+        public override int PrimitiveCount => 2;
+
         public override bool TestHit(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester)
         {
-            Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[2];
-            Pose(span, in mine);
-            return tester.TestHit(span, in other);
+            var c0 = HitPrimitive2D.Circle(mine.Transform(_a), _r * mine.Scale);
+            if (other.Shape.TestHit(in other.Pose, in c0, tester))
+                return true;
+            var c1 = HitPrimitive2D.Circle(mine.Transform(_b), _r * mine.Scale);
+            return other.Shape.TestHit(in other.Pose, in c1, tester);
         }
 
-        public override bool TestHitWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester)
+        public override bool TestHit(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester)
         {
-            Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[2];
-            Pose(span, in mine);
-            return tester.TestHit(other, span);
+            var c0 = HitPrimitive2D.Circle(mine.Transform(_a), _r * mine.Scale);
+            if (tester.TestHit(in c0, in otherPrim))
+                return true;
+            var c1 = HitPrimitive2D.Circle(mine.Transform(_b), _r * mine.Scale);
+            return tester.TestHit(in c1, in otherPrim);
         }
 
-        public override void Visit(in Pose2D mine, HitShapeVisitor2D visitor)
+        public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester, out HitContact2D contact)
         {
-            Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[2];
-            Pose(span, in mine);
-            visitor(span);
+            bool found = false;
+            HitContact2D best = default;
+            var c0 = HitPrimitive2D.Circle(mine.Transform(_a), _r * mine.Scale);
+            if (other.Shape.TryGetContact(in other.Pose, in c0, tester, out var ca))
+            {
+                best = ca.Flipped();
+                found = true;
+            }
+            var c1 = HitPrimitive2D.Circle(mine.Transform(_b), _r * mine.Scale);
+            if (other.Shape.TryGetContact(in other.Pose, in c1, tester, out var cb))
+            {
+                var f = cb.Flipped();
+                if (!found || f.Penetration > best.Penetration)
+                {
+                    best = f;
+                    found = true;
+                }
+            }
+            contact = best;
+            return found;
         }
 
-        private void Pose(Span<HitPrimitive2D> destination, in Pose2D pose)
+        public override bool TryGetContact(in Pose2D mine, in HitPrimitive2D otherPrim, HitTester2D tester, out HitContact2D contact)
         {
-            destination[0] = HitPrimitive2D.Circle(pose.Transform(_a), _r * pose.Scale);
-            destination[1] = HitPrimitive2D.Circle(pose.Transform(_b), _r * pose.Scale);
+            bool found = false;
+            HitContact2D best = default;
+            var c0 = HitPrimitive2D.Circle(mine.Transform(_a), _r * mine.Scale);
+            if (tester.TryGetContact(in c0, in otherPrim, out var ca))
+            {
+                best = ca;
+                found = true;
+            }
+            var c1 = HitPrimitive2D.Circle(mine.Transform(_b), _r * mine.Scale);
+            if (tester.TryGetContact(in c1, in otherPrim, out var cb)
+                && (!found || cb.Penetration > best.Penetration))
+            {
+                best = cb;
+                found = true;
+            }
+            contact = best;
+            return found;
+        }
+
+        public override void Visit(in Pose2D mine, HitPrimitiveAction2D action)
+        {
+            var c0 = HitPrimitive2D.Circle(mine.Transform(_a), _r * mine.Scale);
+            action(in c0);
+            var c1 = HitPrimitive2D.Circle(mine.Transform(_b), _r * mine.Scale);
+            action(in c1);
         }
 
         public override HitShape2D Translate(Vector2 offset) =>
@@ -198,7 +245,7 @@ public class HitShapeTests
     {
         public int Calls { get; private set; }
 
-        public override bool TestHit(ReadOnlySpan<HitPrimitive2D> a, ReadOnlySpan<HitPrimitive2D> b)
+        public override bool TestHit(in HitPrimitive2D a, in HitPrimitive2D b)
         {
             Calls++;
             return false;
