@@ -74,30 +74,19 @@ public readonly struct HitPrimitive3D
         new(HitKind3D.Sphere, center, default, radius, Quaternion.Identity);
 
     /// <summary>
-    /// Builds a capsule primitive: a cylinder of <paramref name="radius"/>
-    /// with hemispherical caps, whose cap centers are <paramref name="a"/>
-    /// and <paramref name="b"/>. Equivalent to the Minkowski sum of
-    /// segment <paramref name="a"/>–<paramref name="b"/> with a ball of
-    /// <paramref name="radius"/>. Degenerate centers
-    /// (<paramref name="a"/> = <paramref name="b"/>) collide as a sphere.
+    /// Builds a capsule primitive: a cylinder with spherical caps.
     /// </summary>
     public static HitPrimitive3D Capsule(Vector3 a, Vector3 b, float radius) =>
         new(HitKind3D.Capsule, a, b, radius, Quaternion.Identity);
 
     /// <summary>
-    /// Builds a solid cylinder primitive with flat caps. The axis runs
-    /// from <paramref name="baseCenter"/> to <paramref name="topCenter"/>;
-    /// the body is everything within <paramref name="radius"/> of that
-    /// axis, capped flat at each end.
+    /// Builds a solid cylinder primitive with flat caps.
     /// </summary>
     public static HitPrimitive3D Cylinder(Vector3 baseCenter, Vector3 topCenter, float radius) =>
         new(HitKind3D.Cylinder, baseCenter, topCenter, radius, Quaternion.Identity);
 
     /// <summary>
-    /// Builds a solid oriented box. <paramref name="halfExtents"/> are
-    /// the half-widths along the box's local X / Y / Z axes;
-    /// <paramref name="rotation"/> turns those local axes into world
-    /// space.
+    /// Builds a solid oriented box.
     /// </summary>
     public static HitPrimitive3D Box(Vector3 center, Vector3 halfExtents, Quaternion rotation) =>
         new(HitKind3D.Box, center, halfExtents, 0f, rotation);
@@ -109,6 +98,63 @@ public readonly struct HitPrimitive3D
     /// </summary>
     public static HitPrimitive3D Wall(Vector3 center, Vector2 halfExtents, Quaternion rotation) =>
         new(HitKind3D.Wall, center, new Vector3(halfExtents, 0f), 0f, rotation);
+
+    /// <summary>
+    /// Reads this primitive as a sphere. The caller is expected to have
+    /// dispatched on <see cref="Kind"/>; throws if this primitive is
+    /// not a <see cref="HitKind3D.Sphere"/>.
+    /// </summary>
+    public (Vector3 Center, float Radius) AsSphere()
+    {
+        if (Kind != HitKind3D.Sphere) throw WrongKind(HitKind3D.Sphere);
+        return (P0, R);
+    }
+
+    /// <summary>
+    /// Reads this primitive as a capsule: a cylinder of
+    /// <c>Radius</c> with hemispherical caps centered at
+    /// <c>CapA</c> and <c>CapB</c>.
+    /// </summary>
+    public (Vector3 CapA, Vector3 CapB, float Radius) AsCapsule()
+    {
+        if (Kind != HitKind3D.Capsule) throw WrongKind(HitKind3D.Capsule);
+        return (P0, P1, R);
+    }
+
+    /// <summary>
+    /// Reads this primitive as a cylinder: a right circular cylinder
+    /// with flat caps centered at <c>BaseCenter</c> and <c>TopCenter</c>.
+    /// </summary>
+    public (Vector3 BaseCenter, Vector3 TopCenter, float Radius) AsCylinder()
+    {
+        if (Kind != HitKind3D.Cylinder) throw WrongKind(HitKind3D.Cylinder);
+        return (P0, P1, R);
+    }
+
+    /// <summary>
+    /// Reads this primitive as a solid oriented box. <c>HalfExtents</c>
+    /// are along the box's local X / Y / Z axes; <c>Rotation</c> turns
+    /// those local axes into world space.
+    /// </summary>
+    public (Vector3 Center, Vector3 HalfExtents, Quaternion Rotation) AsBox()
+    {
+        if (Kind != HitKind3D.Box) throw WrongKind(HitKind3D.Box);
+        return (P0, P1, Q);
+    }
+
+    /// <summary>
+    /// Reads this primitive as a two-sided oriented rectangle.
+    /// <c>HalfExtents</c> span the wall's local X / Y axes;
+    /// <c>Rotation</c>'s local Z is the face normal.
+    /// </summary>
+    public (Vector3 Center, Vector2 HalfExtents, Quaternion Rotation) AsWall()
+    {
+        if (Kind != HitKind3D.Wall) throw WrongKind(HitKind3D.Wall);
+        return (P0, new Vector2(P1.X, P1.Y), Q);
+    }
+
+    private InvalidOperationException WrongKind(HitKind3D expected) =>
+        new($"HitPrimitive3D is a {Kind}, not a {expected}.");
 
     /// <summary>True when this primitive overlaps <paramref name="other"/>.</summary>
     public bool Intersects(in HitPrimitive3D other)

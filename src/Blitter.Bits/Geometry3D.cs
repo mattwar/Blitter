@@ -204,15 +204,19 @@ public static class Geometry3D
         // edges, per Ericson).
         Span<Vector3> R = stackalloc Vector3[3];
         Span<Vector3> absR = stackalloc Vector3[3];
+
         R[0] = new Vector3(Vector3.Dot(ax, bx), Vector3.Dot(ax, by), Vector3.Dot(ax, bz));
         R[1] = new Vector3(Vector3.Dot(ay, bx), Vector3.Dot(ay, by), Vector3.Dot(ay, bz));
         R[2] = new Vector3(Vector3.Dot(az, bx), Vector3.Dot(az, by), Vector3.Dot(az, bz));
+        
         const float eps = 1e-6f;
         for (int i = 0; i < 3; i++)
+        {
             absR[i] = new Vector3(
                 MathF.Abs(R[i].X) + eps,
                 MathF.Abs(R[i].Y) + eps,
                 MathF.Abs(R[i].Z) + eps);
+        }
 
         var a = halfExtentsA;
         var b = halfExtentsB;

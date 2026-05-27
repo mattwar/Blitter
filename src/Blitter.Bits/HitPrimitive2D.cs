@@ -101,6 +101,42 @@ public readonly struct HitPrimitive2D
         new(HitKind2D.Box, center, halfExtents, 0f, rotation);
 
     /// <summary>
+    /// Reads this primitive as a circle. The caller is expected to
+    /// have dispatched on <see cref="Kind"/>; throws if this primitive
+    /// is not a <see cref="HitKind2D.Circle"/>.
+    /// </summary>
+    public (Vector2 Center, float Radius) AsCircle()
+    {
+        if (Kind != HitKind2D.Circle) throw WrongKind(HitKind2D.Circle);
+        return (P0, R);
+    }
+
+    /// <summary>
+    /// Reads this primitive as a capsule: a rectangle of width
+    /// <c>2 * Radius</c> with semicircular caps centered at
+    /// <c>CapA</c> and <c>CapB</c>.
+    /// </summary>
+    public (Vector2 CapA, Vector2 CapB, float Radius) AsCapsule()
+    {
+        if (Kind != HitKind2D.Capsule) throw WrongKind(HitKind2D.Capsule);
+        return (P0, P1, R);
+    }
+
+    /// <summary>
+    /// Reads this primitive as a solid oriented box. <c>HalfExtents</c>
+    /// are along the box's local X / Y axes; <c>Rotation</c> (radians)
+    /// turns those local axes into world space.
+    /// </summary>
+    public (Vector2 Center, Vector2 HalfExtents, float Rotation) AsBox()
+    {
+        if (Kind != HitKind2D.Box) throw WrongKind(HitKind2D.Box);
+        return (P0, P1, Rotation);
+    }
+
+    private InvalidOperationException WrongKind(HitKind2D expected) =>
+        new($"HitPrimitive2D is a {Kind}, not a {expected}.");
+
+    /// <summary>
     /// True when this primitive overlaps <paramref name="other"/>.
     /// </summary>
     public bool Intersects(in HitPrimitive2D other)
