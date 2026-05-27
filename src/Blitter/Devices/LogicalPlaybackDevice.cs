@@ -190,7 +190,7 @@ public class LogicalPlaybackDevice : AudioPlaybackDevice, IDisposable
     public override Task PlayAsync(Sound data, float volume = 1f)
     {
         AudioThread.Assert();
-        var duration = GetPlaybackDuration(data);
+        var duration = data.Duration;
         var slack = TimeSpan.FromMilliseconds(50);
         var busyTicks = (long)((duration + slack).TotalSeconds * Stopwatch.Frequency);
 
@@ -302,18 +302,6 @@ public class LogicalPlaybackDevice : AudioPlaybackDevice, IDisposable
         // both inaudible in practice and avoids half the
         // SDL_SetAudioDeviceGain traffic.
         return Task.Delay(duration + slack);
-    }
-
-    private static TimeSpan GetPlaybackDuration(Sound data)
-    {
-        var spec = data.Spec;
-        // Low byte of the SDL format encodes the bit depth.
-        int bitsPerSample = (int)((uint)spec.Format & 0xFF);
-        int bytesPerFrame = Math.Max(1, (bitsPerSample / 8) * Math.Max(1, spec.Channels));
-        int frames = data.Data.Length / bytesPerFrame;
-        if (spec.Frequency <= 0)
-            return TimeSpan.Zero;
-        return TimeSpan.FromSeconds((double)frames / spec.Frequency);
     }
 
     #region Audio Streams

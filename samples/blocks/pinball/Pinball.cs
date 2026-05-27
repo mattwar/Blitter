@@ -8,9 +8,9 @@
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
 
-// pinball: a chrome ball drops from the top of the cabinet, 
-// tumbles through a field of circular bumpers and angled
-// slingshots, and drains through a gap in the bottom V-floor.
+// pinball: its pinball.. 
+// Keep the ball bouncing off the bumpers to earn points.
+// Use the flippers to keep it in play.
 
 using System.Numerics;
 
@@ -20,8 +20,7 @@ using Blitter.Blocks;
 
 using SkiaSharp;
 
-//Audio.Enabled = false;
-
+// logical size
 const int W = 720;
 const int H = 960;
 
@@ -38,6 +37,7 @@ var window = new Window2D(W, H)
     Title = "Pinball Blaster",
     BackgroundColor = new Color(8, 12, 24),
     FullScreen = true,
+    RelativeMouseMode = true, // hides the mouse
     CloseKey = Key.Escape,
 };
 
@@ -73,7 +73,7 @@ var scoreboard = new ScoreLayer2D
 var camera = new Camera2D { Position = new Vector2(W / 2f, H / 2f) };
 window.Renderer.Camera = camera;
 
-var shake = new CameraShake2D { Camera = camera, MaxOffset = 14f, Decay = 1.8f };
+var shaker = new CameraShake2D { Camera = camera, MaxOffset = 14f, Decay = 1.8f };
 
 var playField = new PlayField2D
 {
@@ -82,111 +82,75 @@ var playField = new PlayField2D
 
 // Outer walls (drain gap left in the middle of the bottom V).
 const float WallInset = 16f;
+const float CenterGapOffset = 111f;
 
-// Side walls
-playField.AddBarrier(
-    new Wall(
-        new Vector2(WallInset, WallInset), 
-        new Vector2(WallInset, 820f),     
-        new Vector2( 1f, 0f)
-        )); // left
-
-playField.AddBarrier(
-    new Wall(
-        new Vector2(W - WallInset, WallInset), 
-        new Vector2(W - WallInset, 820f), 
-        new Vector2(-1f, 0f)
-        )); // right
-
-playField.AddBarrier(
-    new Wall(
-        new Vector2(WallInset, WallInset),     
-        new Vector2(W - WallInset, WallInset), 
-        new Vector2(0f, 1f)
-        )); // ceiling
-
-// Bottom V-floor
-playField.AddBarrier(new Wall(
-    new Vector2(WallInset,    820f),
-    new Vector2(W / 2f - 95f, 860f),
-    solidFreeSide: new Vector2( 1f, -1f)
-    ));
-
-playField.AddBarrier(new Wall(
-    new Vector2(W - WallInset, 820f),
-    new Vector2(W / 2f + 95f,  860f),
-    solidFreeSide: new Vector2(-1f, -1f)
-    ));
+// side walls
+playField.AddBarriers(
+[
+    new Wall(new Vector2(WallInset, WallInset), new Vector2(WallInset, 820f)), // left
+    new Wall(new Vector2(W - WallInset, WallInset), new Vector2(W - WallInset, 820f)), // right
+    new Wall(new Vector2(WallInset, WallInset), new Vector2(W - WallInset, WallInset)), // top
+    new Wall(new Vector2(WallInset, 820f), new Vector2(W / 2f - CenterGapOffset, 860f)), // bottom left
+    new Wall(new Vector2(W - WallInset, 820f), new Vector2(W / 2f + CenterGapOffset, 860f)), // bottom right
+]);
 
 var bumperSound = Sound.Load(Asset.GetPathRelativeToCaller("bumper.wav"));
 var flipperSound = Sound.Load(Asset.GetPathRelativeToCaller("flipper.wav"));
 var slingshotSound = Sound.Load(Asset.GetPathRelativeToCaller("slingshot.wav"));
 
-// Bumpers. Each pre-synthesizes its own hit sound at a distinct
-// pitch so a multi-bumper combo plays as a little arpeggio.
-// Bigger bumpers get lower notes.
-var bumpers = new[]
-{
-    new Bumper(180f, 280f, 44f, new Color(255,  90, 120), bumperSound, scoreboard, shake),
-    new Bumper(420f, 230f, 44f, new Color( 90, 200, 255), bumperSound, scoreboard, shake),
-    new Bumper(300f, 410f, 50f, new Color(140, 255, 140), bumperSound, scoreboard, shake),
-    new Bumper(140f, 580f, 22f, new Color(255, 200,  90), bumperSound, scoreboard, shake),
-    new Bumper(580f, 580f, 22f, new Color(255, 200,  90), bumperSound, scoreboard, shake),
-};
+// circular bumpers
+playField.AddBarriers(
+[
+    new Bumper(180f, 280f, 44f) { Tint=new Color(255, 90, 120), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.40f },
+    new Bumper(420f, 230f, 44f) { Tint=new Color(90, 200, 255), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.40f },
+    new Bumper(300f, 410f, 50f) { Tint=new Color(140, 255, 140), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.50f },
+    new Bumper(140f, 580f, 22f) { Tint=new Color(255, 200, 90), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.22f },
+    new Bumper(580f, 580f, 22f) { Tint=new Color(255, 200, 90), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.22f },
+]);
 
-playField.AddBarriers(bumpers);
-
-// Slingshots
-var slingLeft  = new Slingshot(
-    new Vector2(WallInset + 8f, 620f),
-    new Vector2(220f,740f),
-    solidFreeSide: new Vector2( 1f, -1f),
-    scoreboard, 
-    shake
-    )
-{
-    HitSound = slingshotSound,
-};
-
-var slingRight = new Slingshot(
-    new Vector2(W - WallInset - 8f, 620f),
-    new Vector2(500f, 740f),
-    solidFreeSide: new Vector2(-1f, -1f),
-    scoreboard, 
-    shake
-    )
-{
-    HitSound = slingshotSound,
-};
-
-playField.AddBarrier(slingLeft);
-playField.AddBarrier(slingRight);
+// slingshots: line barriers that bounce on one-side only
+playField.AddBarriers(
+[
+    // left
+    new Slingshot(
+        new Vector2(WallInset + 8f, 620f), 
+        new Vector2(220f, 740f)) 
+    { 
+        HitSound = slingshotSound 
+    },
+    // right
+    new Slingshot(
+        new Vector2(500f, 740f), 
+        new Vector2(W - WallInset - 8f, 620f)) 
+    { 
+        HitSound = slingshotSound 
+    }
+]);
 
 // Flippers
 var flipperLeft = new Flipper
 {
     HitSound = flipperSound,
-    Pivot = new Vector2(W / 2f - 95f, 870f),
+    Pivot = new Vector2(W / 2f - CenterGapOffset, 870f),
     Length = 90f,
     Radius = 10f,
-    RestAngleDeg =  28f,   // down-right
-    ActiveAngleDeg = -22f,   // up-right
+    RestAngleDeg = 28f, // down-right
+    ActiveAngleDeg = -22f, // up-right
     SnapDegPerSec = 900f,
 };
 
 var flipperRight = new Flipper
 {
     HitSound = flipperSound,
-    Pivot = new Vector2(W / 2f + 95f, 870f),
+    Pivot = new Vector2(W / 2f + CenterGapOffset, 870f),
     Length = 90f,
     Radius = 10f,
-    RestAngleDeg = 180f - 28f,  // down-left
-    ActiveAngleDeg = 180f + 22f,  // up-left
+    RestAngleDeg = 180f - 28f, // down-left
+    ActiveAngleDeg = 180f + 22f, // up-left
     SnapDegPerSec = 1900f,
 };
 
-playField.AddBarrier(flipperLeft);
-playField.AddBarrier(flipperRight);
+playField.AddBarriers([flipperLeft, flipperRight]);
 
 // The "ball"
 var ball = new Pinball
@@ -194,30 +158,26 @@ var ball = new Pinball
     Visual = ballImage,
     Center = plungerSpawn,
     Scale = (BallRadius * 2f) / ballImage.Width,
-};
-
-ball.Behaviors.Add(new Gravity2D { Acceleration = new Vector2(0f, 1400f), MaxFallSpeed = 1600f });
-ball.Behaviors.Add(new Motion2D());
-
-// Bounce physics is normal barrier bouncing
-ball.Behaviors.Add(
-    new BarrierBounce2D
+    Behaviors = 
     {
-        Restitution = 0.82f,
-        TangentialDamping = 0.985f,
-    });
-
-// Plunger + drain controller.
-var plunger = new PlungerController(window.Input, plungerSpawn, DrainY, scoreboard);
-ball.Behaviors.Add(plunger);
-
-// Shake runs after the others so it doesn't get clobbered by camera follow
-ball.Behaviors.Add(shake);
+        new Gravity2D { Acceleration = new Vector2(0f, 1400f), MaxFallSpeed = 1600f },
+        new Motion2D(),
+        new BarrierBounce2D
+        {
+            Restitution = 0.82f,
+            TangentialDamping = 0.985f,
+        },
+        shaker
+    }
+};
 
 playField.AddSprite(ball);
 
+// Scene-wide pinball game controls.
+var gameController = new PinballGameController(window.Input, ball, flipperLeft, flipperRight, plungerSpawn, DrainY);
+
 // The drain isn't an actual barrier
-// we just draw it in its own layer, and let the ball fall through
+// it is drawn as its own 'background' layer
 var drainBand = new CustomLayer2D
 {
     OnRender = rd =>
@@ -235,8 +195,8 @@ var hud = new CustomLayer2D
         using var _ = rd.PushState();
         rd.Camera = null;
 
-        var status = plunger.BallInPlay
-            ? $"BALL {plunger.BallNumber}"
+        var status = gameController.BallInPlay
+            ? $"BALL {gameController.BallNumber}"
             : "SPACE TO DROP";
         scoreFont.DrawText(rd, status, Color.White, 20f, 64f);
 
@@ -259,32 +219,7 @@ var scene = new Scene2D
     },
     Behaviors =
     {
-        new CustomSceneBehavior2D
-        {
-            OnApply = (s, in ctx) =>
-            {
-                // Flippers: each frame, drive Pressed off the shift
-                // keys. The barriers handle slewing + surface velocity
-                // themselves.
-                flipperLeft.Pressed = window.Input.IsDown(Key.LShift);
-                flipperRight.Pressed = window.Input.IsDown(Key.RShift);
-
-                // Nudge: tap arrows to give the ball a small lateral
-                // impulse. Real pinball tilt warning is out of scope.
-                if (!plunger.BallInPlay) return;
-                const float nudge = 90f;
-                if (window.Input.WasJustPressed(Key.Left))
-                {
-                    var v = Sprite2D.GetVelocity(ball.Speed, ball.Heading) + new Vector2(-nudge, 0f);
-                    (ball.Speed, ball.Heading) = Sprite2D.GetSpeedAndHeading(v);
-                }
-                if (window.Input.WasJustPressed(Key.Right))
-                {
-                    var v = Sprite2D.GetVelocity(ball.Speed, ball.Heading) + new Vector2( nudge, 0f);
-                    (ball.Speed, ball.Heading) = Sprite2D.GetSpeedAndHeading(v);
-                }
-            }
-        },
+        gameController,
     },
 };
 
@@ -295,11 +230,12 @@ Console.WriteLine($"Final Score: {scoreboard.Score}");
 
 
 //--------------------------------------------------------------------------------------------------------------------------
-// pure types and helpers below here
+// sprites, barriers, behaviors and helpers
 
 static Bitmap MakeChromeBall(int size)
 {
     var image = Bitmap.Create(size, size);
+
     image.DrawCanvas(canvas =>
     {
         canvas.Clear(SKColors.Transparent);
@@ -332,8 +268,8 @@ static Bitmap MakeChromeBall(int size)
             canvas.DrawCircle(cx, cy, r, paint);
         }
 
-        // Tiny specular highlight — a small, mostly opaque white blob
-        // up-and-left of center.
+        // A small, mostly opaque white blob up-and-left of center
+        // to look like a highlight reflection.
         using (var paint = new SKPaint
         {
             IsAntialias = true,
@@ -352,8 +288,8 @@ static Bitmap MakeChromeBall(int size)
             canvas.DrawCircle(cx - r * 0.40f, cy - r * 0.45f, r * 0.30f, paint);
         }
 
-        // Faint reflected-light arc on the lower-right rim — sells the
-        // sphere as a real metal ball by hinting at ambient bounce.
+        // Faint reflected-light arc on the lower-right rim to make the sphere look 
+        // like a real metal ball by hinting at ambient bounce.
         using (var paint = new SKPaint
         {
             IsAntialias = true,
@@ -372,169 +308,116 @@ static Bitmap MakeChromeBall(int size)
             canvas.DrawCircle(cx, cy, r, paint);
         }
     });
+
     return image;
 }
 
-// A simple pinball: a Sprite2D subclass mostly for typing — its real
-// personality is in the behaviors added at the call site.
+// the pinball
 sealed class Pinball : Sprite2D
 {
-}
-
-// Shared geometry helpers used by the barrier Draw overrides below.
-static class TableDraw
-{
-    public static void ThickLine(Renderer2D rd, Vector2 a, Vector2 b, Color color, float thickness)
-    {
-        var d = b - a;
-        var len = d.Length();
-        if (len <= float.Epsilon) return;
-        var n = new Vector2(-d.Y, d.X) / len;
-        var h = thickness * 0.5f;
-        Span<Vertex2D> verts =
-        [
-            new(a + n * h, color),
-            new(b + n * h, color),
-            new(b - n * h, color),
-            new(a - n * h, color),
-        ];
-        Span<int> idx = [0, 1, 2, 0, 2, 3];
-        rd.DrawGeometry(verts, idx);
-    }
-
-    public static void Disc(Renderer2D rd, Vector2 center, float radius, Color color)
-    {
-        const int Segs = 36;
-        // Highlight center with a brightened color, rim with the
-        // saturated color. DrawGeometry interpolates per-vertex colors
-        // across the triangle fan to get a soft cap-shaped gradient.
-        var hi = new Color(
-            (byte)Math.Min(255, color.R + 80),
-            (byte)Math.Min(255, color.G + 80),
-            (byte)Math.Min(255, color.B + 80));
-
-        Span<Vertex2D> verts = stackalloc Vertex2D[Segs + 1];
-        verts[0] = new Vertex2D(center, hi);
-        for (int i = 0; i < Segs; i++)
-        {
-            var theta = i * (MathF.PI * 2f / Segs);
-            var p = center + new Vector2(MathF.Cos(theta), MathF.Sin(theta)) * radius;
-            verts[i + 1] = new Vertex2D(p, color);
-        }
-        Span<int> idx = stackalloc int[Segs * 3];
-        for (int i = 0; i < Segs; i++)
-        {
-            idx[i * 3] = 0;
-            idx[i * 3 + 1] = 1 + i;
-            idx[i * 3 + 2] = 1 + ((i + 1) % Segs);
-        }
-        rd.DrawGeometry(verts, idx);
-    }
 }
 
 // Generic outer-wall / floor / ceiling segment.
 sealed class Wall : LineBarrier2D
 {
-    public Wall(Vector2 start, Vector2 end, Vector2 solidFreeSide)
-        : base(start, end, solidFreeSide)
+    public Wall(Vector2 start, Vector2 end)
+        : base(start, end)
     {
         Material = BarrierMaterial.Metal;
     }
 
     public override void Draw(Renderer2D renderer)
     {
-        TableDraw.ThickLine(renderer, Start, End, new Color(120, 170, 230), 5f);
+        renderer.DrawThickLine(Start, End, new Color(120, 170, 230), 5f);
     }
 }
 
 // Bumper
 sealed class Bumper : CircleBarrier2D
 {
-    private readonly ScoreLayer2D _score;
-    private readonly CameraShake2D _shake;
-    private readonly Sound _hitSound;
+    public ScoreLayer2D? Scoreboard { get; set; }
+    public CameraShake2D? Shaker { get; set; }
+    public float ShakeTrauma { get; set; } = 0.55f;
+    public Sound? HitSound { get; set;}
+    public Color Tint { get; set; } = Color.White;
 
-    public Color Tint { get; }
-
-    public Bumper(float x, float y, float radius, Color tint, Sound sound, ScoreLayer2D score, CameraShake2D shake)
+    public Bumper(float x, float y, float radius)
         : base(x, y, radius)
     {
-        Tint = tint;
-        _score = score;
-        _shake = shake;
-        _hitSound = sound;
         Material = new BarrierMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 320f);
     }
 
     public override void Draw(Renderer2D renderer)
     {
-        TableDraw.Disc(renderer, Center, Radius, Tint);
+        renderer.DrawDisc(Center, Radius, Tint);
     }
 
     public override void OnHitSprite(Sprite2D hitter, in UpdateContext2D context)
     {
-        _score.PositivePopupColor = Tint;
-        _score.Add(100, hitter.Center);
-        _shake.AddTrauma(0.55f);
-        Audio.Play(_hitSound, 0.6f);
+        if (this.Scoreboard != null)
+        {
+            this.Scoreboard.PositivePopupColor = this.Tint;
+            this.Scoreboard.Add(100, hitter.Center);
+        }
+
+        this.Shaker?.AddTrauma(this.ShakeTrauma);
+
+        if (HitSound != null)
+            Audio.Play(HitSound, 0.6f);
     }
 }
 
-// Typed slingshot — a rubber kicker. Same idea as Bumper: owns its
-// visual and its hit reaction. The line normal precomputed by
-// LineBarrier2D is the outward kick direction.
+// slingshot — a one-sided line bumper
 sealed class Slingshot : LineBarrier2D
 {
-    private readonly ScoreLayer2D _score;
-    private readonly CameraShake2D _shake;
+    public Sound? HitSound { get; set; }
 
-    public Slingshot(Vector2 start, Vector2 end, Vector2 solidFreeSide, ScoreLayer2D score, CameraShake2D shake)
-        : base(start, end, ChooseNormal(start, end, solidFreeSide))
+    public ScoreLayer2D? Scoreboard { get; set; }
+    public long ScorePerHit { get; set; } = 25;
+
+    public CameraShake2D? Shaker { get; set; }
+    public float ShakeTrauma { get; set; } = 0.35f;
+
+    public Slingshot(Vector2 start, Vector2 end)
+        : base(start, end)
     {
-        _score = score;
-        _shake = shake;
+        OneSided = true;
         Material = new BarrierMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 180f);
     }
 
-    public Sound? HitSound { get; set; }
-
     public override void Draw(Renderer2D renderer)
     {
-        TableDraw.ThickLine(renderer, Start, End, new Color(255, 150, 80), 5f);
+        renderer.DrawThickLine(Start, End, new Color(255, 150, 80), 5f);
     }
 
     public override void OnHitSprite(Sprite2D hitter, in UpdateContext2D context)
     {
-        _score.PositivePopupColor = new Color(200, 200, 255);
-        _score.Add(25, hitter.Center);
-        _shake.AddTrauma(0.2f);
-        var sound = this.HitSound;
-        if (sound != null)
-            Audio.Play(sound, 0.7f);
-    }
+        if (this.HitSound is {} hs)
+        {
+            Audio.Play(hs, 0.7f);
+        }
 
-    private static Vector2 ChooseNormal(Vector2 start, Vector2 end, Vector2 solidFreeSide)
-    {
-        var d = end - start;
-        var perp = new Vector2(-d.Y, d.X);
-        if (Vector2.Dot(perp, solidFreeSide) < 0f)
-            perp = -perp;
-        return perp;
+        if (this.Scoreboard is {} sb)
+        {
+            sb.PositivePopupColor = new Color(200, 200, 255);
+            sb.Add(this.ScorePerHit, hitter.Center);
+        }
+        
+        if (this.Shaker is {} shaker)
+        {
+            shaker.AddTrauma(this.ShakeTrauma);
+        }
     }
 }
 
-// Typed flipper — inherits the capsule physics + slewing from
-// SwingArmBarrier2D and adds a self-drawn visual: a chunky capsule
-// from pivot to tip plus a small pivot disc. The tint shifts gold
-// while Pressed for visual feedback.
+// Flipper: a swinging barrier with visual and hit sounds
 sealed class Flipper : SwingArmBarrier2D
 {
     public Sound? HitSound { get; set;}
 
     protected override void OnPressed(in UpdateContext2D context)
     {
-        var sound = this.HitSound;
-        if (sound != null)
+        if (this.HitSound is {} sound)
             Audio.Play(sound, 0.5f);
     }
 
@@ -543,47 +426,65 @@ sealed class Flipper : SwingArmBarrier2D
         var tint = Pressed
             ? new Color(255, 230, 120)
             : new Color(220, 220, 235);
-        TableDraw.ThickLine(renderer, Pivot, Tip, tint, Radius * 2f);
-        TableDraw.Disc(renderer, Pivot, Radius + 2f, new Color(180, 180, 200));       
+        renderer.DrawThickLine(Pivot, Tip, tint, Radius * 2f);
+        renderer.DrawDisc(Pivot, Radius + 2f, new Color(180, 180, 200));
     }
 }
 
-// Launches the ball on Space, watches for drain, and respawns. Holds
-// the current ball number so the HUD can read it.
-sealed class PlungerController : SpriteBehavior2D
+// Coordinates pinball gameplay controls and ball lifecycle at scene scope.
+sealed class PinballGameController : SceneBehavior2D
 {
     private readonly FrameInput _input;
+    private readonly Pinball _ball;
+    private readonly Flipper _flipperLeft;
+    private readonly Flipper _flipperRight;
     private readonly Vector2 _spawn;
     private readonly float _drainY;
-    private readonly ScoreLayer2D _score;
 
-    public PlungerController(FrameInput input, Vector2 spawn, float drainY, ScoreLayer2D score)
+    public PinballGameController(
+        FrameInput input,
+        Pinball ball,
+        Flipper flipperLeft,
+        Flipper flipperRight,
+        Vector2 spawn,
+        float drainY)
     {
         _input = input;
+        _ball = ball;
+        _flipperLeft = flipperLeft;
+        _flipperRight = flipperRight;
         _spawn = spawn;
         _drainY = drainY;
-        _score = score;
         BallInPlay = false;
         BallNumber = 0;
     }
 
-    /// <summary>True between launch and drain.</summary>
+    /// <summary>
+    /// True between launch and drain.
+    /// </summary>
     public bool BallInPlay { get; private set; }
 
-    /// <summary>Increments on each launch; lets the HUD show "BALL 3".</summary>
+    /// <summary>
+    /// Increments on each launch so the HUD can show the current ball number.
+    /// </summary>
     public int BallNumber { get; private set; }
 
     private readonly Random _rng = new();
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+    public override void Apply(Scene2D scene, in UpdateContext2D context)
     {
+        // Flippers: each frame, drive Pressed off the shift keys.
+        // The barriers handle slewing and surface velocity.
+        _flipperLeft.Pressed = _input.IsDown(Key.LShift);
+        _flipperRight.Pressed = _input.IsDown(Key.RShift);
+
         if (!BallInPlay)
         {
             // Park the ball at the drop point and freeze it. Space
             // drops it with a small random horizontal kick so each
             // ball plays differently.
-            target.Center = _spawn;
-            target.Speed = 0f;
+            _ball.Center = _spawn;
+            _ball.Speed = 0f;
             if (_input.WasJustPressed(Key.Space))
             {
                 BallInPlay = true;
@@ -591,16 +492,30 @@ sealed class PlungerController : SpriteBehavior2D
                 // Heading: 180 = straight down. ±25° gives some lateral
                 // entry so the ball doesn't fall through the same gap
                 // every time.
-                target.Heading = 180f + ((float)_rng.NextDouble() - 0.5f) * 50f;
-                target.Speed = 380f;
+                _ball.Heading = 180f + ((float)_rng.NextDouble() - 0.5f) * 50f;
+                _ball.Speed = 380f;
                 Audio.Play(Sounds.Jump, 0.7f);
             }
             return;
         }
 
+        // Nudge: tap arrows to give the ball a small lateral impulse.
+        // Real pinball tilt warning is out of scope.
+        const float nudge = 90f;
+        if (_input.WasJustPressed(Key.Left))
+        {
+            var v = Sprite2D.GetVelocity(_ball.Speed, _ball.Heading) + new Vector2(-nudge, 0f);
+            (_ball.Speed, _ball.Heading) = Sprite2D.GetSpeedAndHeading(v);
+        }
+        if (_input.WasJustPressed(Key.Right))
+        {
+            var v = Sprite2D.GetVelocity(_ball.Speed, _ball.Heading) + new Vector2(nudge, 0f);
+            (_ball.Speed, _ball.Heading) = Sprite2D.GetSpeedAndHeading(v);
+        }
+
         // Drain detection — purely positional so the drain region
         // doesn't need to participate in the bounce pass.
-        if (target.Center.Y > _drainY)
+        if (_ball.Center.Y > _drainY)
         {
             BallInPlay = false;
             Audio.Play(Sounds.Hurt, 0.7f);

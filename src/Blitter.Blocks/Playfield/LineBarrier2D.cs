@@ -6,44 +6,44 @@ namespace Blitter.Blocks;
 
 /// <summary>
 /// A barrier defined by a single line segment. Compose several to
-/// build rectangles, maze walls, polylines, etc.
+/// build rectangles, maze walls, polylines, etc. Bounces sprites from
+/// either side by default; set <see cref="OneSided"/> to restrict
+/// collisions to one side (jump-through floors, one-way kickers, etc.).
 /// </summary>
-/// <remarks>
-/// Each segment has an outward <see cref="Normal"/> (the half-space the
-/// barrier protects) and an optional <see cref="OneSided"/> flag for
-/// jump-through floors. Use the named factories (<see cref="Floor"/>,
-/// <see cref="Ceiling"/>, <see cref="WallLeft"/>, <see cref="WallRight"/>,
-/// <see cref="Slope"/>, <see cref="Rect"/>) so you don't have to think
-/// about winding.
-/// </remarks>
 public class LineBarrier2D : Barrier2D
 {
     public Vector2 Start { get; }
     public Vector2 End { get; }
 
     /// <summary>
-    /// Unit vector perpendicular to the segment, pointing toward the
-    /// "solid-free" side. Hit handlers classify floor / wall / ceiling
-    /// by inspecting this.
+    /// Unit vector perpendicular to the segment, derived from the
+    /// winding (<see cref="Start"/> → <see cref="End"/>). Walk the
+    /// segment from start to end: <c>Normal</c> points to your left.
+    /// Only consulted when <see cref="OneSided"/> is true or by
+    /// user code that wants a stable "front-side" classifier; the
+    /// bounce itself uses the contact direction at collision time.
+    /// May be overridden via object initializer.
     /// </summary>
-    public Vector2 Normal { get; }
+    public Vector2 Normal { get; init; }
 
     /// <summary>
     /// When true, sprites only collide when their center is on the
-    /// <see cref="Normal"/> side of the segment. Use for jump-through
-    /// platforms. Fast-moving sprites can still tunnel through; that's
-    /// caller's problem to solve (substep, max fall speed, etc.).
+    /// <see cref="Normal"/> side of the segment. The bouncing side
+    /// is determined by winding: walking from <see cref="Start"/> to
+    /// <see cref="End"/>, sprites collide on your left. If a one-sided
+    /// barrier bounces from the wrong side, swap the endpoints.
     /// </summary>
-    public bool OneSided { get; init; }
+    public bool OneSided { get; set; }
 
     /// <summary>
-    /// Creates a segment with an outward normal computed from the winding:
-    /// for clockwise loops in screen-space (Y-down) the normal points
-    /// outward. For freestanding segments prefer the named factories.
+    /// Creates a two-sided segment between <paramref name="start"/>
+    /// and <paramref name="end"/>.
     /// </summary>
     public LineBarrier2D(Vector2 start, Vector2 end)
-        : this(start, end, DefaultNormal(start, end))
     {
+        Start = start;
+        End = end;
+        Normal = DefaultNormal(start, end);
     }
 
     public LineBarrier2D(float x1, float y1, float x2, float y2)
@@ -51,23 +51,8 @@ public class LineBarrier2D : Barrier2D
     {
     }
 
-    /// <summary>
-    /// Creates a segment with an explicit outward normal. <paramref name="normal"/>
-    /// is normalized; a zero vector falls back to the winding-derived normal.
-    /// </summary>
-    public LineBarrier2D(Vector2 start, Vector2 end, Vector2 normal)
-    {
-        Start = start;
-        End = end;
-        var lenSq = normal.LengthSquared();
-        Normal = lenSq > float.Epsilon
-            ? normal / MathF.Sqrt(lenSq)
-            : DefaultNormal(start, end);
-    }
-
-    // Perpendicular of (End-Start) that points "outward" for a
-    // clockwise-wound loop in screen-space (Y-down): rotate the
-    // direction -90° visually.
+    // Perpendicular of (End-Start) rotated so that, walking from start
+    // to end in screen-space (Y-down), the result points to your left.
     private static Vector2 DefaultNormal(Vector2 start, Vector2 end)
     {
         var d = end - start;
@@ -80,49 +65,33 @@ public class LineBarrier2D : Barrier2D
 
     /// <summary>
     /// Horizontal floor at <paramref name="y"/> from <paramref name="xLeft"/>
-    /// to <paramref name="xRight"/>. Normal points up (toward -Y).
+    /// to <paramref name="xRight"/>. Normal points up.
     /// </summary>
     public static LineBarrier2D Floor(float xLeft, float xRight, float y, bool oneSided = false)
-        => new(new Vector2(xLeft, y), new Vector2(xRight, y), new Vector2(0f, -1f))
+        => new(new Vector2(xLeft, y), new Vector2(xRight, y))
         {
             OneSided = oneSided,
         };
 
     /// <summary>
-    /// Horizontal ceiling at <paramref name="y"/>. Normal points down (toward +Y).
+    /// Horizontal ceiling at <paramref name="y"/>. Normal points down.
     /// </summary>
     public static LineBarrier2D Ceiling(float xLeft, float xRight, float y)
-        => new(new Vector2(xLeft, y), new Vector2(xRight, y), new Vector2(0f, 1f));
+        => new(new Vector2(xRight, y), new Vector2(xLeft, y));
 
     /// <summary>
     /// Vertical wall at <paramref name="x"/> with sprites expected to stay on
     /// the left of it. Normal points -X.
     /// </summary>
     public static LineBarrier2D WallLeft(float x, float yTop, float yBottom)
-        => new(new Vector2(x, yTop), new Vector2(x, yBottom), new Vector2(-1f, 0f));
+        => new(new Vector2(x, yBottom), new Vector2(x, yTop));
 
     /// <summary>
     /// Vertical wall at <paramref name="x"/> with sprites expected to stay on
     /// the right of it. Normal points +X.
     /// </summary>
     public static LineBarrier2D WallRight(float x, float yTop, float yBottom)
-        => new(new Vector2(x, yTop), new Vector2(x, yBottom), new Vector2(1f, 0f));
-
-    /// <summary>
-    /// Arbitrary segment whose outward normal is whichever of the two
-    /// perpendiculars points toward <paramref name="solidFreeSide"/>.
-    /// </summary>
-    public static LineBarrier2D Slope(Vector2 start, Vector2 end, Vector2 solidFreeSide, bool oneSided = false)
-    {
-        var d = end - start;
-        var perp = new Vector2(-d.Y, d.X);
-        if (Vector2.Dot(perp, solidFreeSide) < 0f)
-            perp = -perp;
-        return new LineBarrier2D(start, end, perp)
-        {
-            OneSided = oneSided,
-        };
-    }
+        => new(new Vector2(x, yTop), new Vector2(x, yBottom));
 
     /// <summary>
     /// Builds the four edges of an axis-aligned rectangle as a single
