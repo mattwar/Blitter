@@ -5,10 +5,18 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- New `Blitter.Blocks3D` project / namespace. Currently a placeholder
-  assembly that will host 3D scene, actor, playfield and behavior
-  types. Bundled into the `Blitter` NuGet package alongside
-  `Blitter.Blocks2D`.
+- `Blitter.Blocks3D` basic building blocks: `Scene3D`, `Layer3D`,
+  `CustomLayer3D`, `SceneBehavior3D`, `Behavior3D`, `SpriteBehavior3D`,
+  `Sprite3D`, `Barrier3D`, `PlayField3D`.
+- `Visual3D` in `Blitter.Bits`: abstract 3D visual with state, bounding
+  sphere, hit shape, and `Draw(Renderer3D, in Pose3D, Color, TimeSpan)`.
+- `HitShape3D` family in `Blitter.Bits`: `HitShape3D`, `PosedHitShape3D`,
+  `SphereHitShape3D`, `CapsuleHitShape3D`, `HitPrimitive3D`,
+  `HitTester3D` + `IntersectsHitTester3D`.
+- `Pose3D` struct: position + quaternion rotation + uniform scale,
+  with `Transform(Vector3)` and `ToMatrix()`.
+- `RunState` enum moved to `Blitter` namespace so scenes in any
+  dimension share it.
 - `Audio.DeviceRotationPlayCount` periodically tears down and reopens
   the SDL audio subsystem to work around an SDL3/WASAPI heap crash
   inside `PutAudioStreamData` during sustained playback. Rotation is

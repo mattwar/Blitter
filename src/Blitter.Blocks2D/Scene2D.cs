@@ -3,19 +3,6 @@ using System.Collections;
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// Lifecycle state of a <see cref="Scene2D"/>'s run loop.
-/// </summary>
-public enum RunState
-{
-    /// <summary>The scene is running normally.</summary>
-    Running,
-    /// <summary>Exit has been requested; the scene keeps advancing until all exit conditions are met.</summary>
-    Exiting,
-    /// <summary>All exit conditions have been met; the run loop has stopped (or will on its next check).</summary>
-    Exited,
-}
-
-/// <summary>
 /// A 2D scene comprised of one or more layers.
 /// </summary>
 public class Scene2D
