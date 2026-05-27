@@ -16,7 +16,7 @@ using SkiaSharp;
 
 // Fixed design surface. The renderer letterboxes this into whatever
 // the actual window size is, so the playfield stays a constant
-// 1920x1080 regardless of monitor resolution or fullscreen toggles.
+// 1920x1080 regardless of monitor resolution or fullscreen toggles. 
 const int DesignW = 1920;
 const int DesignH = 1080;
 
