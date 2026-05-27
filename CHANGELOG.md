@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- New `Blitter.Blocks3D` project / namespace. Currently a placeholder
+  assembly that will host 3D scene, actor, playfield and behavior
+  types. Bundled into the `Blitter` NuGet package alongside
+  `Blitter.Blocks2D`.
 - `Audio.DeviceRotationPlayCount` periodically tears down and reopens
   the SDL audio subsystem to work around an SDL3/WASAPI heap crash
   inside `PutAudioStreamData` during sustained playback. Rotation is
@@ -49,6 +53,10 @@ All notable changes to this project will be documented in this file.
   chrome ball (SkiaSharp radial gradient — no asset files).
 
 ### Changed
+- **Breaking:** the `Blitter.Blocks` project and namespace are renamed
+  to `Blitter.Blocks2D` (assembly `Blitter.Blocks2D.dll`). Update any
+  `using Blitter.Blocks;` to `using Blitter.Blocks2D;`. A future
+  `Blitter.Blocks3D` will host the 3D scene/actor types.
 - `PlayField2D` runs adaptive global substepping for sprite
   collisions: when the fastest sprite would move more than half its
   hit radius in one frame, the per-frame update loop runs N times

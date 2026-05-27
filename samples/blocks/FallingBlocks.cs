@@ -8,13 +8,13 @@
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
 
-// Minimal showcase of Blitter.Blocks.Spawner2D: a steady rain of
+// Minimal showcase of Blitter.Blocks2D.Spawner2D: a steady rain of
 // colored squares fall from above and disappear off the bottom.
 // Press Escape to exit, Space to pause/resume the spawner.
 
 using System.Numerics;
 using Blitter;
-using Blitter.Blocks;
+using Blitter.Blocks2D;
 
 const int W = 800, H = 600;
 var rng = new Random(42);

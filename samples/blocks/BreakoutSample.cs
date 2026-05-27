@@ -23,7 +23,7 @@ using System.Numerics;
 
 using Blitter;
 using Blitter.Bits;
-using Blitter.Blocks;
+using Blitter.Blocks2D;
 
 const int W = 960;
 const int H = 720;

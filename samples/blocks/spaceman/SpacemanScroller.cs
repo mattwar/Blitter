@@ -19,7 +19,7 @@ using System.Numerics;
 
 using Blitter;
 using Blitter.Bits;
-using Blitter.Blocks;
+using Blitter.Blocks2D;
 
 // Logical surface matches the artwork (1920x1080). 
 // Window is half that size and letterboxes so it scales cleanly.

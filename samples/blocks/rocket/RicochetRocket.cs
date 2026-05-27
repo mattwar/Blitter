@@ -11,7 +11,7 @@
 using System.Numerics;
 using Blitter;
 using Blitter.Bits;
-using Blitter.Blocks;
+using Blitter.Blocks2D;
 using SkiaSharp;
 
 // Fixed design surface. The renderer letterboxes this into whatever
