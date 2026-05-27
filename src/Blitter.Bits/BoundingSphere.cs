@@ -103,6 +103,29 @@ public readonly struct BoundingSphere : IEquatable<BoundingSphere>
     }
 
     /// <summary>
+    /// Returns the smallest sphere that contains both this sphere and
+    /// <paramref name="other"/>. Empty operands are skipped; if one
+    /// fully contains the other, the containing sphere is returned
+    /// unchanged.
+    /// </summary>
+    public BoundingSphere Encapsulate(BoundingSphere other)
+    {
+        if (other.IsEmpty) return this;
+        if (IsEmpty) return other;
+
+        var delta = other.Center - Center;
+        float dist = delta.Length();
+        if (Radius >= dist + other.Radius) return this;
+        if (other.Radius >= dist + Radius) return other;
+
+        float newRadius = (Radius + other.Radius + dist) * 0.5f;
+        var newCenter = dist > 1e-6f
+            ? Center + delta * ((newRadius - Radius) / dist)
+            : Center;
+        return new BoundingSphere(newCenter, newRadius);
+    }
+
+    /// <summary>
     /// Returns the sphere that bounds this one after applying
     /// <paramref name="matrix"/>. Translation/rotation move the center;
     /// scale grows the radius by the largest absolute axis scale (so the

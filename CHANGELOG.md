@@ -35,6 +35,35 @@ All notable changes to this project will be documented in this file.
 - 2D hit primitive gains a `Box` kind (solid oriented rectangle);
   `HitPrimitive2D` now carries a `Rotation` (radians) field.
 - 2D hit shape: `BoxHitShape2D` (with Klein-4 flip family).
+- `MeshVisual3D` (mesh + material) and `ModelVisual3D` (multi-part
+  model) in `Blitter.Bits`, with implicit conversions from `Mesh` and
+  `Model` to `Visual3D` mirroring the 2D `Texture2D → Visual2D` sugar.
+- `MeshVisual3D` primitive factories — `Cube`, `Sphere`, `Capsule`,
+  `Cylinder`, `Plane`, `Cone`, `Torus`, `Icosphere`, `Tetrahedron`,
+  `Octahedron`, `Icosahedron` — each wired up to the tightest matching
+  `HitShape3D` (box / sphere / capsule / cylinder / wall), with the
+  auto-fit cache covering the rest.
+- Mesh / model visuals auto-fit a `HitShape3D` from the geometry,
+  picking the smallest-volume of box / sphere / capsule / cylinder
+  candidates (the 3D analog of the 2D opaque-pixel fit). For models,
+  each part's mesh is fit independently and the results are bundled
+  in a new `CompositeHitShape3D` so a multi-part model gets one
+  primitive per part.
+- `HitShape3DCache` (mirroring 2D `HitShapeCache`) shares fits across
+  visuals that reference the same `Mesh` or `Model`; subclass to
+  customize.
+- `CompositeHitShape3D`: a `HitShape3D` made of one or more sub-shapes;
+  hit-tests short-circuit on first overlap, primitive enumeration
+  concatenates across all subs.
+- `BoundingSphere.Encapsulate(BoundingSphere)` overload.
+- `MeshVisual3D` / `ModelVisual3D` apply the sprite-level tint by
+  routing the draw through the existing `LitTextureInstanced` shader
+  as a single stack-allocated `TransformAndColorInstance`, so tint
+  works on `LitTextureMaterial` surfaces with zero per-frame heap
+  allocations. The no-tint case stays on the non-instanced shader.
+- `MeshBounds.ComputeBoundingBox(this Mesh)` and
+  `MeshBounds.ComputeBoundingSphere(this Mesh)` non-generic overloads
+  that dispatch across the stock vertex layouts.
 - `Blitter.Blocks3D` basic building blocks: `Scene3D`, `Layer3D`,
   `CustomLayer3D`, `SceneBehavior3D`, `Behavior3D`, `SpriteBehavior3D`,
   `Sprite3D`, `Barrier3D`, `PlayField3D`.

@@ -44,4 +44,18 @@ public abstract class Visual3D
     /// Draws this visual with the specified pose, color tint, and time.
     /// </summary>
     public abstract void Draw(Renderer3D renderer, in Pose3D pose, Color tint, TimeSpan elapsed);
+
+    /// <summary>
+    /// Auto-converts a <see cref="Mesh"/> to a <see cref="MeshVisual3D"/>
+    /// with a default white <see cref="LitTextureMaterial"/>, so users
+    /// can assign a mesh directly to a visual-typed property.
+    /// </summary>
+    public static implicit operator Visual3D(Mesh mesh) =>
+        new MeshVisual3D(mesh, LitTextureMaterial.Default);
+
+    /// <summary>
+    /// Auto-converts a <see cref="Model"/> to a <see cref="ModelVisual3D"/>.
+    /// </summary>
+    public static implicit operator Visual3D(Model model) =>
+        new ModelVisual3D(model);
 }
