@@ -84,7 +84,7 @@ public readonly struct HitPrimitive3D
     public static HitPrimitive3D Sphere(Vector3 center, float radius) =>
         new(HitKind3D.Sphere, center, default, radius, Quaternion.Identity);
 
-    /// <summary>
+    /// <summary> 
     /// Builds a capsule primitive: a cylinder with spherical caps.
     /// </summary>
     public static HitPrimitive3D Capsule(Vector3 a, Vector3 b, float radius) =>

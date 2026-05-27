@@ -5,35 +5,29 @@ using Blitter.Bits;
 namespace Blitter.Blocks3D;
 
 /// <summary>
-/// A barrier based on a mesh.
+/// A barrier based on a mesh. Treats the mesh as immutable from a
+/// collision standpoint: the position / face-normal extraction runs
+/// once per <see cref="Mesh"/> instance and is shared across every
+/// barrier wrapping that mesh.
 /// </summary>
 public class MeshBarrier3D<TVertex> : Barrier3D
     where TVertex : unmanaged, IPositionVertex3D
 {
     private readonly Mesh<TVertex> _mesh;
-
-    // Hot-path caches. Rebuilt when _mesh.Version changes so that
-    // collision-time loops touch a tight Vector3[] (12 B/elem) rather
-    // than dragging full vertices (often 32-56 B/elem) through cache.
-    private Vector3[] _positions = Array.Empty<Vector3>();
-    private Vector3[] _faceNormals = Array.Empty<Vector3>();
-    private BoundingSphere _bounds;
-    private int _cachedVersion = -1;
+    private readonly MeshHitShape3D _hitShape;
 
     /// <summary>
     /// Wraps <paramref name="mesh"/> as a barrier. The mesh's topology
     /// must be <see cref="Topology.TriangleList"/>; vertex positions
     /// are read in whatever space they're authored in, so pre-transform
-    /// to world space if the barrier won't move.
+    /// to world space if the barrier won't move. Later updates to the
+    /// mesh's vertex data are not picked up by collision.
     /// </summary>
     public MeshBarrier3D(Mesh<TVertex> mesh)
     {
         ArgumentNullException.ThrowIfNull(mesh);
-        if (mesh.Topology != Topology.TriangleList)
-            throw new ArgumentException(
-                $"MeshBarrier3D requires {nameof(Topology)}.{nameof(Topology.TriangleList)}; got {mesh.Topology}.",
-                nameof(mesh));
         _mesh = mesh;
+        _hitShape = MeshHitShape3D.For(mesh);
     }
 
     /// <summary>
@@ -43,288 +37,30 @@ public class MeshBarrier3D<TVertex> : Barrier3D
     public Mesh<TVertex> Mesh => _mesh;
 
     /// <summary>Number of triangles in the mesh.</summary>
-    public int TriangleCount
-    {
-        get
-        {
-            EnsureCache();
-            return _positions.Length / 3;
-        }
-    }
+    public int TriangleCount => _hitShape.TriangleCount;
 
     /// <summary>Broad-phase sphere enclosing every vertex.</summary>
-    public BoundingSphere Bounds
-    {
-        get
-        {
-            EnsureCache();
-            return _bounds;
-        }
-    }
+    public BoundingSphere Bounds => _hitShape.Bounds;
 
     /// <summary>
     /// Per-triangle outward face normals, derived from each triangle's
     /// winding (<c>Cross(v1-v0, v2-v0)</c> normalised). Degenerate
     /// (zero-area) triangles yield <see cref="Vector3.Zero"/>.
     /// </summary>
-    public ReadOnlySpan<Vector3> FaceNormals
-    {
-        get
-        {
-            EnsureCache();
-            return _faceNormals;
-        }
-    }
+    public ReadOnlySpan<Vector3> FaceNormals => _hitShape.FaceNormals;
 
     /// <inheritdoc/>
-    public override PosedHitShape3D HitShape
-    {
-        get
-        {
-            EnsureCache();
-            // The hit shape borrows the live caches; rebuilt whenever
-            // the mesh version changes.
-            return new PosedHitShape3D(
-                new MeshHitShape3D(_positions, _faceNormals, _bounds),
-                Pose3D.Identity);
-        }
-    }
+    public override PosedHitShape3D HitShape =>
+        new(_hitShape, Pose3D.Identity);
 
     /// <summary>True when <paramref name="sphere"/> overlaps any of this mesh's triangles.</summary>
-    public bool Intersects(BoundingSphere sphere)
-    {
-        EnsureCache();
-        if (sphere.IsEmpty || !_bounds.Intersects(sphere))
-            return false;
-
-        var r2 = sphere.Radius * sphere.Radius;
-        var c = sphere.Center;
-        var verts = _positions;
-        for (int i = 0; i < verts.Length; i += 3)
-        {
-            var closest = Geometry3D.ClosestPointOnTriangle(c, verts[i], verts[i + 1], verts[i + 2]);
-            if (Vector3.DistanceSquared(c, closest) <= r2)
-                return true;
-        }
-        return false;
-    }
+    public bool Intersects(BoundingSphere sphere) => _hitShape.Intersects(sphere);
 
     /// <summary>
     /// Closed-form sphere-vs-mesh contact: picks the nearest triangle
     /// and uses its outward face normal. <paramref name="normal"/>
     /// points from the surface toward the sphere.
     /// </summary>
-    public bool TryGetContact(BoundingSphere sphere, out Vector3 normal, out float penetration)
-    {
-        normal = default;
-        penetration = 0f;
-        EnsureCache();
-        if (sphere.IsEmpty || !_bounds.Intersects(sphere))
-            return false;
-
-        var c = sphere.Center;
-        var verts = _positions;
-        var faces = _faceNormals;
-        var bestDistSq = float.PositiveInfinity;
-        var bestNormal = Vector3.UnitY;
-        for (int i = 0, t = 0; i < verts.Length; i += 3, t++)
-        {
-            var closest = Geometry3D.ClosestPointOnTriangle(c, verts[i], verts[i + 1], verts[i + 2]);
-            var distSq = Vector3.DistanceSquared(c, closest);
-            if (distSq < bestDistSq)
-            {
-                bestDistSq = distSq;
-                var face = faces[t];
-                if (face.LengthSquared() <= float.Epsilon)
-                {
-                    var delta = c - closest;
-                    var dl = delta.LengthSquared();
-                    bestNormal = dl > float.Epsilon ? delta / MathF.Sqrt(dl) : Vector3.UnitY;
-                }
-                else
-                {
-                    bestNormal = face;
-                }
-            }
-        }
-        if (bestDistSq > sphere.Radius * sphere.Radius)
-            return false;
-        normal = bestNormal;
-        penetration = sphere.Radius - MathF.Sqrt(bestDistSq);
-        return true;
-    }
-
-    private void EnsureCache()
-    {
-        if (_cachedVersion == _mesh.Version)
-            return;
-
-        var verts = _mesh.Vertices;
-        var indices = _mesh.Indices;
-
-        int positionCount;
-        if (indices.Length > 0)
-        {
-            if (indices.Length % 3 != 0)
-                throw new InvalidOperationException("Mesh index count is not a multiple of 3.");
-            positionCount = indices.Length;
-        }
-        else
-        {
-            if (verts.Length % 3 != 0)
-                throw new InvalidOperationException("Mesh vertex count is not a multiple of 3.");
-            positionCount = verts.Length;
-        }
-
-        if (_positions.Length != positionCount)
-        {
-            _positions = new Vector3[positionCount];
-            _faceNormals = new Vector3[positionCount / 3];
-        }
-
-        if (indices.Length > 0)
-        {
-            for (int i = 0; i < indices.Length; i++)
-                _positions[i] = verts[(int)indices[i]].Position;
-        }
-        else
-        {
-            for (int i = 0; i < verts.Length; i++)
-                _positions[i] = verts[i].Position;
-        }
-
-        for (int i = 0, t = 0; i < _positions.Length; i += 3, t++)
-        {
-            var n = Vector3.Cross(_positions[i + 1] - _positions[i], _positions[i + 2] - _positions[i]);
-            var lenSq = n.LengthSquared();
-            _faceNormals[t] = lenSq > float.Epsilon ? n / MathF.Sqrt(lenSq) : Vector3.Zero;
-        }
-
-        _bounds = BoundingSphere.FromPoints(_positions);
-        _cachedVersion = _mesh.Version;
-    }
-}
-
-/// <summary>
-/// Triangle-soup <see cref="HitShape3D"/> backed by a flat array of
-/// world-space vertex positions (three per triangle) plus matching
-/// outward face normals. Iterates triangles inline at hit-test time
-/// and dispatches via <see cref="HitPrimitive3D.Triangle"/>.
-/// </summary>
-public sealed class MeshHitShape3D : HitShape3D
-{
-    private readonly Vector3[] _positions;
-    private readonly Vector3[] _faceNormals;
-    private readonly BoundingSphere _bounds;
-
-    internal MeshHitShape3D(Vector3[] positions, Vector3[] faceNormals, BoundingSphere bounds)
-    {
-        _positions = positions;
-        _faceNormals = faceNormals;
-        _bounds = bounds;
-    }
-
-    public override BoundingSphere LocalBoundary => _bounds;
-
-    public override int PrimitiveCount => _positions.Length / 3;
-
-    public override bool TestHit(in Pose3D mine, in PosedHitShape3D other, HitTester3D tester)
-    {
-        var verts = _positions;
-        // Per-tri broad-phase prune is sphere-vs-triangle (not the
-        // cheapest test) so only do it when the other side has more
-        // than one primitive to skip.
-        bool prune = other.Shape.PrimitiveCount > 1;
-        HitPrimitive3D otherBound = prune ? (HitPrimitive3D)other.BoundingSphere : default;
-        for (int i = 0; i < verts.Length; i += 3)
-        {
-            var tri = TrianglePrimitive(in mine, verts, i);
-            if (prune && !tester.TestHit(in tri, in otherBound))
-                continue;
-            if (other.Shape.TestHit(in other.Pose, in tri, tester))
-                return true;
-        }
-        return false;
-    }
-
-    public override bool TestHit(in Pose3D mine, in HitPrimitive3D otherPrim, HitTester3D tester)
-    {
-        var verts = _positions;
-        for (int i = 0; i < verts.Length; i += 3)
-        {
-            var tri = TrianglePrimitive(in mine, verts, i);
-            if (tester.TestHit(in tri, in otherPrim))
-                return true;
-        }
-        return false;
-    }
-
-    public override bool TryGetContact(in Pose3D mine, in PosedHitShape3D other, HitTester3D tester, out HitContact3D contact)
-    {
-        var verts = _positions;
-        bool found = false;
-        HitContact3D best = default;
-        bool prune = other.Shape.PrimitiveCount > 1;
-        HitPrimitive3D otherBound = prune ? (HitPrimitive3D)other.BoundingSphere : default;
-        for (int i = 0; i < verts.Length; i += 3)
-        {
-            var tri = TrianglePrimitive(in mine, verts, i);
-            if (prune && !tester.TestHit(in tri, in otherBound))
-                continue;
-            // other.TryGetContact(tri) returns "from tri → other"; flip
-            // to "from other → me".
-            if (other.Shape.TryGetContact(in other.Pose, in tri, tester, out var c))
-            {
-                c = c.Flipped();
-                if (!found || c.Penetration > best.Penetration)
-                {
-                    best = c;
-                    found = true;
-                }
-            }
-        }
-        contact = best;
-        return found;
-    }
-
-    public override bool TryGetContact(in Pose3D mine, in HitPrimitive3D otherPrim, HitTester3D tester, out HitContact3D contact)
-    {
-        var verts = _positions;
-        bool found = false;
-        HitContact3D best = default;
-        for (int i = 0; i < verts.Length; i += 3)
-        {
-            var tri = TrianglePrimitive(in mine, verts, i);
-            // tester.TryGetContact(tri, otherPrim) returns "from otherPrim → tri"
-            // = "from external → me". Receiver convention; no flip.
-            if (tester.TryGetContact(in tri, in otherPrim, out var c)
-                && (!found || c.Penetration > best.Penetration))
-            {
-                best = c;
-                found = true;
-            }
-        }
-        contact = best;
-        return found;
-    }
-
-    public override void Visit(in Pose3D mine, HitPrimitiveAction3D action)
-    {
-        var verts = _positions;
-        for (int i = 0; i < verts.Length; i += 3)
-        {
-            var tri = TrianglePrimitive(in mine, verts, i);
-            action(in tri);
-        }
-    }
-
-    public override HitShape3D Translate(Vector3 offset) =>
-        throw new NotSupportedException(
-            $"{nameof(MeshHitShape3D)} caches its mesh data and cannot be translated; translate the source mesh instead.");
-
-    private static HitPrimitive3D TrianglePrimitive(in Pose3D pose, Vector3[] verts, int i) =>
-        HitPrimitive3D.Triangle(
-            pose.Transform(verts[i]),
-            pose.Transform(verts[i + 1]),
-            pose.Transform(verts[i + 2]));
+    public bool TryGetContact(BoundingSphere sphere, out Vector3 normal, out float penetration) =>
+        _hitShape.TryGetContact(sphere, out normal, out penetration);
 }
