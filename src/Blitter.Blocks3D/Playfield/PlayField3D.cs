@@ -235,8 +235,8 @@ public class PlayField3D : Layer3D
             var sprite = _sprites[i];
             if (!sprite.IsAlive || !sprite.CanBeHit)
                 continue;
-            var sphere = sprite.HitSphere;
-            if (sphere.Radius <= 0f)
+            var spriteShape = sprite.HitShape;
+            if (spriteShape.BoundingSphere.IsEmpty)
                 continue;
 
             for (int j = 0; j < _barriers.Count; j++)
@@ -244,7 +244,7 @@ public class PlayField3D : Layer3D
                 if (!sprite.IsAlive)
                     break;
                 var barrier = _barriers[j];
-                if (!barrier.Intersects(sphere))
+                if (!spriteShape.TestHit(barrier.HitShape))
                     continue;
                 sprite.OnHitBarrier(barrier, spriteContext);
                 if (sprite.IsAlive)

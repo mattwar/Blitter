@@ -124,27 +124,22 @@ public class WallBarrier3D : Barrier3D
     }
 
     /// <inheritdoc/>
-    public override bool Intersects(BoundingSphere sphere)
+    public override PosedHitShape3D HitShape
     {
-        if (sphere.IsEmpty)
-            return false;
-
-        // Signed perpendicular distance from sphere center to the wall's plane.
-        var d = sphere.Center - Center;
-        var n = Vector3.Dot(d, Normal);
-        if (OneSided && n < 0f)
-            return false;
-
-        var r = sphere.Radius;
-        if (MathF.Abs(n) > r)
-            return false;
-
-        // Project onto the wall's in-plane axes and clamp to the
-        // rectangle. The resulting world-space closest point is the
-        // nearest spot on the wall to the sphere centre.
-        var u = Math.Clamp(Vector3.Dot(d, Tangent),   -HalfExtents.X, HalfExtents.X);
-        var v = Math.Clamp(Vector3.Dot(d, Bitangent), -HalfExtents.Y, HalfExtents.Y);
-        var closest = Center + Tangent * u + Bitangent * v;
-        return Vector3.DistanceSquared(sphere.Center, closest) <= r * r;
+        get
+        {
+            // Local frame: X = Tangent, Y = Bitangent, Z = Normal.
+            // .NET Matrix4x4 uses row-vector multiplication, so each
+            // row is the world-space image of the corresponding local
+            // axis.
+            var m = new Matrix4x4(
+                Tangent.X,   Tangent.Y,   Tangent.Z,   0f,
+                Bitangent.X, Bitangent.Y, Bitangent.Z, 0f,
+                Normal.X,    Normal.Y,    Normal.Z,    0f,
+                0f, 0f, 0f, 1f);
+            var rotation = Quaternion.CreateFromRotationMatrix(m);
+            var shape = new WallHitShape3D(Vector3.Zero, HalfExtents, Quaternion.Identity, OneSided);
+            return new PosedHitShape3D(shape, new Pose3D(Center, rotation, 1f));
+        }
     }
 }

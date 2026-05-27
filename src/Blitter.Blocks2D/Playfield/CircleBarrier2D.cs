@@ -21,11 +21,7 @@ public class CircleBarrier2D : Barrier2D
     public CircleBarrier2D(float x, float y, float radius)
         : this(new Vector2(x, y), radius) { }
 
-    public override bool Intersects(BoundingCircle circle)
-    {
-        if (circle.IsEmpty)
-            return false;
-        var r = Radius + circle.Radius;
-        return Vector2.DistanceSquared(Center, circle.Center) <= r * r;
-    }
+    public override PosedHitShape2D HitShape =>
+        new(new CircleHitShape2D(Vector2.Zero, Radius),
+            new Pose2D(Center, 0f, 1f));
 }

@@ -59,7 +59,8 @@ public sealed class ModelVisual3D : Visual3D
         one[0] = new TransformAndColorInstance(transform, tint);
         foreach (var part in Model.Parts)
         {
-            if (part.Material is LitTextureMaterial)
+            if (part.Material is LitTextureMaterial
+                && part.Mesh.VertexType == typeof(LitTextureVertex3D))
                 renderer.DrawMesh<TransformAndColorInstance>(part.Mesh, part.Material, one, _materializer);
             else
                 renderer.DrawMesh(part.Mesh, part.Material, transform, _materializer);

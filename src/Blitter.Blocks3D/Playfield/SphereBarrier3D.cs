@@ -22,11 +22,8 @@ public class SphereBarrier3D : Barrier3D
     public SphereBarrier3D(float x, float y, float z, float radius)
         : this(new Vector3(x, y, z), radius) { }
 
-    public override bool Intersects(BoundingSphere sphere)
-    {
-        if (sphere.IsEmpty)
-            return false;
-        var r = Radius + sphere.Radius;
-        return Vector3.DistanceSquared(Center, sphere.Center) <= r * r;
-    }
+    /// <inheritdoc/>
+    public override PosedHitShape3D HitShape =>
+        new(new SphereHitShape3D(Vector3.Zero, Radius),
+            new Pose3D(Center, Quaternion.Identity, 1f));
 }

@@ -357,8 +357,8 @@ public class PlayField2D : Layer2D
                 var sprite = _sprites[s];
                 if (!sprite.IsAlive || !sprite.CanBeHit)
                     continue;
-                var sc = sprite.HitCircle;
-                if (sc.Radius <= 0f)
+                var spriteShape = sprite.HitShape;
+                if (spriteShape.BoundingCircle.IsEmpty)
                     continue;
 
                 for (int k = 0; k < _barriers.Count; k++)
@@ -368,7 +368,7 @@ public class PlayField2D : Layer2D
                     var barrier = _barriers[k];
                     // Re-read each time: the previous barrier handler
                     // may have moved the sprite.
-                    if (!barrier.Intersects(sprite.HitCircle))
+                    if (!sprite.HitShape.TestHit(barrier.HitShape))
                         continue;
 
                     // Barrier reacts first so any state change it

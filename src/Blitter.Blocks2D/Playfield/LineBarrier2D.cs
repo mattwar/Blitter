@@ -111,42 +111,7 @@ public class LineBarrier2D : Barrier2D
         ];
     }
 
-    public override bool Intersects(BoundingCircle circle)
-    {
-        if (circle.IsEmpty)
-            return false;
-
-        // Closest point on segment to circle center, then compare
-        // squared distance against squared radius.
-        var ab = End - Start;
-        var lenSq = Vector2.Dot(ab, ab);
-        Vector2 closest;
-        if (lenSq <= float.Epsilon)
-        {
-            // Degenerate (zero-length) segment: just the start point.
-            closest = Start;
-        }
-        else
-        {
-            var t = Vector2.Dot(circle.Center - Start, ab) / lenSq;
-            if (t < 0f) t = 0f;
-            else if (t > 1f) t = 1f;
-            closest = Start + ab * t;
-        }
-
-        var d = circle.Center - closest;
-        if (Vector2.Dot(d, d) > circle.Radius * circle.Radius)
-            return false;
-
-        if (OneSided)
-        {
-            // Only collide when the sprite center is on the solid-free
-            // side of the segment (or exactly on it). Lets things drop
-            // through the bottom of jump-through platforms.
-            if (Vector2.Dot(circle.Center - Start, Normal) < 0f)
-                return false;
-        }
-        return true;
-    }
+    public override PosedHitShape2D HitShape =>
+        new(new SegmentHitShape2D(Start, End, OneSided), Pose2D.Identity);
 }
 

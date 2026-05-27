@@ -55,7 +55,13 @@ public sealed class MeshVisual3D : Visual3D
         // already multiplies a per-instance color into the fragment
         // result) by submitting a single stack-allocated instance. No
         // heap alloc, no Material mutation, no shader changes needed.
-        if (tint == Color.White || Material is not LitTextureMaterial)
+        // The instanced shader only exists for LitTextureMaterial +
+        // LitTextureVertex3D meshes today; anything else (LitVertex3D
+        // primitives, PbrMaterial, ...) falls back to the plain
+        // non-instanced path and drops the tint silently.
+        if (tint == Color.White
+            || Material is not LitTextureMaterial
+            || Mesh.VertexType != typeof(LitTextureVertex3D))
         {
             renderer.DrawMesh(Mesh, Material, transform, _materializer);
             return;

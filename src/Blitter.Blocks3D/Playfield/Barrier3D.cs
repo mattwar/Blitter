@@ -13,37 +13,33 @@ namespace Blitter.Blocks3D;
 public abstract class Barrier3D
 {
     /// <summary>
-    /// True when <paramref name="sphere"/> overlaps this barrier's
-    /// shape. Called once per barrier per frame during the playfield's
-    /// collision pass.
+    /// Collision shape of this barrier in world space. 
     /// </summary>
-    public abstract bool Intersects(BoundingSphere sphere);
+    public abstract PosedHitShape3D HitShape { get; }
 
     /// <summary>
-    /// Called by <see cref="PlayField3D"/> once per frame. Useful for
-    /// barriers that are animated or have variable properties over time.
+    /// Called by <see cref="PlayField3D"/> once per frame.
     /// </summary>
     public virtual void Update(in UpdateContext3D context) { }
 
     /// <summary>
-    /// Render this barrier. By default, barriers don't have a visual
-    /// representation.
+    /// Render this barrier. 
+    /// By default, barriers don't have a visual representation.
     /// </summary>
     public virtual void Draw(Renderer3D renderer) { }
 
-    /// <summary>Called when <paramref name="hitter"/> collided with this barrier.</summary>
+    /// <summary>Called when a sprite collides with this barrier.</summary>
     public virtual void OnHitSprite(Sprite3D hitter, in UpdateContext3D context) { }
 
     /// <summary>
-    /// Physical character of this barrier (elasticity, friction, kick).
-    /// Read by future bounce/contact behaviors. Default is
-    /// <see cref="PhysicsMaterial.Ideal"/>.
+    /// Physical characteristics of this barrier.
+    /// Used by gameplay mechanics.
     /// </summary>
     public virtual PhysicsMaterial PhysicsMaterial { get; set; } = PhysicsMaterial.Ideal;
 
     /// <summary>
-    /// Surface velocity at <paramref name="point"/> in world units per
-    /// second. Animated barriers (moving platforms, rotating fans)
+    /// Surface velocity at <paramref name="point"/> in world units per second.
+    /// Animated barriers (moving platforms, rotating fans)
     /// override to add their motion to the contact. Default returns
     /// <see cref="Vector3.Zero"/>.
     /// </summary>

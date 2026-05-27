@@ -29,6 +29,33 @@ public abstract class HitShape3D
     /// </summary>
     public abstract bool TestHitWith(in Pose3D mine, ReadOnlySpan<HitPrimitive3D> other, HitTester3D tester);
 
+    /// <summary>
+    /// Computes a closed-form contact between this shape (posed by
+    /// <paramref name="mine"/>) and <paramref name="other"/>, using
+    /// <paramref name="tester"/>. Convention:
+    /// <see cref="HitContact3D.Normal"/> points from
+    /// <paramref name="other"/> toward this shape. Default impl
+    /// returns <see langword="false"/> — concrete shapes override.
+    /// </summary>
+    public virtual bool TryGetContact(in Pose3D mine, in PosedHitShape3D other, ContactHitTester3D tester, out HitContact3D contact)
+    {
+        contact = default;
+        return false;
+    }
+
+    /// <summary>
+    /// Computes a closed-form contact between this shape (posed by
+    /// <paramref name="mine"/>) and the primitives in
+    /// <paramref name="other"/>. Convention: normal points from
+    /// <paramref name="other"/> toward this shape. Default impl
+    /// returns <see langword="false"/>.
+    /// </summary>
+    public virtual bool TryGetContactWith(in Pose3D mine, ReadOnlySpan<HitPrimitive3D> other, ContactHitTester3D tester, out HitContact3D contact)
+    {
+        contact = default;
+        return false;
+    }
+
     /// <summary>Calls <paramref name="visitor"/> with the posed primitives of this shape.</summary>
     public abstract void Visit(in Pose3D mine, HitShapeVisitor3D visitor);
 
@@ -96,6 +123,15 @@ public readonly struct PosedHitShape3D
     public bool TestHit(in PosedHitShape3D other) =>
         TestHit(in other, IntersectsHitTester3D.Instance);
 
+    /// <summary>
+    /// True when this posed shape contacts <paramref name="other"/>;
+    /// <paramref name="contact"/> reports the deepest contact found.
+    /// Convention: <see cref="HitContact3D.Normal"/> points from
+    /// <paramref name="other"/> toward this shape.
+    /// </summary>
+    public bool TryGetContact(in PosedHitShape3D other, out HitContact3D contact) =>
+        ContactHitTester3D.Instance.TryGetContact(in this, in other, out contact);
+
     /// <summary>Hands this shape's current posed primitives to <paramref name="visitor"/>.</summary>
     public void Visit(HitShapeVisitor3D visitor) =>
         Shape.Visit(in Pose, visitor);
@@ -130,6 +166,20 @@ public sealed class SphereHitShape3D : HitShape3D
         Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
         span[0] = Pose(in mine);
         return tester.TestHit(other, span);
+    }
+
+    public override bool TryGetContact(in Pose3D mine, in PosedHitShape3D other, ContactHitTester3D tester, out HitContact3D contact)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(span, in other, out contact);
+    }
+
+    public override bool TryGetContactWith(in Pose3D mine, ReadOnlySpan<HitPrimitive3D> other, ContactHitTester3D tester, out HitContact3D contact)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(other, span, out contact);
     }
 
     public override void Visit(in Pose3D mine, HitShapeVisitor3D visitor)
@@ -186,6 +236,20 @@ public sealed class CapsuleHitShape3D : HitShape3D
         Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
         span[0] = Pose(in mine);
         return tester.TestHit(other, span);
+    }
+
+    public override bool TryGetContact(in Pose3D mine, in PosedHitShape3D other, ContactHitTester3D tester, out HitContact3D contact)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(span, in other, out contact);
+    }
+
+    public override bool TryGetContactWith(in Pose3D mine, ReadOnlySpan<HitPrimitive3D> other, ContactHitTester3D tester, out HitContact3D contact)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(other, span, out contact);
     }
 
     public override void Visit(in Pose3D mine, HitShapeVisitor3D visitor)
@@ -247,6 +311,20 @@ public sealed class CylinderHitShape3D : HitShape3D
         return tester.TestHit(other, span);
     }
 
+    public override bool TryGetContact(in Pose3D mine, in PosedHitShape3D other, ContactHitTester3D tester, out HitContact3D contact)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(span, in other, out contact);
+    }
+
+    public override bool TryGetContactWith(in Pose3D mine, ReadOnlySpan<HitPrimitive3D> other, ContactHitTester3D tester, out HitContact3D contact)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(other, span, out contact);
+    }
+
     public override void Visit(in Pose3D mine, HitShapeVisitor3D visitor)
     {
         Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
@@ -304,6 +382,20 @@ public sealed class BoxHitShape3D : HitShape3D
         return tester.TestHit(other, span);
     }
 
+    public override bool TryGetContact(in Pose3D mine, in PosedHitShape3D other, ContactHitTester3D tester, out HitContact3D contact)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(span, in other, out contact);
+    }
+
+    public override bool TryGetContactWith(in Pose3D mine, ReadOnlySpan<HitPrimitive3D> other, ContactHitTester3D tester, out HitContact3D contact)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(other, span, out contact);
+    }
+
     public override void Visit(in Pose3D mine, HitShapeVisitor3D visitor)
     {
         Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
@@ -333,14 +425,26 @@ public sealed class WallHitShape3D : HitShape3D
     public Vector2 LocalHalfExtents { get; }
     public Quaternion LocalRotation { get; }
 
+    /// <summary>
+    /// When true, only register a hit / contact when the other shape's
+    /// bounding-sphere centre lies on the +Z (face-normal) side of the
+    /// rectangle's supporting plane. Models one-way platforms and
+    /// jump-through floors.
+    /// </summary>
+    public bool OneSided { get; }
+
     public WallHitShape3D(Vector3 localCenter, Vector2 localHalfExtents)
-        : this(localCenter, localHalfExtents, Quaternion.Identity) { }
+        : this(localCenter, localHalfExtents, Quaternion.Identity, false) { }
 
     public WallHitShape3D(Vector3 localCenter, Vector2 localHalfExtents, Quaternion localRotation)
+        : this(localCenter, localHalfExtents, localRotation, false) { }
+
+    public WallHitShape3D(Vector3 localCenter, Vector2 localHalfExtents, Quaternion localRotation, bool oneSided)
     {
         LocalCenter = localCenter;
         LocalHalfExtents = localHalfExtents;
         LocalRotation = localRotation;
+        OneSided = oneSided;
     }
 
     public override BoundingSphere LocalBoundary =>
@@ -348,16 +452,48 @@ public sealed class WallHitShape3D : HitShape3D
 
     public override bool TestHit(in Pose3D mine, in PosedHitShape3D other, HitTester3D tester)
     {
+        var primitive = Pose(in mine);
+        if (OneSided && !IsOnOutwardSide(other.BoundingSphere.Center, in primitive))
+            return false;
         Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
-        span[0] = Pose(in mine);
+        span[0] = primitive;
         return tester.TestHit(span, in other);
     }
 
     public override bool TestHitWith(in Pose3D mine, ReadOnlySpan<HitPrimitive3D> other, HitTester3D tester)
     {
+        var primitive = Pose(in mine);
+        if (OneSided && other.Length > 0 && !IsOnOutwardSide(other[0].P0, in primitive))
+            return false;
         Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
-        span[0] = Pose(in mine);
+        span[0] = primitive;
         return tester.TestHit(other, span);
+    }
+
+    public override bool TryGetContact(in Pose3D mine, in PosedHitShape3D other, ContactHitTester3D tester, out HitContact3D contact)
+    {
+        var primitive = Pose(in mine);
+        if (OneSided && !IsOnOutwardSide(other.BoundingSphere.Center, in primitive))
+        {
+            contact = default;
+            return false;
+        }
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = primitive;
+        return tester.TryGetContact(span, in other, out contact);
+    }
+
+    public override bool TryGetContactWith(in Pose3D mine, ReadOnlySpan<HitPrimitive3D> other, ContactHitTester3D tester, out HitContact3D contact)
+    {
+        var primitive = Pose(in mine);
+        if (OneSided && other.Length > 0 && !IsOnOutwardSide(other[0].P0, in primitive))
+        {
+            contact = default;
+            return false;
+        }
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = primitive;
+        return tester.TryGetContact(other, span, out contact);
     }
 
     public override void Visit(in Pose3D mine, HitShapeVisitor3D visitor)
@@ -373,6 +509,14 @@ public sealed class WallHitShape3D : HitShape3D
             LocalHalfExtents * pose.Scale,
             pose.Rotation * LocalRotation);
 
+    // Outward = local +Z (the face normal) rotated by the wall's world
+    // quaternion (primitive.Q). Center → world via primitive.P0.
+    private static bool IsOnOutwardSide(Vector3 point, in HitPrimitive3D wall)
+    {
+        var normal = Vector3.Transform(Vector3.UnitZ, wall.Q);
+        return Vector3.Dot(point - wall.P0, normal) >= 0f;
+    }
+
     public override HitShape3D Translate(Vector3 offset) =>
-        new WallHitShape3D(LocalCenter + offset, LocalHalfExtents, LocalRotation);
+        new WallHitShape3D(LocalCenter + offset, LocalHalfExtents, LocalRotation, OneSided);
 }

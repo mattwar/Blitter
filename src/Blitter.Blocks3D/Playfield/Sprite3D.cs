@@ -24,10 +24,9 @@ public class Sprite3D : IUpdatable<UpdateContext3D>, IDrawable3D
     public Vector3 Velocity { get; set; }
 
     /// <summary>
-    /// Angular velocity as an axis-times-radians-per-second vector. The
-    /// vector's direction is the rotation axis; its length is the
-    /// angular speed. Integrated by a motion behavior, not by the
-    /// sprite itself.
+    /// Angular velocity as an axis-times-radians-per-second vector. 
+    /// The vector's direction is the rotation axis; its length is the angular speed.
+    /// Integrated by a motion behavior, not by the sprite itself.
     /// </summary>
     public Vector3 AngularVelocity { get; set; }
 

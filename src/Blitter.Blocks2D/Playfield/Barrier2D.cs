@@ -12,11 +12,12 @@ namespace Blitter.Blocks2D;
 public abstract class Barrier2D
 {
     /// <summary>
-    /// True when <paramref name="circle"/> overlaps this barrier's
-    /// shape. Called once per prop per tick during the playfield's
-    /// collision pass.
+    /// Collision shape of this barrier in world space. The playfield
+    /// tests against <see cref="Sprite2D.HitShape"/> each tick and
+    /// dispatches <see cref="Sprite2D.OnHitBarrier"/> on overlap;
+    /// <see cref="BarrierBounce2D"/> reads a contact via the shape.
     /// </summary>
-    public abstract bool Intersects(BoundingCircle circle);
+    public abstract PosedHitShape2D HitShape { get; }
 
     /// <summary>
     /// Called by <see cref="PlayField2D"/> once per tick.

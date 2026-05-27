@@ -120,13 +120,8 @@ public class SwingArmBarrier2D : Barrier2D
         return AngularVelRadPerSec * new Vector2(-offset.Y, offset.X);
     }
 
-    public override bool Intersects(BoundingCircle circle)
-    {
-        var (closest, _) = ClosestPointOnSegment(Pivot, Tip, circle.Center);
-        var dSq = Vector2.DistanceSquared(closest, circle.Center);
-        var r = circle.Radius + Radius;
-        return dSq <= r * r;
-    }
+    public override PosedHitShape2D HitShape =>
+        new(new CapsuleHitShape2D(Pivot, Tip, Radius), Pose2D.Identity);
 
     internal static (Vector2 point, float t) ClosestPointOnSegment(Vector2 a, Vector2 b, Vector2 p)
     {

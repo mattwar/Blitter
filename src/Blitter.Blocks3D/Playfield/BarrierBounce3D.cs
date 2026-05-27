@@ -1,19 +1,20 @@
-using System.Numerics;
+﻿using System.Numerics;
 
 using Blitter.Bits;
 
-namespace Blitter.Blocks2D;
+namespace Blitter.Blocks3D;
 
 /// <summary>
 /// On contact with a barrier, snaps the sprite out of penetration along
 /// the contact normal and reflects velocity. Final bounce composes the
 /// behavior's ball-side <see cref="Restitution"/> /
 /// <see cref="TangentialDamping"/> with the barrier's
-/// <see cref="Barrier2D.PhysicsMaterial"/>. Shape-agnostic: any
-/// <see cref="Barrier2D"/> whose <see cref="Barrier2D.HitShape"/>
-/// reports a contact participates.
+/// <see cref="Barrier3D.PhysicsMaterial"/>. Shape-agnostic: any
+/// <see cref="Barrier3D"/> that implements
+/// <see cref="Barrier3D.HitShape"/> participates. The 3D analog of
+/// <c>Blitter.Blocks2D.BarrierBounce2D</c>.
 /// </summary>
-public sealed class BarrierBounce2D : SpriteBehavior2D
+public sealed class BarrierBounce3D : SpriteBehavior3D
 {
     /// <summary>Ball-side elastic coefficient. Multiplied with the barrier's <see cref="PhysicsMaterial.Restitution"/>. 1 = perfectly elastic, 0 = sticks.</summary>
     public float Restitution { get; set; } = 1f;
@@ -22,43 +23,41 @@ public sealed class BarrierBounce2D : SpriteBehavior2D
     public float TangentialDamping { get; set; } = 1f;
 
     /// <summary>Called after a successful bounce. Args: sprite, barrier, contact normal.</summary>
-    public Action<Sprite2D, Barrier2D, Vector2>? OnBounce { get; set; }
+    public Action<Sprite3D, Barrier3D, Vector3>? OnBounce { get; set; }
 
-    public override void OnHitBarrier(Sprite2D self, Barrier2D barrier, in UpdateContext2D context)
+    public override void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext3D context)
     {
         // Normal convention: TryGetContact returns normal from b → a;
         // here a = self.HitShape, b = barrier.HitShape, so `contact.Normal`
         // points from the barrier surface toward the sprite.
-        if (!ContactHitTester2D.Instance.TryGetContact(self.HitShape, barrier.HitShape, out var contact))
+        if (!ContactHitTester3D.Instance.TryGetContact(self.HitShape, barrier.HitShape, out var contact))
             return;
 
         var normal = contact.Normal;
         if (contact.Penetration > 0f)
-            self.Center += normal * contact.Penetration;
+            self.Position += normal * contact.Penetration;
 
-        // Surface velocity at the contact point. Stationary barriers
-        // report zero so this collapses to the textbook reflection;
-        // moving barriers (flippers, etc.) contribute their motion.
+        // Use the contact point on the barrier surface; stationary
+        // barriers report zero velocity here, so the textbook
+        // reflection drops out, while moving barriers (sliding
+        // paddles, etc.) feed their motion into the bounce.
         var vSurface = barrier.SurfaceVelocityAt(contact.Point);
         var mat = barrier.PhysicsMaterial;
 
-        var vBall = Sprite2D.GetVelocity(self.Speed, self.Heading);
+        var vBall = self.Velocity;
         var vRel = vBall - vSurface;
-        var along = Vector2.Dot(vRel, normal);
+        var along = Vector3.Dot(vRel, normal);
         if (along < 0f)
         {
             var vN = normal * along;
             var vT = vRel - vN;
-            // Compose ball-side and barrier-side material: behavior
-            // values are the ball's defaults, barrier values modulate
-            // them per-surface.
             var normalScale = Restitution * mat.Restitution;
             var tangentMul = TangentialDamping * (1f - mat.Friction);
             vRel = vT * tangentMul - vN * normalScale;
             vBall = vRel + vSurface;
             if (mat.KickSpeed != 0f)
                 vBall += normal * mat.KickSpeed;
-            (self.Speed, self.Heading) = Sprite2D.GetSpeedAndHeading(vBall);
+            self.Velocity = vBall;
         }
 
         OnBounce?.Invoke(self, barrier, normal);

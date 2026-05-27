@@ -51,3 +51,64 @@ public sealed class IntersectsHitTester2D : HitTester2D
         return false;
     }
 }
+
+/// <summary>
+/// Computes the deepest contact (largest <see cref="HitContact2D.Penetration"/>)
+/// between two <see cref="PosedHitShape2D"/>s or their primitives, when
+/// a primitive pair has a closed-form contact resolution.
+/// </summary>
+public sealed class ContactHitTester2D
+{
+    /// <summary>Shared instance — the tester holds no state.</summary>
+    public static readonly ContactHitTester2D Instance = new();
+
+    private ContactHitTester2D() { }
+
+    /// <summary>
+    /// True when <paramref name="a"/> and <paramref name="b"/> overlap;
+    /// <paramref name="contact"/> reports the deepest contact found.
+    /// Convention: <see cref="HitContact2D.Normal"/> points from
+    /// <paramref name="b"/> toward <paramref name="a"/>.
+    /// </summary>
+    public bool TryGetContact(in PosedHitShape2D a, in PosedHitShape2D b, out HitContact2D contact)
+    {
+        if (!a.BoundingCircle.Intersects(b.BoundingCircle))
+        {
+            contact = default;
+            return false;
+        }
+        return a.Shape.TryGetContact(in a.Pose, in b, this, out contact);
+    }
+
+    /// <summary>
+    /// True when any primitive in <paramref name="a"/> contacts
+    /// <paramref name="b"/>'s shape. Convention: normal points from
+    /// <paramref name="b"/> toward <paramref name="a"/>.
+    /// </summary>
+    public bool TryGetContact(ReadOnlySpan<HitPrimitive2D> a, in PosedHitShape2D b, out HitContact2D contact) =>
+        b.Shape.TryGetContactWith(in b.Pose, a, this, out contact);
+
+    /// <summary>
+    /// Walks every primitive pair and keeps the deepest contact found.
+    /// Per-pair convention: <see cref="HitContact2D.Normal"/> points
+    /// from <paramref name="b"/>[j] toward <paramref name="a"/>[i].
+    /// </summary>
+    public bool TryGetContact(ReadOnlySpan<HitPrimitive2D> a, ReadOnlySpan<HitPrimitive2D> b, out HitContact2D contact)
+    {
+        bool found = false;
+        contact = default;
+        for (int i = 0; i < a.Length; i++)
+        {
+            for (int j = 0; j < b.Length; j++)
+            {
+                if (a[i].TryGetContact(in b[j], out var c)
+                    && (!found || c.Penetration > contact.Penetration))
+                {
+                    contact = c;
+                    found = true;
+                }
+            }
+        }
+        return found;
+    }
+}

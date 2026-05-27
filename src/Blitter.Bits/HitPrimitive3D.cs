@@ -351,5 +351,217 @@ public readonly struct HitPrimitive3D
 
     private static bool BoxBox(in HitPrimitive3D a, in HitPrimitive3D b) =>
         Geometry3D.BoxesOverlap(a.P0, a.Q, a.P1, b.P0, b.Q, b.P1);
+
+    // ---- TryGetContact pair table -------------------------------------
+    //
+    // Closed-form contact for primitive pairs. Convention: for
+    // <c>a.TryGetContact(b, out c)</c>, <c>c.Normal</c> points from
+    // <c>b</c> toward <c>a</c>. Asymmetric pairs reuse the canonical
+    // direction and flip the result.
+    //
+    // Currently implemented: every Sphere row pair. The remaining pairs
+    // return false (intersect-only via <see cref="Intersects"/>); they
+    // can be added as the need arises without breaking callers.
+
+    /// <summary>
+    /// Computes a closed-form contact between this primitive and
+    /// <paramref name="other"/>. Returns <see langword="false"/> if the
+    /// primitives don't overlap or the pair has no contact resolution
+    /// yet. <paramref name="contact"/>'s normal points from
+    /// <paramref name="other"/> toward this primitive.
+    /// </summary>
+    public bool TryGetContact(in HitPrimitive3D other, out HitContact3D contact)
+    {
+        switch (Kind, other.Kind)
+        {
+            case (HitKind3D.Sphere, HitKind3D.Sphere):
+                return SphereSphereContact(in this, in other, out contact);
+            case (HitKind3D.Sphere, HitKind3D.Box):
+                return SphereBoxContact(in this, in other, out contact);
+            case (HitKind3D.Sphere, HitKind3D.Wall):
+                return SphereWallContact(in this, in other, out contact);
+            case (HitKind3D.Sphere, HitKind3D.Capsule):
+                return SphereCapsuleContact(in this, in other, out contact);
+            case (HitKind3D.Sphere, HitKind3D.Cylinder):
+                return SphereCylinderContact(in this, in other, out contact);
+
+            // Reverse direction: swap args, then flip the normal.
+            case (HitKind3D.Box, HitKind3D.Sphere):
+            {
+                bool hit = SphereBoxContact(in other, in this, out contact);
+                if (hit) contact = contact.Flipped();
+                return hit;
+            }
+            case (HitKind3D.Wall, HitKind3D.Sphere):
+            {
+                bool hit = SphereWallContact(in other, in this, out contact);
+                if (hit) contact = contact.Flipped();
+                return hit;
+            }
+            case (HitKind3D.Capsule, HitKind3D.Sphere):
+            {
+                bool hit = SphereCapsuleContact(in other, in this, out contact);
+                if (hit) contact = contact.Flipped();
+                return hit;
+            }
+            case (HitKind3D.Cylinder, HitKind3D.Sphere):
+            {
+                bool hit = SphereCylinderContact(in other, in this, out contact);
+                if (hit) contact = contact.Flipped();
+                return hit;
+            }
+
+            default:
+                contact = default;
+                return false;
+        }
+    }
+
+    private static bool SphereSphereContact(in HitPrimitive3D sphere, in HitPrimitive3D b, out HitContact3D contact)
+    {
+        var d = sphere.P0 - b.P0;
+        float distSq = d.LengthSquared();
+        float rs = sphere.R + b.R;
+        if (distSq > rs * rs)
+        {
+            contact = default;
+            return false;
+        }
+        float dist = MathF.Sqrt(distSq);
+        Vector3 normal = dist > 1e-6f ? d / dist : Vector3.UnitY;
+        float pen = rs - dist;
+        Vector3 point = b.P0 + normal * b.R;
+        contact = new HitContact3D(normal, point, pen);
+        return true;
+    }
+
+    private static bool SphereBoxContact(in HitPrimitive3D sphere, in HitPrimitive3D box, out HitContact3D contact)
+    {
+        var inv = Quaternion.Conjugate(box.Q);
+        var local = Vector3.Transform(sphere.P0 - box.P0, inv);
+        var h = box.P1;
+        var clamped = new Vector3(
+            Math.Clamp(local.X, -h.X, h.X),
+            Math.Clamp(local.Y, -h.Y, h.Y),
+            Math.Clamp(local.Z, -h.Z, h.Z));
+        var delta = local - clamped;
+        float distSq = delta.LengthSquared();
+        if (distSq > sphere.R * sphere.R)
+        {
+            contact = default;
+            return false;
+        }
+        Vector3 localNormal;
+        float pen;
+        if (distSq > 1e-12f)
+        {
+            float dist = MathF.Sqrt(distSq);
+            localNormal = delta / dist;
+            pen = sphere.R - dist;
+        }
+        else
+        {
+            // Sphere center is inside the box: push out through the
+            // nearest face (smallest gap to a half-extent).
+            float gapX = h.X - MathF.Abs(local.X);
+            float gapY = h.Y - MathF.Abs(local.Y);
+            float gapZ = h.Z - MathF.Abs(local.Z);
+            if (gapX <= gapY && gapX <= gapZ)
+            {
+                float sx = MathF.Sign(local.X);
+                localNormal = new Vector3(sx == 0f ? 1f : sx, 0f, 0f);
+                pen = sphere.R + gapX;
+            }
+            else if (gapY <= gapZ)
+            {
+                float sy = MathF.Sign(local.Y);
+                localNormal = new Vector3(0f, sy == 0f ? 1f : sy, 0f);
+                pen = sphere.R + gapY;
+            }
+            else
+            {
+                float sz = MathF.Sign(local.Z);
+                localNormal = new Vector3(0f, 0f, sz == 0f ? 1f : sz);
+                pen = sphere.R + gapZ;
+            }
+        }
+        Vector3 normal = Vector3.Transform(localNormal, box.Q);
+        Vector3 point = box.P0 + Vector3.Transform(clamped, box.Q);
+        contact = new HitContact3D(normal, point, pen);
+        return true;
+    }
+
+    private static bool SphereWallContact(in HitPrimitive3D sphere, in HitPrimitive3D wall, out HitContact3D contact)
+    {
+        var inv = Quaternion.Conjugate(wall.Q);
+        var local = Vector3.Transform(sphere.P0 - wall.P0, inv);
+        float hx = wall.P1.X, hy = wall.P1.Y;
+        float cx = Math.Clamp(local.X, -hx, hx);
+        float cy = Math.Clamp(local.Y, -hy, hy);
+        var clamped = new Vector3(cx, cy, 0f);
+        var delta = local - clamped;
+        float distSq = delta.LengthSquared();
+        if (distSq > sphere.R * sphere.R)
+        {
+            contact = default;
+            return false;
+        }
+        Vector3 localNormal;
+        float pen;
+        if (distSq > 1e-12f)
+        {
+            float dist = MathF.Sqrt(distSq);
+            localNormal = delta / dist;
+            pen = sphere.R - dist;
+        }
+        else
+        {
+            // Sphere center sits exactly on the wall plane within the
+            // rectangle: pick the +Z side by convention.
+            localNormal = Vector3.UnitZ;
+            pen = sphere.R;
+        }
+        Vector3 normal = Vector3.Transform(localNormal, wall.Q);
+        Vector3 point = wall.P0 + Vector3.Transform(clamped, wall.Q);
+        contact = new HitContact3D(normal, point, pen);
+        return true;
+    }
+
+    private static bool SphereCapsuleContact(in HitPrimitive3D sphere, in HitPrimitive3D capsule, out HitContact3D contact)
+    {
+        var closest = ClosestPointOnSegment(sphere.P0, capsule.P0, capsule.P1);
+        var d = sphere.P0 - closest;
+        float distSq = d.LengthSquared();
+        float rs = sphere.R + capsule.R;
+        if (distSq > rs * rs)
+        {
+            contact = default;
+            return false;
+        }
+        float dist = MathF.Sqrt(distSq);
+        Vector3 normal = dist > 1e-6f ? d / dist : Vector3.UnitY;
+        float pen = rs - dist;
+        Vector3 point = closest + normal * capsule.R;
+        contact = new HitContact3D(normal, point, pen);
+        return true;
+    }
+
+    private static bool SphereCylinderContact(in HitPrimitive3D sphere, in HitPrimitive3D cyl, out HitContact3D contact)
+    {
+        // Approximate the cylinder as a capsule of the same axis and
+        // radius — same approximation as <see cref="Intersects"/>.
+        // Slightly rounded contact near the flat caps; exact on the body.
+        return SphereCapsuleContact(in sphere, in cyl, out contact);
+    }
+
+    private static Vector3 ClosestPointOnSegment(Vector3 p, Vector3 a, Vector3 b)
+    {
+        var ab = b - a;
+        float lenSq = ab.LengthSquared();
+        if (lenSq <= 1e-12f)
+            return a;
+        float t = Math.Clamp(Vector3.Dot(p - a, ab) / lenSq, 0f, 1f);
+        return a + t * ab;
+    }
 }
 

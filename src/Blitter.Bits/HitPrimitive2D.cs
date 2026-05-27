@@ -325,4 +325,159 @@ public readonly struct HitPrimitive2D
             c * worldDelta.X + s * worldDelta.Y,
             -s * worldDelta.X + c * worldDelta.Y);
     }
+
+    // ---- TryGetContact pair table -------------------------------------
+    //
+    // Closed-form contact for primitive pairs. Convention: for
+    // <c>a.TryGetContact(b, out c)</c>, <c>c.Normal</c> points from
+    // <c>b</c> toward <c>a</c>. Asymmetric pairs reuse the canonical
+    // direction and flip the result.
+
+    /// <summary>
+    /// Computes a closed-form contact between this primitive and
+    /// <paramref name="other"/>. Returns <see langword="false"/> if the
+    /// primitives don't overlap or the pair has no contact resolution
+    /// yet. <paramref name="contact"/>'s normal points from
+    /// <paramref name="other"/> toward this primitive.
+    /// </summary>
+    public bool TryGetContact(in HitPrimitive2D other, out HitContact2D contact)
+    {
+        switch (Kind, other.Kind)
+        {
+            case (HitKind2D.Circle, HitKind2D.Circle):
+                return CircleCircleContact(in this, in other, out contact);
+            case (HitKind2D.Circle, HitKind2D.Capsule):
+                return CircleCapsuleContact(in this, in other, out contact);
+            case (HitKind2D.Circle, HitKind2D.Box):
+                return CircleBoxContact(in this, in other, out contact);
+
+            case (HitKind2D.Capsule, HitKind2D.Circle):
+            {
+                bool hit = CircleCapsuleContact(in other, in this, out contact);
+                if (hit) contact = contact.Flipped();
+                return hit;
+            }
+            case (HitKind2D.Box, HitKind2D.Circle):
+            {
+                bool hit = CircleBoxContact(in other, in this, out contact);
+                if (hit) contact = contact.Flipped();
+                return hit;
+            }
+
+            default:
+                contact = default;
+                return false;
+        }
+    }
+
+    private static bool CircleCircleContact(in HitPrimitive2D a, in HitPrimitive2D b, out HitContact2D contact)
+    {
+        var d = a.P0 - b.P0;
+        float distSq = d.LengthSquared();
+        float rs = a.R + b.R;
+        if (distSq > rs * rs)
+        {
+            contact = default;
+            return false;
+        }
+        float dist = MathF.Sqrt(distSq);
+        Vector2 normal = dist > 1e-6f ? d / dist : new Vector2(0f, -1f);
+        float pen = rs - dist;
+        Vector2 point = b.P0 + normal * b.R;
+        contact = new HitContact2D(normal, point, pen);
+        return true;
+    }
+
+    private static bool CircleCapsuleContact(in HitPrimitive2D circle, in HitPrimitive2D capsule, out HitContact2D contact)
+    {
+        var closest = ClosestPointOnSegment(circle.P0, capsule.P0, capsule.P1);
+        var d = circle.P0 - closest;
+        float distSq = d.LengthSquared();
+        float rs = circle.R + capsule.R;
+        if (distSq > rs * rs)
+        {
+            contact = default;
+            return false;
+        }
+        float dist = MathF.Sqrt(distSq);
+        Vector2 normal;
+        if (dist > 1e-6f)
+        {
+            normal = d / dist;
+        }
+        else
+        {
+            // Circle center sits exactly on the segment: pick the
+            // segment's left perpendicular (in screen-space Y-down,
+            // this is "to your left" walking A→B).
+            var ab = capsule.P1 - capsule.P0;
+            float abLen = ab.Length();
+            normal = abLen > 1e-6f ? new Vector2(ab.Y, -ab.X) / abLen : new Vector2(0f, -1f);
+        }
+        float pen = rs - dist;
+        Vector2 point = closest + normal * capsule.R;
+        contact = new HitContact2D(normal, point, pen);
+        return true;
+    }
+
+    private static bool CircleBoxContact(in HitPrimitive2D circle, in HitPrimitive2D box, out HitContact2D contact)
+    {
+        var local = ToLocal(circle.P0 - box.P0, box.Rotation);
+        var h = box.P1;
+        var clamped = new Vector2(
+            Math.Clamp(local.X, -h.X, h.X),
+            Math.Clamp(local.Y, -h.Y, h.Y));
+        var delta = local - clamped;
+        float distSq = delta.LengthSquared();
+        if (distSq > circle.R * circle.R)
+        {
+            contact = default;
+            return false;
+        }
+        Vector2 localNormal;
+        float pen;
+        if (distSq > 1e-12f)
+        {
+            float dist = MathF.Sqrt(distSq);
+            localNormal = delta / dist;
+            pen = circle.R - dist;
+        }
+        else
+        {
+            // Circle center inside the box: push out through the
+            // nearest face (smallest gap to a half-extent).
+            float gapX = h.X - MathF.Abs(local.X);
+            float gapY = h.Y - MathF.Abs(local.Y);
+            if (gapX <= gapY)
+            {
+                float sx = MathF.Sign(local.X);
+                localNormal = new Vector2(sx == 0f ? 1f : sx, 0f);
+                pen = circle.R + gapX;
+            }
+            else
+            {
+                float sy = MathF.Sign(local.Y);
+                localNormal = new Vector2(0f, sy == 0f ? 1f : sy);
+                pen = circle.R + gapY;
+            }
+        }
+        // Rotate localNormal back to world.
+        float cos = MathF.Cos(box.Rotation), sin = MathF.Sin(box.Rotation);
+        Vector2 normal = new(cos * localNormal.X - sin * localNormal.Y,
+                             sin * localNormal.X + cos * localNormal.Y);
+        Vector2 point = box.P0 + new Vector2(cos * clamped.X - sin * clamped.Y,
+                                             sin * clamped.X + cos * clamped.Y);
+        contact = new HitContact2D(normal, point, pen);
+        return true;
+    }
+
+    private static Vector2 ClosestPointOnSegment(Vector2 p, Vector2 a, Vector2 b)
+    {
+        var ab = b - a;
+        float lenSq = ab.LengthSquared();
+        if (lenSq <= 1e-12f)
+            return a;
+        float t = Math.Clamp(Vector2.Dot(p - a, ab) / lenSq, 0f, 1f);
+        return a + t * ab;
+    }
 }

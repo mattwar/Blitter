@@ -67,6 +67,17 @@ All notable changes to this project will be documented in this file.
 - `Blitter.Blocks3D` basic building blocks: `Scene3D`, `Layer3D`,
   `CustomLayer3D`, `SceneBehavior3D`, `Behavior3D`, `SpriteBehavior3D`,
   `Sprite3D`, `Barrier3D`, `PlayField3D`.
+- `Blitter.Blocks3D` sprite behaviors: `Motion3D` (integrates
+  `Velocity` and `AngularVelocity` into `Position` and `Orientation`,
+  with sub-millisecond delta buffering), `BarrierBounce3D` (sphere-vs-
+  wall / box / sphere reflection with `PhysicsMaterial` composition
+  and `OnBounce` callback), and `SpeedClamp3D` (min/max magnitude
+  clamp, direction-preserving).
+- First playfield-based 3D sample: `samples/blocks/Breakout3D.cs` — a
+  first-person Breakout inside a closed 3D arena with X/Y paddle
+  movement, position-based english on the paddle, a 5x7 colored
+  brick grid, score / lives HUD via `DebugDraw`, and a launch /
+  drain / win flow driven by a single `SceneBehavior3D` controller.
 - `Visual3D` in `Blitter.Bits`: abstract 3D visual with state, bounding
   sphere, hit shape, and `Draw(Renderer3D, in Pose3D, Color, TimeSpan)`.
 - `HitShape3D` family in `Blitter.Bits`: `HitShape3D`, `PosedHitShape3D`,

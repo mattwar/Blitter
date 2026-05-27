@@ -36,6 +36,33 @@ public abstract class HitShape2D
     public abstract bool TestHitWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester);
 
     /// <summary>
+    /// Computes a closed-form contact between this shape (posed by
+    /// <paramref name="mine"/>) and <paramref name="other"/>, using
+    /// <paramref name="tester"/>. Convention:
+    /// <see cref="HitContact2D.Normal"/> points from
+    /// <paramref name="other"/> toward this shape. Default impl
+    /// returns <see langword="false"/> — concrete shapes override.
+    /// </summary>
+    public virtual bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, ContactHitTester2D tester, out HitContact2D contact)
+    {
+        contact = default;
+        return false;
+    }
+
+    /// <summary>
+    /// Computes a closed-form contact between this shape (posed by
+    /// <paramref name="mine"/>) and the primitives in
+    /// <paramref name="other"/>. Convention: normal points from
+    /// <paramref name="other"/> toward this shape. Default impl
+    /// returns <see langword="false"/>.
+    /// </summary>
+    public virtual bool TryGetContactWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, ContactHitTester2D tester, out HitContact2D contact)
+    {
+        contact = default;
+        return false;
+    }
+
+    /// <summary>
     /// Calls the <paramref name="visitor"/> with the posed primitives of this shape.
     /// </summary>
     public abstract void Visit(in Pose2D mine, HitShapeVisitor2D visitor);
@@ -173,6 +200,15 @@ public readonly struct PosedHitShape2D
         TestHit(in other, IntersectsHitTester2D.Instance);
 
     /// <summary>
+    /// True when this posed shape contacts <paramref name="other"/>;
+    /// <paramref name="contact"/> reports the deepest contact found.
+    /// Convention: <see cref="HitContact2D.Normal"/> points from
+    /// <paramref name="other"/> toward this shape.
+    /// </summary>
+    public bool TryGetContact(in PosedHitShape2D other, out HitContact2D contact) =>
+        ContactHitTester2D.Instance.TryGetContact(in this, in other, out contact);
+
+    /// <summary>
     /// Hands this shape's current posed primitives to
     /// <paramref name="visitor"/>. Off the collision hot path
     /// (debug rendering, gizmos, tests).
@@ -210,6 +246,20 @@ public sealed class CircleHitShape2D : HitShape2D
         Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
         span[0] = Pose(in mine);
         return tester.TestHit(other, span);
+    }
+
+    public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, ContactHitTester2D tester, out HitContact2D contact)
+    {
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(span, in other, out contact);
+    }
+
+    public override bool TryGetContactWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, ContactHitTester2D tester, out HitContact2D contact)
+    {
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(other, span, out contact);
     }
 
     public override void Visit(in Pose2D mine, HitShapeVisitor2D visitor)
@@ -271,6 +321,20 @@ public sealed class CapsuleHitShape2D : HitShape2D
         return tester.TestHit(other, span);
     }
 
+    public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, ContactHitTester2D tester, out HitContact2D contact)
+    {
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(span, in other, out contact);
+    }
+
+    public override bool TryGetContactWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, ContactHitTester2D tester, out HitContact2D contact)
+    {
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(other, span, out contact);
+    }
+
     public override void Visit(in Pose2D mine, HitShapeVisitor2D visitor)
     {
         Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
@@ -330,6 +394,20 @@ public sealed class BoxHitShape2D : HitShape2D
         return tester.TestHit(other, span);
     }
 
+    public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, ContactHitTester2D tester, out HitContact2D contact)
+    {
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(span, in other, out contact);
+    }
+
+    public override bool TryGetContactWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, ContactHitTester2D tester, out HitContact2D contact)
+    {
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = Pose(in mine);
+        return tester.TryGetContact(other, span, out contact);
+    }
+
     public override void Visit(in Pose2D mine, HitShapeVisitor2D visitor)
     {
         Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
@@ -355,3 +433,123 @@ public sealed class BoxHitShape2D : HitShape2D
         return new BoxHitShape2D(Mirror(LocalCenter, flip), LocalHalfExtents, r);
     }
 }
+
+/// <summary>
+/// A <see cref="HitShape2D"/> that is a bare line segment. Posed as a
+/// <see cref="HitKind2D.Capsule"/> primitive with radius 0. When
+/// <see cref="OneSided"/> is true, only collides with shapes whose
+/// representative point lies on the segment's <em>outward</em> side,
+/// where outward = <c>perp(B - A)</c> in screen-space Y-down (i.e. to
+/// your left walking from A to B). Used by
+/// <c>Blitter.Blocks2D.LineBarrier2D</c> to model jump-through floors,
+/// one-way gates, and similar one-sided walls.
+/// </summary>
+public sealed class SegmentHitShape2D : HitShape2D
+{
+    public Vector2 LocalEndA { get; }
+    public Vector2 LocalEndB { get; }
+
+    /// <summary>
+    /// When true, only register a hit / contact when the other shape's
+    /// representative point is on the outward side of the segment
+    /// (left of A→B walking in screen-space Y-down).
+    /// </summary>
+    public bool OneSided { get; }
+
+    public SegmentHitShape2D(Vector2 localEndA, Vector2 localEndB, bool oneSided = false)
+    {
+        LocalEndA = localEndA;
+        LocalEndB = localEndB;
+        OneSided = oneSided;
+    }
+
+    public override BoundingCircle LocalBoundary
+    {
+        get
+        {
+            var mid = (LocalEndA + LocalEndB) * 0.5f;
+            var half = (LocalEndA - LocalEndB).Length() * 0.5f;
+            return new BoundingCircle(mid, half);
+        }
+    }
+
+    public override bool TestHit(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester)
+    {
+        var (a, b) = PoseEndpoints(in mine);
+        if (OneSided && !IsOnOutwardSide(other.BoundingCircle.Center, a, b))
+            return false;
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = HitPrimitive2D.Capsule(a, b, 0f);
+        return tester.TestHit(span, in other);
+    }
+
+    public override bool TestHitWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester)
+    {
+        var (a, b) = PoseEndpoints(in mine);
+        if (OneSided && other.Length > 0 && !IsOnOutwardSide(PrimitiveCenter(other[0]), a, b))
+            return false;
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = HitPrimitive2D.Capsule(a, b, 0f);
+        return tester.TestHit(other, span);
+    }
+
+    public override bool TryGetContact(in Pose2D mine, in PosedHitShape2D other, ContactHitTester2D tester, out HitContact2D contact)
+    {
+        var (a, b) = PoseEndpoints(in mine);
+        if (OneSided && !IsOnOutwardSide(other.BoundingCircle.Center, a, b))
+        {
+            contact = default;
+            return false;
+        }
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = HitPrimitive2D.Capsule(a, b, 0f);
+        return tester.TryGetContact(span, in other, out contact);
+    }
+
+    public override bool TryGetContactWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, ContactHitTester2D tester, out HitContact2D contact)
+    {
+        var (a, b) = PoseEndpoints(in mine);
+        if (OneSided && other.Length > 0 && !IsOnOutwardSide(PrimitiveCenter(other[0]), a, b))
+        {
+            contact = default;
+            return false;
+        }
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = HitPrimitive2D.Capsule(a, b, 0f);
+        return tester.TryGetContact(other, span, out contact);
+    }
+
+    public override void Visit(in Pose2D mine, HitShapeVisitor2D visitor)
+    {
+        var (a, b) = PoseEndpoints(in mine);
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = HitPrimitive2D.Capsule(a, b, 0f);
+        visitor(span);
+    }
+
+    public override HitShape2D Translate(Vector2 offset) =>
+        new SegmentHitShape2D(LocalEndA + offset, LocalEndB + offset, OneSided);
+
+    protected override HitShape2D CreateFlipped(FlipMode flip) =>
+        new SegmentHitShape2D(Mirror(LocalEndA, flip), Mirror(LocalEndB, flip), OneSided);
+
+    private (Vector2 a, Vector2 b) PoseEndpoints(in Pose2D pose) =>
+        (pose.Transform(LocalEndA), pose.Transform(LocalEndB));
+
+    // Outward direction = perp(B - A) in screen-space Y-down, matching
+    // LineBarrier2D's default normal: walking A → B, outward is "left".
+    private static bool IsOnOutwardSide(Vector2 point, Vector2 a, Vector2 b)
+    {
+        var d = b - a;
+        var outward = new Vector2(d.Y, -d.X);
+        return Vector2.Dot(point - a, outward) >= 0f;
+    }
+
+    private static Vector2 PrimitiveCenter(in HitPrimitive2D p) => p.Kind switch
+    {
+        HitKind2D.Capsule => (p.P0 + p.P1) * 0.5f,
+        _ => p.P0,
+    };
+}
+
+
