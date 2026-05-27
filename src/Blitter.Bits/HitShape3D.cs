@@ -71,9 +71,6 @@ public abstract class HitShape3D
     /// </summary>
     public abstract void Visit(in Pose3D mine, HitPrimitiveAction3D action);
 
-    /// <summary>Copies this <see cref="HitShape3D"/> with the center offset by <paramref name="offset"/>.</summary>
-    public abstract HitShape3D Translate(Vector3 offset);
-
     /// <summary>Shared "no shape" sentinel — never hits anything.</summary>
     public static readonly HitShape3D None = new NoneShape();
 
@@ -94,7 +91,6 @@ public abstract class HitShape3D
             return false;
         }
         public override void Visit(in Pose3D mine, HitPrimitiveAction3D action) { }
-        public override HitShape3D Translate(Vector3 offset) => this;
     }
 }
 
@@ -230,9 +226,6 @@ public sealed class SphereHitShape3D : HitShape3D
 
     private HitPrimitive3D Pose(in Pose3D pose) =>
         HitPrimitive3D.Sphere(pose.Transform(LocalCenter), LocalRadius * pose.Scale);
-
-    public override HitShape3D Translate(Vector3 offset) =>
-        new SphereHitShape3D(LocalCenter + offset, LocalRadius);
 }
 
 /// <summary>
@@ -302,9 +295,6 @@ public sealed class CapsuleHitShape3D : HitShape3D
             pose.Transform(LocalEndA),
             pose.Transform(LocalEndB),
             LocalRadius * pose.Scale);
-
-    public override HitShape3D Translate(Vector3 offset) =>
-        new CapsuleHitShape3D(LocalEndA + offset, LocalEndB + offset, LocalRadius);
 }
 
 /// <summary>
@@ -374,9 +364,6 @@ public sealed class CylinderHitShape3D : HitShape3D
             pose.Transform(LocalBase),
             pose.Transform(LocalTop),
             LocalRadius * pose.Scale);
-
-    public override HitShape3D Translate(Vector3 offset) =>
-        new CylinderHitShape3D(LocalBase + offset, LocalTop + offset, LocalRadius);
 }
 
 /// <summary>
@@ -444,9 +431,6 @@ public sealed class BoxHitShape3D : HitShape3D
             pose.Transform(LocalCenter),
             LocalHalfExtents * pose.Scale,
             pose.Rotation * LocalRotation);
-
-    public override HitShape3D Translate(Vector3 offset) =>
-        new BoxHitShape3D(LocalCenter + offset, LocalHalfExtents, LocalRotation);
 }
 
 /// <summary>
@@ -547,7 +531,4 @@ public sealed class WallHitShape3D : HitShape3D
         var normal = Vector3.Transform(Vector3.UnitZ, wall.Q);
         return Vector3.Dot(point - wall.P0, normal) >= 0f;
     }
-
-    public override HitShape3D Translate(Vector3 offset) =>
-        new WallHitShape3D(LocalCenter + offset, LocalHalfExtents, LocalRotation, OneSided);
 }

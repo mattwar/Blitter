@@ -107,14 +107,6 @@ public sealed class CompositeHitShape3D : HitShape3D
             sub.Visit(in mine, action);
     }
 
-    public override HitShape3D Translate(Vector3 offset)
-    {
-        var builder = ImmutableArray.CreateBuilder<HitShape3D>(Shapes.Length);
-        foreach (var s in Shapes)
-            builder.Add(s.Translate(offset));
-        return new CompositeHitShape3D(builder.ToImmutable());
-    }
-
     private static BoundingSphere PosedSubBound(HitShape3D sub, in Pose3D mine)
     {
         var local = sub.LocalBoundary;

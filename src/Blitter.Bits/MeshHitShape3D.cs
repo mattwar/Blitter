@@ -215,10 +215,6 @@ public sealed class MeshHitShape3D : HitShape3D
         }
     }
 
-    public override HitShape3D Translate(Vector3 offset) =>
-        throw new NotSupportedException(
-            $"{nameof(MeshHitShape3D)} shares its cached mesh data and cannot be translated; translate the source mesh instead.");
-
     private static HitPrimitive3D TrianglePrimitive(in Pose3D pose, Vector3[] verts, int i) =>
         HitPrimitive3D.Triangle(
             pose.Transform(verts[i]),
