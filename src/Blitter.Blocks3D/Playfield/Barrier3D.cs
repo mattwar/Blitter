@@ -1,3 +1,5 @@
+using System.Numerics;
+
 using Blitter.Bits;
 
 namespace Blitter.Blocks3D;
@@ -31,4 +33,20 @@ public abstract class Barrier3D
 
     /// <summary>Called when <paramref name="hitter"/> collided with this barrier.</summary>
     public virtual void OnHitSprite(Sprite3D hitter, in UpdateContext3D context) { }
+
+    /// <summary>
+    /// Physical character of this barrier (elasticity, friction, kick).
+    /// Read by future bounce/contact behaviors. Default is
+    /// <see cref="PhysicsMaterial.Ideal"/>.
+    /// </summary>
+    public virtual PhysicsMaterial PhysicsMaterial { get; set; } = PhysicsMaterial.Ideal;
+
+    /// <summary>
+    /// Surface velocity at <paramref name="point"/> in world units per
+    /// second. Animated barriers (moving platforms, rotating fans)
+    /// override to add their motion to the contact. Default returns
+    /// <see cref="Vector3.Zero"/>.
+    /// </summary>
+    public virtual Vector3 SurfaceVelocityAt(Vector3 point) => Vector3.Zero;
 }
+

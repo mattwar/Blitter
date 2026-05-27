@@ -1,5 +1,7 @@
 using System.Numerics;
 
+using Blitter.Bits;
+
 namespace Blitter.Blocks2D;
 
 /// <summary>
@@ -7,15 +9,15 @@ namespace Blitter.Blocks2D;
 /// the contact normal and reflects velocity. Final bounce composes the
 /// behavior's ball-side <see cref="Restitution"/> /
 /// <see cref="TangentialDamping"/> with the barrier's
-/// <see cref="Barrier2D.Material"/>. Handles <see cref="LineBarrier2D"/>,
+/// <see cref="Barrier2D.PhysicsMaterial"/>. Handles <see cref="LineBarrier2D"/>,
 /// <see cref="CircleBarrier2D"/>, and <see cref="SwingArmBarrier2D"/>.
 /// </summary>
 public sealed class BarrierBounce2D : SpriteBehavior2D
 {
-    /// <summary>Ball-side elastic coefficient. Multiplied with the barrier's <see cref="BarrierMaterial.Restitution"/>. 1 = perfectly elastic, 0 = sticks.</summary>
+    /// <summary>Ball-side elastic coefficient. Multiplied with the barrier's <see cref="PhysicsMaterial.Restitution"/>. 1 = perfectly elastic, 0 = sticks.</summary>
     public float Restitution { get; set; } = 1f;
 
-    /// <summary>Ball-side tangent velocity retention. Multiplied with <c>(1 - barrier.Material.Friction)</c>. 1 = frictionless ball, &lt; 1 = ball-side surface drag.</summary>
+    /// <summary>Ball-side tangent velocity retention. Multiplied with <c>(1 - barrier.PhysicsMaterial.Friction)</c>. 1 = frictionless ball, &lt; 1 = ball-side surface drag.</summary>
     public float TangentialDamping { get; set; } = 1f;
 
     /// <summary>Called after a successful bounce. Args: sprite, barrier, contact normal.</summary>
@@ -34,7 +36,7 @@ public sealed class BarrierBounce2D : SpriteBehavior2D
         // moving barriers (flippers, etc.) contribute their motion.
         var contactPoint = self.Center - normal * self.HitCircle.Radius;
         var vSurface = barrier.SurfaceVelocityAt(contactPoint);
-        var mat = barrier.Material;
+        var mat = barrier.PhysicsMaterial;
 
         var vBall = Sprite2D.GetVelocity(self.Speed, self.Heading);
         var vRel = vBall - vSurface;

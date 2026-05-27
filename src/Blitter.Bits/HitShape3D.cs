@@ -204,3 +204,175 @@ public sealed class CapsuleHitShape3D : HitShape3D
     public override HitShape3D Translate(Vector3 offset) =>
         new CapsuleHitShape3D(LocalEndA + offset, LocalEndB + offset, LocalRadius);
 }
+
+/// <summary>
+/// A <see cref="HitShape3D"/> that is a solid right cylinder with flat
+/// caps. The axis runs from <see cref="LocalBase"/> to
+/// <see cref="LocalTop"/> in local (model) coordinates.
+/// </summary>
+public sealed class CylinderHitShape3D : HitShape3D
+{
+    public Vector3 LocalBase { get; }
+    public Vector3 LocalTop { get; }
+    public float LocalRadius { get; }
+
+    public CylinderHitShape3D(Vector3 localBase, Vector3 localTop, float localRadius)
+    {
+        LocalBase = localBase;
+        LocalTop = localTop;
+        LocalRadius = localRadius;
+    }
+
+    public override BoundingSphere LocalBoundary
+    {
+        get
+        {
+            var mid = (LocalBase + LocalTop) * 0.5f;
+            var half = (LocalTop - LocalBase).Length() * 0.5f;
+            return new BoundingSphere(mid, half + LocalRadius);
+        }
+    }
+
+    public override bool TestHit(in Pose3D mine, in PosedHitShape3D other, HitTester3D tester)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TestHit(span, in other);
+    }
+
+    public override bool TestHitWith(in Pose3D mine, ReadOnlySpan<HitPrimitive3D> other, HitTester3D tester)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TestHit(other, span);
+    }
+
+    public override void Visit(in Pose3D mine, HitShapeVisitor3D visitor)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        visitor(span);
+    }
+
+    private HitPrimitive3D Pose(in Pose3D pose) =>
+        HitPrimitive3D.Cylinder(
+            pose.Transform(LocalBase),
+            pose.Transform(LocalTop),
+            LocalRadius * pose.Scale);
+
+    public override HitShape3D Translate(Vector3 offset) =>
+        new CylinderHitShape3D(LocalBase + offset, LocalTop + offset, LocalRadius);
+}
+
+/// <summary>
+/// A <see cref="HitShape3D"/> that is a solid oriented box.
+/// <see cref="LocalHalfExtents"/> are the half-widths along the box's
+/// local X / Y / Z axes; <see cref="LocalRotation"/> rotates those
+/// axes within the model's frame (the pose's rotation rotates the
+/// model on top).
+/// </summary>
+public sealed class BoxHitShape3D : HitShape3D
+{
+    public Vector3 LocalCenter { get; }
+    public Vector3 LocalHalfExtents { get; }
+    public Quaternion LocalRotation { get; }
+
+    public BoxHitShape3D(Vector3 localCenter, Vector3 localHalfExtents)
+        : this(localCenter, localHalfExtents, Quaternion.Identity) { }
+
+    public BoxHitShape3D(Vector3 localCenter, Vector3 localHalfExtents, Quaternion localRotation)
+    {
+        LocalCenter = localCenter;
+        LocalHalfExtents = localHalfExtents;
+        LocalRotation = localRotation;
+    }
+
+    public override BoundingSphere LocalBoundary =>
+        new(LocalCenter, LocalHalfExtents.Length());
+
+    public override bool TestHit(in Pose3D mine, in PosedHitShape3D other, HitTester3D tester)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TestHit(span, in other);
+    }
+
+    public override bool TestHitWith(in Pose3D mine, ReadOnlySpan<HitPrimitive3D> other, HitTester3D tester)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TestHit(other, span);
+    }
+
+    public override void Visit(in Pose3D mine, HitShapeVisitor3D visitor)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        visitor(span);
+    }
+
+    private HitPrimitive3D Pose(in Pose3D pose) =>
+        HitPrimitive3D.Box(
+            pose.Transform(LocalCenter),
+            LocalHalfExtents * pose.Scale,
+            pose.Rotation * LocalRotation);
+
+    public override HitShape3D Translate(Vector3 offset) =>
+        new BoxHitShape3D(LocalCenter + offset, LocalHalfExtents, LocalRotation);
+}
+
+/// <summary>
+/// A <see cref="HitShape3D"/> that is a two-sided oriented rectangle
+/// ("wall"). The rectangle is the local XY plane spanned by
+/// <see cref="LocalHalfExtents"/>; <see cref="LocalRotation"/>'s local
+/// Z axis is the face normal.
+/// </summary>
+public sealed class WallHitShape3D : HitShape3D
+{
+    public Vector3 LocalCenter { get; }
+    public Vector2 LocalHalfExtents { get; }
+    public Quaternion LocalRotation { get; }
+
+    public WallHitShape3D(Vector3 localCenter, Vector2 localHalfExtents)
+        : this(localCenter, localHalfExtents, Quaternion.Identity) { }
+
+    public WallHitShape3D(Vector3 localCenter, Vector2 localHalfExtents, Quaternion localRotation)
+    {
+        LocalCenter = localCenter;
+        LocalHalfExtents = localHalfExtents;
+        LocalRotation = localRotation;
+    }
+
+    public override BoundingSphere LocalBoundary =>
+        new(LocalCenter, LocalHalfExtents.Length());
+
+    public override bool TestHit(in Pose3D mine, in PosedHitShape3D other, HitTester3D tester)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TestHit(span, in other);
+    }
+
+    public override bool TestHitWith(in Pose3D mine, ReadOnlySpan<HitPrimitive3D> other, HitTester3D tester)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        return tester.TestHit(other, span);
+    }
+
+    public override void Visit(in Pose3D mine, HitShapeVisitor3D visitor)
+    {
+        Span<HitPrimitive3D> span = stackalloc HitPrimitive3D[1];
+        span[0] = Pose(in mine);
+        visitor(span);
+    }
+
+    private HitPrimitive3D Pose(in Pose3D pose) =>
+        HitPrimitive3D.Wall(
+            pose.Transform(LocalCenter),
+            LocalHalfExtents * pose.Scale,
+            pose.Rotation * LocalRotation);
+
+    public override HitShape3D Translate(Vector3 offset) =>
+        new WallHitShape3D(LocalCenter + offset, LocalHalfExtents, LocalRotation);
+}

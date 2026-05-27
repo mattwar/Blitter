@@ -39,9 +39,9 @@ public abstract class Barrier2D
     /// Physical character of this barrier (elasticity, friction, kick).
     /// Read by <see cref="BarrierBounce2D"/> and composed with the
     /// behavior's ball-side knobs to determine each bounce. Default is
-    /// <see cref="BarrierMaterial.Ideal"/>.
+    /// <see cref="PhysicsMaterial.Ideal"/>.
     /// </summary>
-    public virtual BarrierMaterial Material { get; set; } = BarrierMaterial.Ideal;
+    public virtual PhysicsMaterial PhysicsMaterial { get; set; } = PhysicsMaterial.Ideal;
 
     /// <summary>
     /// Surface velocity at <paramref name="point"/> in world units per

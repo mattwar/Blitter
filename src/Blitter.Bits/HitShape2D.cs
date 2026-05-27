@@ -290,3 +290,68 @@ public sealed class CapsuleHitShape2D : HitShape2D
     protected override HitShape2D CreateFlipped(FlipMode flip) =>
         new CapsuleHitShape2D(Mirror(LocalEndA, flip), Mirror(LocalEndB, flip), LocalRadius);
 }
+
+/// <summary>
+/// A <see cref="HitShape2D"/> that is a solid oriented box.
+/// <see cref="LocalHalfExtents"/> are the half-widths along the box's
+/// local X / Y axes; <see cref="LocalRotation"/> (radians) rotates
+/// those axes within the image's frame.
+/// </summary>
+public sealed class BoxHitShape2D : HitShape2D
+{
+    public Vector2 LocalCenter { get; }
+    public Vector2 LocalHalfExtents { get; }
+    public float LocalRotation { get; }
+
+    public BoxHitShape2D(Vector2 localCenter, Vector2 localHalfExtents)
+        : this(localCenter, localHalfExtents, 0f) { }
+
+    public BoxHitShape2D(Vector2 localCenter, Vector2 localHalfExtents, float localRotation)
+    {
+        LocalCenter = localCenter;
+        LocalHalfExtents = localHalfExtents;
+        LocalRotation = localRotation;
+    }
+
+    public override BoundingCircle LocalBoundary =>
+        new(LocalCenter, LocalHalfExtents.Length());
+
+    public override bool TestHit(in Pose2D mine, in PosedHitShape2D other, HitTester2D tester)
+    {
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = Pose(in mine);
+        return tester.TestHit(span, in other);
+    }
+
+    public override bool TestHitWith(in Pose2D mine, ReadOnlySpan<HitPrimitive2D> other, HitTester2D tester)
+    {
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = Pose(in mine);
+        return tester.TestHit(other, span);
+    }
+
+    public override void Visit(in Pose2D mine, HitShapeVisitor2D visitor)
+    {
+        Span<HitPrimitive2D> span = stackalloc HitPrimitive2D[1];
+        span[0] = Pose(in mine);
+        visitor(span);
+    }
+
+    private HitPrimitive2D Pose(in Pose2D pose) =>
+        HitPrimitive2D.Box(
+            pose.Transform(LocalCenter),
+            LocalHalfExtents * pose.Scale,
+            LocalRotation + pose.Rotation * (MathF.PI / 180f));
+
+    public override HitShape2D Translate(Vector2 offset) =>
+        new BoxHitShape2D(LocalCenter + offset, LocalHalfExtents, LocalRotation);
+
+    protected override HitShape2D CreateFlipped(FlipMode flip)
+    {
+        // Mirror the center; half-extents stay positive; the rotation
+        // negates for either single-axis flip and is preserved under a
+        // 180° flip (Horizontal + Vertical).
+        float r = flip == FlipMode.Both ? LocalRotation : -LocalRotation;
+        return new BoxHitShape2D(Mirror(LocalCenter, flip), LocalHalfExtents, r);
+    }
+}

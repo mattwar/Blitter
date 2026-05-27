@@ -19,6 +19,15 @@ public enum HitKind2D : byte
     /// <see cref="HitPrimitive2D.R"/> = radius).
     /// </summary>
     Capsule,
+
+    /// <summary>
+    /// Solid oriented box
+    /// (<see cref="HitPrimitive2D.P0"/> = center,
+    /// <see cref="HitPrimitive2D.P1"/> = half-extents along the box's
+    /// local X / Y axes, <see cref="HitPrimitive2D.Rotation"/> =
+    /// angle of those axes in radians).
+    /// </summary>
+    Box,
 }
 
 /// <summary>
@@ -49,12 +58,19 @@ public readonly struct HitPrimitive2D
     /// </summary>
     public readonly float R;
 
-    private HitPrimitive2D(HitKind2D kind, Vector2 p0, Vector2 p1, float r)
+    /// <summary>
+    /// Rotation angle, in radians. Used by <see cref="HitKind2D.Box"/>;
+    /// zero for all other kinds.
+    /// </summary>
+    public readonly float Rotation;
+
+    private HitPrimitive2D(HitKind2D kind, Vector2 p0, Vector2 p1, float r, float rotation)
     {
         Kind = kind;
         P0 = p0;
         P1 = p1;
         R = r;
+        Rotation = rotation;
     }
 
     /// <summary>
@@ -62,16 +78,27 @@ public readonly struct HitPrimitive2D
     /// with radius <paramref name="radius"/>.
     /// </summary>
     public static HitPrimitive2D Circle(Vector2 center, float radius) =>
-        new(HitKind2D.Circle, center, default, radius);
+        new(HitKind2D.Circle, center, default, radius, 0f);
 
     /// <summary>
     /// Builds a capsule primitive — the Minkowski sum of the segment
     /// <paramref name="a"/>–<paramref name="b"/> with a disk of
     /// <paramref name="radius"/>. Degenerate endpoints
     /// (<paramref name="a"/> = <paramref name="b"/>) collide as a circle.
+    /// A capsule with <paramref name="radius"/> = 0 is a bare line
+    /// segment.
     /// </summary>
     public static HitPrimitive2D Capsule(Vector2 a, Vector2 b, float radius) =>
-        new(HitKind2D.Capsule, a, b, radius);
+        new(HitKind2D.Capsule, a, b, radius, 0f);
+
+    /// <summary>
+    /// Builds a solid oriented box. <paramref name="halfExtents"/> are
+    /// the half-widths along the box's local X / Y axes;
+    /// <paramref name="rotation"/> (in radians) turns those axes into
+    /// world space.
+    /// </summary>
+    public static HitPrimitive2D Box(Vector2 center, Vector2 halfExtents, float rotation) =>
+        new(HitKind2D.Box, center, halfExtents, 0f, rotation);
 
     /// <summary>
     /// True when this primitive overlaps <paramref name="other"/>.
@@ -85,8 +112,13 @@ public readonly struct HitPrimitive2D
         {
             (HitKind2D.Circle, HitKind2D.Circle) => IntersectsCircleCircle(in this, in other),
             (HitKind2D.Circle, HitKind2D.Capsule) => IntersectsCircleCapsule(in this, in other),
+            (HitKind2D.Circle, HitKind2D.Box) => IntersectsCircleBox(in this, in other),
             (HitKind2D.Capsule, HitKind2D.Circle) => IntersectsCircleCapsule(in other, in this),
             (HitKind2D.Capsule, HitKind2D.Capsule) => IntersectsCapsuleCapsule(in this, in other),
+            (HitKind2D.Capsule, HitKind2D.Box) => IntersectsCapsuleBox(in this, in other),
+            (HitKind2D.Box, HitKind2D.Circle) => IntersectsCircleBox(in other, in this),
+            (HitKind2D.Box, HitKind2D.Capsule) => IntersectsCapsuleBox(in other, in this),
+            (HitKind2D.Box, HitKind2D.Box) => IntersectsBoxBox(in this, in other),
             _ => false,
         };
     }
@@ -153,4 +185,108 @@ public readonly struct HitPrimitive2D
     }
 
     private static float Cross(Vector2 u, Vector2 v) => u.X * v.Y - u.Y * v.X;
+
+    private static bool IntersectsCircleBox(in HitPrimitive2D circle, in HitPrimitive2D box)
+    {
+        // Transform the circle center into the box's local frame, then
+        // clamp to ±halfExtents and check distance.
+        var local = ToLocal(circle.P0 - box.P0, box.Rotation);
+        var h = box.P1;
+        var clamped = new Vector2(
+            Math.Clamp(local.X, -h.X, h.X),
+            Math.Clamp(local.Y, -h.Y, h.Y));
+        return Vector2.DistanceSquared(local, clamped) <= circle.R * circle.R;
+    }
+
+    private static bool IntersectsCapsuleBox(in HitPrimitive2D capsule, in HitPrimitive2D box)
+    {
+        // Transform the capsule's segment into box-local space, then
+        // test against the AABB inflated by the capsule's radius. The
+        // inflation gives a rectangle with square corners rather than
+        // the Minkowski sum's rounded corners — minor false positives
+        // possible near corners; acceptable for gameplay.
+        var a = ToLocal(capsule.P0 - box.P0, box.Rotation);
+        var b = ToLocal(capsule.P1 - box.P0, box.Rotation);
+        var h = box.P1 + new Vector2(capsule.R);
+        return SegmentIntersectsAabb(a, b, h);
+    }
+
+    private static bool IntersectsBoxBox(in HitPrimitive2D a, in HitPrimitive2D b)
+    {
+        // 2D SAT over 4 candidate separating axes: A's local X, A's
+        // local Y, B's local X, B's local Y.
+        float cosA = MathF.Cos(a.Rotation), sinA = MathF.Sin(a.Rotation);
+        float cosB = MathF.Cos(b.Rotation), sinB = MathF.Sin(b.Rotation);
+        var ax = new Vector2(cosA, sinA);
+        var ay = new Vector2(-sinA, cosA);
+        var bx = new Vector2(cosB, sinB);
+        var by = new Vector2(-sinB, cosB);
+        var t = b.P0 - a.P0;
+
+        return ProjectionsOverlap(t, ax, a.P1, ax, ay, b.P1, bx, by)
+            && ProjectionsOverlap(t, ay, a.P1, ax, ay, b.P1, bx, by)
+            && ProjectionsOverlap(t, bx, a.P1, ax, ay, b.P1, bx, by)
+            && ProjectionsOverlap(t, by, a.P1, ax, ay, b.P1, bx, by);
+    }
+
+    private static bool ProjectionsOverlap(
+        Vector2 t, Vector2 axis,
+        Vector2 hA, Vector2 ax, Vector2 ay,
+        Vector2 hB, Vector2 bx, Vector2 by)
+    {
+        // Radius of an OBB projected onto axis: sum of (half-extent ×
+        // |axis · localAxis|) over the box's two local axes.
+        float rA = hA.X * MathF.Abs(Vector2.Dot(axis, ax))
+                 + hA.Y * MathF.Abs(Vector2.Dot(axis, ay));
+        float rB = hB.X * MathF.Abs(Vector2.Dot(axis, bx))
+                 + hB.Y * MathF.Abs(Vector2.Dot(axis, by));
+        return MathF.Abs(Vector2.Dot(t, axis)) <= rA + rB;
+    }
+
+    private static bool SegmentIntersectsAabb(Vector2 a, Vector2 b, Vector2 halfExtents)
+    {
+        // Liang–Barsky slab test against the origin-centered AABB.
+        var d = b - a;
+        float tMin = 0f, tMax = 1f;
+
+        if (MathF.Abs(d.X) < 1e-12f)
+        {
+            if (MathF.Abs(a.X) > halfExtents.X) return false;
+        }
+        else
+        {
+            float t1 = (-halfExtents.X - a.X) / d.X;
+            float t2 = (+halfExtents.X - a.X) / d.X;
+            if (t1 > t2) (t1, t2) = (t2, t1);
+            if (t1 > tMin) tMin = t1;
+            if (t2 < tMax) tMax = t2;
+            if (tMin > tMax) return false;
+        }
+
+        if (MathF.Abs(d.Y) < 1e-12f)
+        {
+            if (MathF.Abs(a.Y) > halfExtents.Y) return false;
+        }
+        else
+        {
+            float t1 = (-halfExtents.Y - a.Y) / d.Y;
+            float t2 = (+halfExtents.Y - a.Y) / d.Y;
+            if (t1 > t2) (t1, t2) = (t2, t1);
+            if (t1 > tMin) tMin = t1;
+            if (t2 < tMax) tMax = t2;
+            if (tMin > tMax) return false;
+        }
+
+        return true;
+    }
+
+    private static Vector2 ToLocal(Vector2 worldDelta, float rotation)
+    {
+        // Rotate by -rotation to enter the local frame.
+        float c = MathF.Cos(rotation);
+        float s = MathF.Sin(rotation);
+        return new Vector2(
+            c * worldDelta.X + s * worldDelta.Y,
+            -s * worldDelta.X + c * worldDelta.Y);
+    }
 }

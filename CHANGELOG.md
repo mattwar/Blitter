@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `Blitter.Blocks3D` barriers: `SphereBarrier3D`, `WallBarrier3D`
+  (finite oriented rectangle with `OneSided` flag and
+  `Floor`/`Ceiling`/`Vertical` helpers), `BoxBarrier3D` (axis-aligned
+  or oriented), `MeshBarrier3D<TVertex>` (generic over any vertex
+  implementing `IPositionVertex3D`; wraps a `Mesh<TVertex>` so the
+  same instance drives collision and debug drawing, with a flat
+  position cache for the inner triangle loop).
+- `Barrier3D.PhysicsMaterial` (defaults to `PhysicsMaterial.Ideal`) and
+  `Barrier3D.SurfaceVelocityAt(Vector3)` hooks for future bounce /
+  contact behaviors.
+- `PhysicsMaterial` (renamed from `BarrierMaterial`) lives in the
+  `Blitter.Bits` namespace so 2D and 3D barriers share one type and
+  one set of presets. `Barrier2D.Material` / `Barrier3D.Material` are
+  now `Barrier2D.PhysicsMaterial` / `Barrier3D.PhysicsMaterial`.
+- `Geometry3D` static class in `Blitter.Bits`:
+  `ClosestPointOnTriangle(p, a, b, c)` — Ericson's RTCD §5.1.5
+  triangle clamp. First inhabitant of a new home for 3D geometric
+  primitives (closest-point queries, intersections).
+- `Geometry3D` grows `PointSegmentDistanceSquared`,
+  `SegmentSegmentDistanceSquared`, `SegmentIntersectsAabb`
+  (Liang–Barsky slab test), and `BoxesOverlap` (15-axis OBB SAT).
+- 3D hit primitives gain `Cylinder` (solid right cylinder with flat
+  caps), `Box` (solid oriented box), and `Wall` (two-sided oriented
+  rectangle). `HitPrimitive3D` now carries a `Quaternion` orientation
+  alongside `P0` / `P1` / `R`.
+- 3D hit shapes: `CylinderHitShape3D`, `BoxHitShape3D`,
+  `WallHitShape3D`.
+- 2D hit primitive gains a `Box` kind (solid oriented rectangle);
+  `HitPrimitive2D` now carries a `Rotation` (radians) field.
+- 2D hit shape: `BoxHitShape2D` (with Klein-4 flip family).
 - `Blitter.Blocks3D` basic building blocks: `Scene3D`, `Layer3D`,
   `CustomLayer3D`, `SceneBehavior3D`, `Behavior3D`, `SpriteBehavior3D`,
   `Sprite3D`, `Barrier3D`, `PlayField3D`.
@@ -47,12 +77,12 @@ All notable changes to this project will be documented in this file.
   before the sprite resolves contact, so state changes affect this
   frame's bounce. For score, sound, flash, or drop-target reactions.
   Default is a no-op.
-- `BarrierMaterial` record struct + `Barrier2D.Material` virtual:
-  per-barrier elasticity, friction, and active kick speed. Presets
-  for `Ideal`, `Metal`, `Wood`, `Concrete`, `Dirt`, `Grass`, `Sand`,
-  `Rubber`, `Felt`, `Pillow`, `Ice`, `OilSlick`, and `Trampoline`.
-  `BarrierBounce2D` composes the ball-side knobs with the barrier
-  material.
+- `PhysicsMaterial` record struct + `Barrier2D.PhysicsMaterial`
+  virtual: per-barrier elasticity, friction, and active kick speed.
+  Presets for `Ideal`, `Metal`, `Wood`, `Concrete`, `Dirt`, `Grass`,
+  `Sand`, `Rubber`, `Felt`, `Pillow`, `Ice`, `OilSlick`, and
+  `Trampoline`. `BarrierBounce2D` composes the ball-side knobs with
+  the barrier material.
 - `Barrier2D.SurfaceVelocityAt(Vector2)` virtual generalizes the
   flipper's moving-surface kick so any animated barrier can
   participate in the bounce. Default returns zero.

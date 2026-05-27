@@ -8,166 +8,302 @@ namespace Blitter.Bits;
 public enum HitKind3D : byte
 {
     /// <summary>
-    /// Center + radius sphere (<see cref="HitPrimitive3D.P0"/> = center,
-    /// <see cref="HitPrimitive3D.R"/> = radius).
+    /// A sphere based on a center point and radius.
     /// </summary>
     Sphere,
 
     /// <summary>
-    /// Rounded line segment (<see cref="HitPrimitive3D.P0"/> and
-    /// <see cref="HitPrimitive3D.P1"/> = endpoints,
-    /// <see cref="HitPrimitive3D.R"/> = radius).
+    /// A cylinder with hemispherical end caps.
     /// </summary>
     Capsule,
+
+    /// <summary>
+    /// A solid right circular cylinder with flat caps.
+    /// </summary>
+    Cylinder,
+
+    /// <summary>
+    /// A solid oriented box.
+    /// </summary>
+    Box,
+
+    /// <summary>
+    /// An oriented rectangle ("wall").
+    /// </summary>
+    Wall,
 }
 
 /// <summary>
-/// A single collidable 3D primitive. Stack-only by convention — built
-/// by a <see cref="HitShape3D"/> into a <see cref="System.Span{T}"/>
-/// and handed to a <see cref="HitTester3D"/>; never stored on the heap.
+/// A single collidable 3D primitive
 /// </summary>
 public readonly struct HitPrimitive3D
 {
     /// <summary>Which primitive shape this struct represents.</summary>
     public readonly HitKind3D Kind;
 
-    /// <summary>Primary point. Sphere center / capsule endpoint A.</summary>
+    /// <summary>Primary point. Center / endpoint A depending on <see cref="Kind"/>.</summary>
     public readonly Vector3 P0;
 
     /// <summary>
-    /// Secondary point. Capsule endpoint B; unused for
-    /// <see cref="HitKind3D.Sphere"/>.
+    /// Secondary point. Endpoint B for capsule / cylinder;
+    /// half-extents for box / wall. Unused for sphere.
     /// </summary>
     public readonly Vector3 P1;
 
-    /// <summary>Scalar. Sphere radius / capsule radius.</summary>
+    /// <summary>Scalar radius. Used by sphere, capsule, cylinder; unused for box / wall.</summary>
     public readonly float R;
 
-    private HitPrimitive3D(HitKind3D kind, Vector3 p0, Vector3 p1, float r)
+    /// <summary>
+    /// Orientation. Used by box (rotates the half-extent axes) and
+    /// wall (local Z = normal, local X/Y span the rectangle).
+    /// <see cref="Quaternion.Identity"/> for all other kinds.
+    /// </summary>
+    public readonly Quaternion Q;
+
+    private HitPrimitive3D(HitKind3D kind, Vector3 p0, Vector3 p1, float r, Quaternion q)
     {
         Kind = kind;
         P0 = p0;
         P1 = p1;
         R = r;
+        Q = q;
     }
 
-    /// <summary>
-    /// Builds a sphere primitive centered on <paramref name="center"/>
-    /// with radius <paramref name="radius"/>.
-    /// </summary>
+    /// <summary>Builds a sphere primitive.</summary>
     public static HitPrimitive3D Sphere(Vector3 center, float radius) =>
-        new(HitKind3D.Sphere, center, default, radius);
+        new(HitKind3D.Sphere, center, default, radius, Quaternion.Identity);
 
     /// <summary>
-    /// Builds a capsule primitive — the Minkowski sum of the segment
-    /// <paramref name="a"/>–<paramref name="b"/> with a ball of
-    /// <paramref name="radius"/>. Degenerate endpoints
+    /// Builds a capsule primitive: a cylinder of <paramref name="radius"/>
+    /// with hemispherical caps, whose cap centers are <paramref name="a"/>
+    /// and <paramref name="b"/>. Equivalent to the Minkowski sum of
+    /// segment <paramref name="a"/>–<paramref name="b"/> with a ball of
+    /// <paramref name="radius"/>. Degenerate centers
     /// (<paramref name="a"/> = <paramref name="b"/>) collide as a sphere.
     /// </summary>
     public static HitPrimitive3D Capsule(Vector3 a, Vector3 b, float radius) =>
-        new(HitKind3D.Capsule, a, b, radius);
+        new(HitKind3D.Capsule, a, b, radius, Quaternion.Identity);
+
+    /// <summary>
+    /// Builds a solid cylinder primitive with flat caps. The axis runs
+    /// from <paramref name="baseCenter"/> to <paramref name="topCenter"/>;
+    /// the body is everything within <paramref name="radius"/> of that
+    /// axis, capped flat at each end.
+    /// </summary>
+    public static HitPrimitive3D Cylinder(Vector3 baseCenter, Vector3 topCenter, float radius) =>
+        new(HitKind3D.Cylinder, baseCenter, topCenter, radius, Quaternion.Identity);
+
+    /// <summary>
+    /// Builds a solid oriented box. <paramref name="halfExtents"/> are
+    /// the half-widths along the box's local X / Y / Z axes;
+    /// <paramref name="rotation"/> turns those local axes into world
+    /// space.
+    /// </summary>
+    public static HitPrimitive3D Box(Vector3 center, Vector3 halfExtents, Quaternion rotation) =>
+        new(HitKind3D.Box, center, halfExtents, 0f, rotation);
+
+    /// <summary>
+    /// Builds a two-sided oriented rectangle ("wall"). The rectangle is
+    /// the local XY plane spanned by <paramref name="halfExtents"/>;
+    /// local Z (after <paramref name="rotation"/>) is the face normal.
+    /// </summary>
+    public static HitPrimitive3D Wall(Vector3 center, Vector2 halfExtents, Quaternion rotation) =>
+        new(HitKind3D.Wall, center, new Vector3(halfExtents, 0f), 0f, rotation);
 
     /// <summary>True when this primitive overlaps <paramref name="other"/>.</summary>
     public bool Intersects(in HitPrimitive3D other)
     {
         return (Kind, other.Kind) switch
         {
-            (HitKind3D.Sphere, HitKind3D.Sphere) => IntersectsSphereSphere(in this, in other),
-            (HitKind3D.Sphere, HitKind3D.Capsule) => IntersectsSphereCapsule(in this, in other),
-            (HitKind3D.Capsule, HitKind3D.Sphere) => IntersectsSphereCapsule(in other, in this),
-            (HitKind3D.Capsule, HitKind3D.Capsule) => IntersectsCapsuleCapsule(in this, in other),
+            // Sphere row.
+            (HitKind3D.Sphere, HitKind3D.Sphere) => SphereSphere(in this, in other),
+            (HitKind3D.Sphere, HitKind3D.Capsule) => SphereCapsule(in this, in other),
+            (HitKind3D.Sphere, HitKind3D.Cylinder) => SphereCylinder(in this, in other),
+            (HitKind3D.Sphere, HitKind3D.Box) => SphereBox(in this, in other),
+            (HitKind3D.Sphere, HitKind3D.Wall) => SphereWall(in this, in other),
+
+            // Capsule row (asymmetric pairs reuse the row above).
+            (HitKind3D.Capsule, HitKind3D.Sphere) => SphereCapsule(in other, in this),
+            (HitKind3D.Capsule, HitKind3D.Capsule) => CapsuleCapsule(in this, in other),
+            (HitKind3D.Capsule, HitKind3D.Cylinder) => CapsuleCylinder(in this, in other),
+            (HitKind3D.Capsule, HitKind3D.Box) => CapsuleBox(in this, in other),
+            (HitKind3D.Capsule, HitKind3D.Wall) => CapsuleWall(in this, in other),
+
+            // Cylinder row.
+            (HitKind3D.Cylinder, HitKind3D.Sphere) => SphereCylinder(in other, in this),
+            (HitKind3D.Cylinder, HitKind3D.Capsule) => CapsuleCylinder(in other, in this),
+            (HitKind3D.Cylinder, HitKind3D.Cylinder) => CylinderCylinder(in this, in other),
+            (HitKind3D.Cylinder, HitKind3D.Box) => CylinderBox(in this, in other),
+            (HitKind3D.Cylinder, HitKind3D.Wall) => CylinderWall(in this, in other),
+
+            // Box row.
+            (HitKind3D.Box, HitKind3D.Sphere) => SphereBox(in other, in this),
+            (HitKind3D.Box, HitKind3D.Capsule) => CapsuleBox(in other, in this),
+            (HitKind3D.Box, HitKind3D.Cylinder) => CylinderBox(in other, in this),
+            (HitKind3D.Box, HitKind3D.Box) => BoxBox(in this, in other),
+
+            // Wall row — sphere/capsule/cylinder fall through to the
+            // mirrored cases above. Wall-vs-box and wall-vs-wall are
+            // intentionally not implemented yet (no current use case).
+            (HitKind3D.Wall, HitKind3D.Sphere) => SphereWall(in other, in this),
+            (HitKind3D.Wall, HitKind3D.Capsule) => CapsuleWall(in other, in this),
+            (HitKind3D.Wall, HitKind3D.Cylinder) => CylinderWall(in other, in this),
+
             _ => false,
         };
     }
 
-    private static bool IntersectsSphereSphere(in HitPrimitive3D a, in HitPrimitive3D b)
+    // ---- Sphere ----
+
+    private static bool SphereSphere(in HitPrimitive3D a, in HitPrimitive3D b)
     {
         var d = a.P0 - b.P0;
         var rs = a.R + b.R;
         return d.LengthSquared() <= rs * rs;
     }
 
-    private static bool IntersectsSphereCapsule(in HitPrimitive3D sphere, in HitPrimitive3D capsule)
+    private static bool SphereCapsule(in HitPrimitive3D sphere, in HitPrimitive3D capsule)
     {
-        var distSq = PointSegmentDistanceSquared(sphere.P0, capsule.P0, capsule.P1);
+        var distSq = Geometry3D.PointSegmentDistanceSquared(sphere.P0, capsule.P0, capsule.P1);
         var rs = sphere.R + capsule.R;
         return distSq <= rs * rs;
     }
 
-    private static bool IntersectsCapsuleCapsule(in HitPrimitive3D a, in HitPrimitive3D b)
+    private static bool SphereCylinder(in HitPrimitive3D sphere, in HitPrimitive3D cyl)
     {
-        var distSq = SegmentSegmentDistanceSquared(a.P0, a.P1, b.P0, b.P1);
+        // Closed form: split the sphere-to-cylinder distance into the
+        // axial overflow (past either cap) and radial overflow (past
+        // the side). Both zero means the center is inside → hit.
+        var axis = cyl.P1 - cyl.P0;
+        var axisLenSq = axis.LengthSquared();
+        if (axisLenSq <= 1e-12f)
+        {
+            // Degenerate cylinder collapses to a sphere of radius cyl.R.
+            var d2 = (sphere.P0 - cyl.P0).LengthSquared();
+            var rs = sphere.R + cyl.R;
+            return d2 <= rs * rs;
+        }
+
+        var axisLen = MathF.Sqrt(axisLenSq);
+        var axisDir = axis / axisLen;
+        var v = sphere.P0 - cyl.P0;
+        float along = Vector3.Dot(v, axisDir);
+        var radial = v - along * axisDir;
+        float radialLen = radial.Length();
+
+        float axialOverflow = along < 0f ? -along : (along > axisLen ? along - axisLen : 0f);
+        float radialOverflow = radialLen > cyl.R ? radialLen - cyl.R : 0f;
+        float distSq = axialOverflow * axialOverflow + radialOverflow * radialOverflow;
+        return distSq <= sphere.R * sphere.R;
+    }
+
+    private static bool SphereBox(in HitPrimitive3D sphere, in HitPrimitive3D box)
+    {
+        // Transform the sphere center into the box's local frame, then
+        // clamp to ±halfExtents and check distance.
+        var inv = Quaternion.Conjugate(box.Q);
+        var local = Vector3.Transform(sphere.P0 - box.P0, inv);
+        var h = box.P1;
+        var clamped = new Vector3(
+            Math.Clamp(local.X, -h.X, h.X),
+            Math.Clamp(local.Y, -h.Y, h.Y),
+            Math.Clamp(local.Z, -h.Z, h.Z));
+        return Vector3.DistanceSquared(local, clamped) <= sphere.R * sphere.R;
+    }
+
+    private static bool SphereWall(in HitPrimitive3D sphere, in HitPrimitive3D wall)
+    {
+        // Wall is the local XY rectangle. Transform sphere center to
+        // wall-local; clamp to the rectangle in XY; Z is the unclamped
+        // normal-direction distance.
+        var inv = Quaternion.Conjugate(wall.Q);
+        var local = Vector3.Transform(sphere.P0 - wall.P0, inv);
+        float hx = wall.P1.X, hy = wall.P1.Y;
+        float cx = Math.Clamp(local.X, -hx, hx);
+        float cy = Math.Clamp(local.Y, -hy, hy);
+        float dx = local.X - cx;
+        float dy = local.Y - cy;
+        float dz = local.Z;
+        return dx * dx + dy * dy + dz * dz <= sphere.R * sphere.R;
+    }
+
+    // ---- Capsule ----
+
+    private static bool CapsuleCapsule(in HitPrimitive3D a, in HitPrimitive3D b)
+    {
+        var distSq = Geometry3D.SegmentSegmentDistanceSquared(a.P0, a.P1, b.P0, b.P1);
         var rs = a.R + b.R;
         return distSq <= rs * rs;
     }
 
-    private static float PointSegmentDistanceSquared(Vector3 p, Vector3 a, Vector3 b)
+    private static bool CapsuleCylinder(in HitPrimitive3D capsule, in HitPrimitive3D cyl)
     {
-        var ab = b - a;
-        var lenSq = ab.LengthSquared();
-        if (lenSq <= float.Epsilon)
-            return (p - a).LengthSquared();
-        var t = Vector3.Dot(p - a, ab) / lenSq;
-        if (t < 0f) t = 0f;
-        else if (t > 1f) t = 1f;
-        var closest = a + t * ab;
-        return (p - closest).LengthSquared();
+        // Approximate the cylinder as a capsule with the same axis and
+        // radius. Conservative at the cylinder's flat caps (false
+        // positives in a thin rounded-cap band); exact on the body.
+        var distSq = Geometry3D.SegmentSegmentDistanceSquared(capsule.P0, capsule.P1, cyl.P0, cyl.P1);
+        var rs = capsule.R + cyl.R;
+        return distSq <= rs * rs;
     }
 
-    // Classic two-segment closest-point algorithm (Ericson, Real-Time
-    // Collision Detection, ch. 5). Returns the squared distance between
-    // the two segments' closest points.
-    private static float SegmentSegmentDistanceSquared(Vector3 p1, Vector3 q1, Vector3 p2, Vector3 q2)
+    private static bool CapsuleBox(in HitPrimitive3D capsule, in HitPrimitive3D box)
     {
-        var d1 = q1 - p1;
-        var d2 = q2 - p2;
-        var r  = p1 - p2;
-        float a = Vector3.Dot(d1, d1);
-        float e = Vector3.Dot(d2, d2);
-        float f = Vector3.Dot(d2, r);
-
-        const float eps = 1e-12f;
-
-        float s, t;
-        if (a <= eps && e <= eps)
-            return (p1 - p2).LengthSquared();
-
-        if (a <= eps)
-        {
-            s = 0f;
-            t = Math.Clamp(f / e, 0f, 1f);
-        }
-        else
-        {
-            float c = Vector3.Dot(d1, r);
-            if (e <= eps)
-            {
-                t = 0f;
-                s = Math.Clamp(-c / a, 0f, 1f);
-            }
-            else
-            {
-                float b = Vector3.Dot(d1, d2);
-                float denom = a * e - b * b;
-                s = denom != 0f
-                    ? Math.Clamp((b * f - c * e) / denom, 0f, 1f)
-                    : 0f;
-                t = (b * s + f) / e;
-                if (t < 0f)
-                {
-                    t = 0f;
-                    s = Math.Clamp(-c / a, 0f, 1f);
-                }
-                else if (t > 1f)
-                {
-                    t = 1f;
-                    s = Math.Clamp((b - c) / a, 0f, 1f);
-                }
-            }
-        }
-
-        var c1 = p1 + d1 * s;
-        var c2 = p2 + d2 * t;
-        return (c1 - c2).LengthSquared();
+        // Transform the capsule's segment into box-local space, then
+        // test against the AABB inflated by the capsule's radius. The
+        // inflation produces a box with square corners rather than the
+        // true Minkowski sum's rounded corners — slight false positives
+        // possible near corners; acceptable for gameplay.
+        var inv = Quaternion.Conjugate(box.Q);
+        var a = Vector3.Transform(capsule.P0 - box.P0, inv);
+        var b = Vector3.Transform(capsule.P1 - box.P0, inv);
+        var h = box.P1 + new Vector3(capsule.R);
+        return Geometry3D.SegmentIntersectsAabb(a, b, h);
     }
+
+    private static bool CapsuleWall(in HitPrimitive3D capsule, in HitPrimitive3D wall)
+    {
+        // Same approach as box, with the wall's Z half-extent = 0.
+        var inv = Quaternion.Conjugate(wall.Q);
+        var a = Vector3.Transform(capsule.P0 - wall.P0, inv);
+        var b = Vector3.Transform(capsule.P1 - wall.P0, inv);
+        var h = new Vector3(wall.P1.X + capsule.R, wall.P1.Y + capsule.R, capsule.R);
+        return Geometry3D.SegmentIntersectsAabb(a, b, h);
+    }
+
+    // ---- Cylinder ----
+
+    private static bool CylinderCylinder(in HitPrimitive3D a, in HitPrimitive3D b)
+    {
+        // Same approximation as capsule-cylinder: treat both axes as
+        // capsule segments.
+        var distSq = Geometry3D.SegmentSegmentDistanceSquared(a.P0, a.P1, b.P0, b.P1);
+        var rs = a.R + b.R;
+        return distSq <= rs * rs;
+    }
+
+    private static bool CylinderBox(in HitPrimitive3D cyl, in HitPrimitive3D box)
+    {
+        // Treat the cylinder as a capsule of the same radius. Slight
+        // overlap reported at the cylinder's flat caps.
+        var inv = Quaternion.Conjugate(box.Q);
+        var a = Vector3.Transform(cyl.P0 - box.P0, inv);
+        var b = Vector3.Transform(cyl.P1 - box.P0, inv);
+        var h = box.P1 + new Vector3(cyl.R);
+        return Geometry3D.SegmentIntersectsAabb(a, b, h);
+    }
+
+    private static bool CylinderWall(in HitPrimitive3D cyl, in HitPrimitive3D wall)
+    {
+        var inv = Quaternion.Conjugate(wall.Q);
+        var a = Vector3.Transform(cyl.P0 - wall.P0, inv);
+        var b = Vector3.Transform(cyl.P1 - wall.P0, inv);
+        var h = new Vector3(wall.P1.X + cyl.R, wall.P1.Y + cyl.R, cyl.R);
+        return Geometry3D.SegmentIntersectsAabb(a, b, h);
+    }
+
+    // ---- Box ----
+
+    private static bool BoxBox(in HitPrimitive3D a, in HitPrimitive3D b) =>
+        Geometry3D.BoxesOverlap(a.P0, a.Q, a.P1, b.P0, b.Q, b.P1);
 }
+
