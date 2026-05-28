@@ -190,7 +190,7 @@ public abstract class Renderer3D
     /// projection transform -- the args struct's transform field, if
     /// any, is sent to the GPU unchanged.
     /// </summary>
-    public Camera? Camera { get; set; }
+    public Camera3D? Camera { get; set; }
 
     /// <summary>
     /// Whole-scene ambient light, applied by lit shaders that opt in via

@@ -183,7 +183,7 @@ public abstract class Renderer2D
     /// use coordinates in the (<paramref name="width"/>,
     /// <paramref name="height"/>) space and the renderer handles
     /// scaling, centering, and letterbox bars automatically.
-    /// Pass <see cref="LogicalPresentation.Disabled"/> with any size
+    /// Pass <see cref="LogicalPresentation.None"/> with any size
     /// to turn it off.
     /// </summary>
     public abstract void SetLogicalSize(int width, int height, LogicalPresentation mode);

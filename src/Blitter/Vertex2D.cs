@@ -4,13 +4,9 @@ using System.Runtime.InteropServices;
 namespace Blitter;
 
 /// <summary>
-/// A 2D vertex used by <see cref="Renderer2D.DrawGeometry"/>: a position,
-/// a tint color (linear float RGBA), and a texture coordinate.
+/// A 2D vertex used by <see cref="Renderer2D.DrawGeometry"/>: 
+/// a position, a tint color (linear float RGBA), and a texture coordinate.
 /// </summary>
-/// <remarks>
-/// Layout is binary-compatible with SDL's <c>SDL_Vertex</c> so arrays can be
-/// pinned and passed directly to the renderer without an intermediate copy.
-/// </remarks>
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct Vertex2D : IEquatable<Vertex2D>, IPositionVertex2D
 {

@@ -1,8 +1,8 @@
 namespace Blitter;
 
 /// <summary>
-/// Virtual key codes. Values mirror the underlying SDL3 keycode values exactly,
-/// so unknown values can be safely cast from the underlying uint.
+/// Keys defined by their use or character they produce, regardless of their physical location
+/// on the keyboard, as opposed to <see cref="PhysicalKey"/>.
 /// </summary>
 public enum Key : uint
 {

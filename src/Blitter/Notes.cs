@@ -1,8 +1,7 @@
 namespace Blitter;
 
 /// <summary>
-/// Equal-tempered note frequencies in Hertz (A4 = 440 Hz). 
-/// Pass directly to <see cref="Sound.Tone"/> or <see cref="Sound.Sweep"/>.
+/// Note frequencies in Hertz (A4 = 440 Hz).
 /// Sharp notes use the <c>s</c> suffix (e.g. <see cref="Cs4"/> = C#4 = Db4).
 /// </summary>
 public static class Notes

@@ -11,7 +11,7 @@ namespace Blitter;
 public class Window3D : Window
 {
     private readonly GpuDevice _device;
-    private GpuRenderer? _renderer;
+    private GpuRenderer3D? _renderer;
     private bool _claimed;
 
     internal Window3D(GpuDevice device, int width, int height, WindowFlags flags = WindowFlags.None)
@@ -51,7 +51,7 @@ public class Window3D : Window
             }
             _claimed = true;
         });
-        _renderer = new GpuRenderer(_device, this);
+        _renderer = new GpuRenderer3D(_device, this);
         _renderer.BackgroundColor = base.BackgroundColor;
     }
 
@@ -160,7 +160,7 @@ public class Window3D : Window
     public Task RunAsync(Action<Renderer3D> renderFrame, CancellationToken cancellationToken = default)
         => RunAsync(static () => false, renderFrame, cancellationToken);
 
-    private bool TryGetRenderer([NotNullWhen(true)] out GpuRenderer? renderer)
+    private bool TryGetRenderer([NotNullWhen(true)] out GpuRenderer3D? renderer)
     {
         renderer = _renderer;
         return renderer is not null && _claimed && !this.IsClosed;

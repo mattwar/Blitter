@@ -1,6 +1,8 @@
 namespace Blitter;
 
-/// <summary>Keyboard modifier flags.</summary>
+/// <summary>
+/// Keyboard modifier flags.
+/// </summary>
 [Flags]
 public enum KeyModifiers : ushort
 {

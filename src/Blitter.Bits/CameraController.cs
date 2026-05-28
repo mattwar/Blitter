@@ -4,7 +4,7 @@ namespace Blitter.Bits;
 
 /// <summary>
 /// Base class for camera-driving controllers — objects that own a
-/// <see cref="Blitter.Camera"/> and mutate it each frame (typically from
+/// <see cref="Blitter.Camera3D"/> and mutate it each frame (typically from
 /// input or a tracked target). Plug into a render loop by calling
 /// <see cref="IUpdatable{TCtx}.Update"/> with the renderer's update
 /// context, then either assign <see cref="Camera"/> to
@@ -18,7 +18,7 @@ public abstract class CameraController : IUpdatable<UpdateContext3D>, IDrawable3
     /// <see cref="PerspectiveCamera"/>; assign your own to use a
     /// different projection or pre-configured starting pose.
     /// </summary>
-    public Camera Camera { get; set; } = new PerspectiveCamera();
+    public Camera3D Camera { get; set; } = new PerspectiveCamera();
 
     /// <inheritdoc/>
     public abstract void Update(in UpdateContext3D context);

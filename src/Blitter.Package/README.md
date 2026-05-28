@@ -6,16 +6,16 @@
 
 ## What's in the box
 
-- **Window2D** - bitmap/sprite-style 2D rendering
+- **Window2D** - simple 2D rendering
 - **Window3D** - GPU-accelerated 3D rendering
-- **SkiaSharp** Integration - Fonts, Filters, Canvas and more
+- **SkiaSharp** - integration for advanced 2D rendering
 - **Input** - keyboard, mouse, gamepad, and touch via simple events
 - **Audio** - load, play & mix wav, mp3 and ogg sound files
 - **Images** - load, save, manipulate pixels, apply filters
 - **Shaders** - load, save, dynamic compilation
 - **Blitter.Bits** - beyond the basics: useful tidbits for graphical apps
-- **Blitter.Blocks2D** - building blocks: sprites, scenes, panels and more
-- **Blitter.Blocks3D** - building blocks for 3D scenes (in development)
+- **Blitter.Blocks2D** - building blocks to compose scenes, sprites, behaviors and more.
+- **Blitter.Blocks3D** - Similar to Blocks2D, but with even more D.
 
 ## A 2D example
 
@@ -80,7 +80,7 @@ await window.RunAsync(r =>
 
 ## Learn more
 
-For full documentation, samples, and shader authoring details, see the project repository:
+For full documentation and samples see the project repository:
 
 **https://github.com/mattwar/Blitter**
 

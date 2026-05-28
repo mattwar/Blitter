@@ -16,7 +16,7 @@ public sealed class CameraFlyer : CameraController
     /// <summary>Camera position in world space.</summary>
     public Vector3 Position { get; set; } = new(0f, 0f, 5f);
 
-    /// <summary>World-up axis used for the look-at <see cref="Camera.Up"/>.</summary>
+    /// <summary>World-up axis used for the look-at <see cref="Camera3D.Up"/>.</summary>
     public Vector3 Up { get; set; } = Vector3.UnitY;
 
     /// <summary>Yaw angle in radians (rotation around <see cref="Up"/>; 0 = looking down -Z).</summary>

@@ -639,7 +639,7 @@ public static class SkiaSharpExtensions
             // Tie the scratch's lifetime to the renderer when possible
             // so native handles (SKBitmap, SKCanvas, Image) are released
             // on Dispose() instead of waiting for finalization.
-            if (r is BitmapRenderer2D br)
+            if (r is TextureRenderer2D br)
                 br.AddResource(s);
             return s;
         });

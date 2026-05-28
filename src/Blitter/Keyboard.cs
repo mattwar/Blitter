@@ -1,8 +1,7 @@
 namespace Blitter;
 
 /// <summary>
-/// Provides access to global keyboard state, independent of
-/// <see cref="Window.KeyDown"/> / <see cref="Window.KeyUp"/> events.
+/// Provides access to global keyboard state.
 /// </summary>
 public static class Keyboard
 {

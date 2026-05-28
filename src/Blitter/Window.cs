@@ -7,7 +7,7 @@ using Blitter.Utilities;
 namespace Blitter;
 
 /// <summary>
-/// A window class corresponding to an SDL window.
+/// A window base class with eventing.
 /// </summary>
 public abstract class Window : IDisposable
 {

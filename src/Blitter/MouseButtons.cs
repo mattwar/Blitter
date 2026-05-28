@@ -1,6 +1,8 @@
 namespace Blitter;
 
-/// <summary>Mouse button state flags.</summary>
+/// <summary>
+/// Mouse button state flags.
+/// </summary>
 [Flags]
 public enum MouseButtons : uint
 {

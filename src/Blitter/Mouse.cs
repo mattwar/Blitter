@@ -66,10 +66,6 @@ public static class Mouse
 
     /// <summary>
     /// The mouse cursor position in desktop (global) coordinates.
-    /// Setting this warps the cursor to the requested position.
-    /// While any window has <see cref="Window.RelativeMouseMode"/>
-    /// enabled the OS pins the cursor and this value stops moving;
-    /// use <see cref="FrameInput.MouseDelta"/> for motion in that mode.
     /// </summary>
     public static Vector2 Position
     {
@@ -89,9 +85,7 @@ public static class Mouse
 
     /// <summary>
     /// Returns the mouse cursor position in coordinates relative to the
-    /// top-left of the given window. Pinned (does not move) while any
-    /// window has <see cref="Window.RelativeMouseMode"/> enabled; use
-    /// <see cref="FrameInput.MouseDelta"/> for motion in that mode.
+    /// top-left of the given window.
     /// </summary>
     public static Vector2 GetPosition(Window window)
     {
@@ -103,7 +97,7 @@ public static class Mouse
     }
 
     /// <summary>
-    /// Warps the mouse cursor to the given position in coordinates relative
+    /// Moves the mouse cursor to the given position in coordinates relative
     /// to the top-left of the given window.
     /// </summary>
     public static void SetPosition(Window window, Vector2 position)

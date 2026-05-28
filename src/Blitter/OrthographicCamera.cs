@@ -9,12 +9,12 @@ namespace Blitter;
 /// camera. Common for 2D-in-3D scenes, technical/CAD views, and
 /// isometric or top-down games.
 /// </summary>
-public sealed class OrthographicCamera : Camera
+public sealed class OrthographicCamera : Camera3D
 {
     /// <summary>
     /// Vertical extent of the view volume in world units. Defaults to
     /// <c>2</c>. The horizontal extent is derived from the aspect ratio
-    /// passed to <see cref="Camera.GetProjection"/>.
+    /// passed to <see cref="Camera3D.GetProjection"/>.
     /// </summary>
     public float Height { get; set; } = 2f;
 

@@ -3,11 +3,7 @@ using System.Numerics;
 namespace Blitter;
 
 /// <summary>
-/// World-space placement of 2D geometry: position, rotation, and
-/// uniform scale. Bundled into one struct so the visual pose and
-/// the collision pose can stay in sync. Flip is not part of the
-/// pose — it lives with the visual (animation frame) and the hit
-/// shape (via <c>Flipped(FlipMode)</c>).
+/// World-space placement of 2D geometry: position, rotation, and scale. 
 /// </summary>
 public readonly struct Pose2D
 {

@@ -1,56 +1,64 @@
 namespace Blitter;
 
 /// <summary>
-/// Base type for any 2D image asset the renderer can sample as a
-/// texture. Concrete subtypes include <see cref="Bitmap"/>
-/// (CPU-backed surface with full pixel access) and
-/// <see cref="Mipmap"/> (an explicit mip chain of images).
+/// A base type for any 2D texture. 
 /// </summary>
 public abstract class Texture2D : Texture, IDisposable
 {
-    /// <summary>Width of the (base level of the) image in pixels.</summary>
+    /// <summary>
+    /// Width of the texture in pixels.
+    /// </summary>
     public abstract int Width { get; }
 
-    /// <summary>Height of the (base level of the) image in pixels.</summary>
+    /// <summary>
+    /// Height of the texture in pixels.
+    /// </summary>
     public abstract int Height { get; }
 
-    /// <summary>Pixel format of the image.</summary>
+    /// <summary>
+    /// Pixel format of the texture.
+    /// </summary>
     public abstract PixelFormat PixelFormat { get; }
 
     /// <summary>
-    /// Bumped each time the image's contents change. Renderers use
-    /// this to detect when their cached GPU upload is stale.
+    /// Bumped each time the texture's contents change. 
+    /// Renderers use this to detect when their cached GPU upload is stale.
     /// </summary>
     public abstract int Version { get; }
 
     /// <summary>
-    /// Number of mip levels stored. <c>1</c> means just a base level.
+    /// Number of mip levels stored. 
+    /// <c>1</c> means just a base level.
     /// </summary>
     public abstract int LevelCount { get; }
 
     /// <summary>
-    /// Hints to renderers that a mip chain should be generated for
-    /// this image on upload. Ignored when <see cref="LevelCount"/>
-    /// is already greater than 1.
+    /// Hints to renderers that a mip chain should be generated for this texture on upload. 
+    /// Ignored when <see cref="LevelCount"/> is already greater than 1.
     /// </summary>
     public abstract bool Mipmaps { get; }
 
-    /// <summary>Whether the image has been disposed.</summary>
+    /// <summary>
+    /// Whether the texture has been disposed.
+    /// </summary>
     public abstract bool IsDisposed { get; }
 
-    /// <summary>Marks contents as changed so renderers re-upload.</summary>
+    /// <summary>
+    /// Marks the texture's contents as changed so renderers re-upload.
+    /// </summary>
     public abstract void Invalidate();
 
     /// <inheritdoc/>
     public abstract void Dispose();
 
-    /// <summary>Size of the (base level of the) image in pixels.</summary>
+    /// <summary>
+    /// Size of the texture in pixels.
+    /// </summary>
     public (int Width, int Height) Size => (Width, Height);
 
     /// <summary>
-    /// Creates a texture that views the given sub-rectangle of this
-    /// image. Readable textures return a readable segment; other
-    /// textures return a non-readable one.
+    /// Returns a rectangular region of this texture.
     /// </summary>
-    public virtual Texture2D Slice(Rect region) => new TextureSegment2D(this, region);
+    public virtual Texture2D Slice(Rect region) => 
+        new TextureRegion2D(this, region);
 }

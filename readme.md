@@ -15,7 +15,7 @@
 SDL3 is fantastic, but using it directly from C# means a lot of P/Invoke, unsafe code, and boilerplate. Blitter exists to give .NET developers a small, approachable surface for:
 
 - Managing windows and events
-- Drawing/animating 2D images and primitives
+- Drawing/animating 2D bitmaps and primitives
 - Drawing/animating 3D meshes, models and text with lighting
 - Reading keyboard, mouse, gamepad, and touch input
 - Loading/Playing sounds
@@ -26,16 +26,16 @@ SDL3 is fantastic, but using it directly from C# means a lot of P/Invoke, unsafe
 
 ## Features
 
-- **Window2D** - bitmap/sprite-style 2D rendering
+- **Window2D** - simple 2D rendering
 - **Window3D** - GPU-accelerated 3D rendering
-- **SkiaSharp** Integration - Fonts, Filters, Canvas and more
+- **SkiaSharp** - integration for advanced 2D rendering
 - **Input** - keyboard, mouse, gamepad, and touch via simple events
 - **Audio** - load, play & mix wav, mp3 and ogg sound files
 - **Images** - load, save, manipulate pixels, apply filters
 - **Shaders** - load, save, dynamic compilation
 - **Blitter.Bits** - beyond the basics: useful tidbits for graphical apps
-- **Blitter.Blocks2D** - building blocks: sprites, scenes, panels and more
-- **Blitter.Blocks3D** - building blocks for 3D scenes (in development)
+- **Blitter.Blocks2D** - building blocks to compose scenes, sprites, behaviors and more.
+- **Blitter.Blocks3D** - Similar to Blocks2D, but with even more D.
 
 ## Installation
 
@@ -45,7 +45,7 @@ Blitter is published as a NuGet package:
 dotnet add package Blitter
 ```
 
-The native SDL3 binaries are pulled in automatically via the `SDL3-CS.Native` and `SDL3-CS.Native.Shadercross` package dependencies — there is nothing to install separately.
+All required native binaries are pulled in automatically — there is nothing to install separately.
 
 Targets **.NET 10**.
 
@@ -150,6 +150,8 @@ Blitter stands on the shoulders of some excellent open-source projects:
 - [SDL3-CS](https://github.com/edwardgushchin/SDL3-CS) by Edward Gushchin — the C# bindings for SDL3.
 - [SkiaSharp](https://github.com/mono/SkiaSharp) — image decoding (PNG, JPEG, etc.) and 2D canvas drawing into bitmaps. Blitter bridges those bitmaps onto the screen.
 - [SharpGLTF](https://github.com/vpenades/SharpGLTF) by Vicente Penades — glTF 2.0 (`.glb` / `.gltf`) parsing used by `Model.Load`.
+- [NLayer](https://github.com/naudio/NLayer) by Mark Heath, Andrew Ward and contributors — managed MP3 decoder used by `Sound.Load`.
+- [NVorbis](https://github.com/NVorbis/NVorbis) by Andrew Ward — managed Ogg Vorbis decoder used by `Sound.Load`.
 
 Full copyright notices and license texts are reproduced in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 

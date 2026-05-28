@@ -1,10 +1,8 @@
 namespace Blitter;
 
 /// <summary>
-/// Identifies a key by its physical position on the keyboard, independent of
-/// the active keyboard layout. Values are based on the USB HID usage table and
-/// match the underlying SDL3 scancode values exactly, so unknown values can be
-/// safely cast from the underlying int.
+/// Keys defined by their physical location on the keyboard (via scancodes)
+/// using a typical HID layout, as opposed to the virtual keycode defined by <see cref="Key"/>.
 /// </summary>
 public enum PhysicalKey
 {

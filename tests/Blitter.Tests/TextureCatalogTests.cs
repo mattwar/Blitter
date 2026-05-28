@@ -16,8 +16,8 @@ public class TextureCatalogTests
         using var atlas = TextureCatalog.FromRegions(image, rects);
 
         Assert.Equal(2, atlas.Count);
-        Assert.Equal(rects[0], ((ITextureRegion)atlas[0]).SourceRect);
-        Assert.Equal(rects[1], ((ITextureRegion)atlas[1]).SourceRect);
+        Assert.Equal(rects[0], ((ITextureRegion)atlas[0]).Region);
+        Assert.Equal(rects[1], ((ITextureRegion)atlas[1]).Region);
         Assert.Same(image, ((ITextureRegion)atlas[0]).Source);
     }
 
@@ -35,8 +35,8 @@ public class TextureCatalogTests
         var names = new Dictionary<string, int> { ["alpha"] = 0, ["beta"] = 1 };
         using var atlas = TextureCatalog.FromRegions(CreateImage(), rects, names);
 
-        Assert.Equal(rects[0], ((ITextureRegion)atlas["alpha"]).SourceRect);
-        Assert.Equal(rects[1], ((ITextureRegion)atlas["beta"]).SourceRect);
+        Assert.Equal(rects[0], ((ITextureRegion)atlas["alpha"]).Region);
+        Assert.Equal(rects[1], ((ITextureRegion)atlas["beta"]).Region);
         Assert.True(atlas.Contains("alpha"));
         Assert.False(atlas.Contains("missing"));
     }
@@ -87,17 +87,17 @@ public class TextureCatalogTests
         using var atlas = TextureCatalog.Grid(image, columns: 4, rows: 4);
 
         Assert.Equal(16, atlas.Count);
-        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
-        Assert.Equal(new Rect(4, 0, 4, 4), ((ITextureRegion)atlas[1]).SourceRect);
-        Assert.Equal(new Rect(0, 4, 4, 4), ((ITextureRegion)atlas[4]).SourceRect);
-        Assert.Equal(new Rect(12, 12, 4, 4), ((ITextureRegion)atlas[15]).SourceRect);
+        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).Region);
+        Assert.Equal(new Rect(4, 0, 4, 4), ((ITextureRegion)atlas[1]).Region);
+        Assert.Equal(new Rect(0, 4, 4, 4), ((ITextureRegion)atlas[4]).Region);
+        Assert.Equal(new Rect(12, 12, 4, 4), ((ITextureRegion)atlas[15]).Region);
     }
 
     [Fact]
     public void Grid_RowMajor()
     {
         using var atlas = TextureCatalog.Grid(CreateImage(12, 8), columns: 3, rows: 2);
-        Assert.Equal(new Rect(8, 4, 4, 4), ((ITextureRegion)atlas[5]).SourceRect); // row 1, col 2
+        Assert.Equal(new Rect(8, 4, 4, 4), ((ITextureRegion)atlas[5]).Region); // row 1, col 2
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public class TextureCatalogTests
             columns: 4, rows: 4, cellWidth: 4, cellHeight: 4);
 
         Assert.Equal(16, atlas.Count);
-        Assert.Equal(new Rect(12, 12, 4, 4), ((ITextureRegion)atlas[15]).SourceRect);
+        Assert.Equal(new Rect(12, 12, 4, 4), ((ITextureRegion)atlas[15]).Region);
     }
 
     [Fact]
@@ -159,9 +159,9 @@ public class TextureCatalogTests
         using var atlas = TextureCatalog.Sense(bmp);
 
         Assert.Equal(3, atlas.Count);
-        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
-        Assert.Equal(new Rect(5, 0, 4, 4), ((ITextureRegion)atlas[1]).SourceRect);
-        Assert.Equal(new Rect(10, 0, 4, 4), ((ITextureRegion)atlas[2]).SourceRect);
+        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).Region);
+        Assert.Equal(new Rect(5, 0, 4, 4), ((ITextureRegion)atlas[1]).Region);
+        Assert.Equal(new Rect(10, 0, 4, 4), ((ITextureRegion)atlas[2]).Region);
     }
 
     [Fact]
@@ -176,10 +176,10 @@ public class TextureCatalogTests
         using var atlas = TextureCatalog.Sense(bmp);
 
         Assert.Equal(4, atlas.Count);
-        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
-        Assert.Equal(new Rect(6, 0, 4, 4), ((ITextureRegion)atlas[1]).SourceRect);
-        Assert.Equal(new Rect(0, 6, 4, 4), ((ITextureRegion)atlas[2]).SourceRect);
-        Assert.Equal(new Rect(6, 6, 4, 4), ((ITextureRegion)atlas[3]).SourceRect);
+        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).Region);
+        Assert.Equal(new Rect(6, 0, 4, 4), ((ITextureRegion)atlas[1]).Region);
+        Assert.Equal(new Rect(0, 6, 4, 4), ((ITextureRegion)atlas[2]).Region);
+        Assert.Equal(new Rect(6, 6, 4, 4), ((ITextureRegion)atlas[3]).Region);
     }
 
     [Fact]
@@ -192,8 +192,8 @@ public class TextureCatalogTests
         using var atlas = TextureCatalog.Sense(bmp);
 
         Assert.Equal(2, atlas.Count);
-        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
-        Assert.Equal(new Rect(6, 6, 4, 4), ((ITextureRegion)atlas[1]).SourceRect);
+        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).Region);
+        Assert.Equal(new Rect(6, 6, 4, 4), ((ITextureRegion)atlas[1]).Region);
     }
 
     [Fact]
@@ -211,9 +211,9 @@ public class TextureCatalogTests
         using var atlas = TextureCatalog.Sense(bmp);
 
         Assert.Equal(3, atlas.Count);
-        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).SourceRect);
-        Assert.Equal(new Rect(6, 0, 4, 4), ((ITextureRegion)atlas[1]).SourceRect);
-        Assert.Equal(new Rect(3, 6, 5, 4), ((ITextureRegion)atlas[2]).SourceRect);
+        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)atlas[0]).Region);
+        Assert.Equal(new Rect(6, 0, 4, 4), ((ITextureRegion)atlas[1]).Region);
+        Assert.Equal(new Rect(3, 6, 5, 4), ((ITextureRegion)atlas[2]).Region);
     }
 
     [Fact]
@@ -231,8 +231,8 @@ public class TextureCatalogTests
         using var atlas = TextureCatalog.Sense(bmp, minRegionWidth: 4, minRegionHeight: 4);
 
         Assert.Equal(2, atlas.Count);
-        Assert.Equal(new Rect(0, 0, 8, 8), ((ITextureRegion)atlas[0]).SourceRect);
-        Assert.Equal(new Rect(4, 12, 8, 8), ((ITextureRegion)atlas[1]).SourceRect);
+        Assert.Equal(new Rect(0, 0, 8, 8), ((ITextureRegion)atlas[0]).Region);
+        Assert.Equal(new Rect(4, 12, 8, 8), ((ITextureRegion)atlas[1]).Region);
     }
 
     [Fact]
@@ -252,7 +252,7 @@ public class TextureCatalogTests
 
         using var merged = TextureCatalog.Sense(bmp, minRowGutter: 3);
         Assert.Equal(1, merged.Count);
-        Assert.Equal(new Rect(0, 0, 8, 13), ((ITextureRegion)merged[0]).SourceRect);
+        Assert.Equal(new Rect(0, 0, 8, 13), ((ITextureRegion)merged[0]).Region);
     }
 
     [Fact]
@@ -272,7 +272,7 @@ public class TextureCatalogTests
         Assert.Equal(0, sensedAbove.Count);
         using var sensedBelow = TextureCatalog.Sense(bmp, alphaThreshold: 64);
         Assert.Equal(1, sensedBelow.Count);
-        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)sensedBelow[0]).SourceRect);
+        Assert.Equal(new Rect(0, 0, 4, 4), ((ITextureRegion)sensedBelow[0]).Region);
     }
 
     private static void FillRect(Bitmap bmp, int x, int y, int w, int h) =>

@@ -64,7 +64,7 @@ window.Rendering += (w, rd) =>
     // coordinates, mapped onto the displayed destination rect.
     for (int i = 0; i < atlas.Count; i++)
     {
-        var src = ((ITextureRegion)atlas[i]).SourceRect;
+        var src = ((ITextureRegion)atlas[i]).Region;
         float x0 = drawX + src.X * scale;
         float y0 = drawY + src.Y * scale;
         float x1 = x0 + src.Width * scale;

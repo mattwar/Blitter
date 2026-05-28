@@ -351,7 +351,7 @@ public sealed class Font : IDisposable
             if (_runeToSlot.TryGetValue(rune.Value, out var slot))
             {
                 // Font's atlas slots are always regions over _image.
-                var rect = ((ITextureRegion)_atlas[slot]).SourceRect;
+                var rect = ((ITextureRegion)_atlas[slot]).Region;
                 float u0 = rect.X / atlasW;
                 float u1 = (rect.X + rect.Width) / atlasW;
                 float v0 = rect.Y / atlasH;

@@ -4,28 +4,8 @@ using System.Runtime.InteropServices;
 namespace Blitter;
 
 /// <summary>
-/// A one-field args struct whose only payload is a 4x4 transform
-/// matrix, exposed through <see cref="IUniformArgs{TSelf}"/> so
-/// the renderer can compose its <see cref="Renderer3D.Camera"/>
-/// view-projection into it before each draw.
+/// A one-field args struct whose only payload is a 4x4 transform matrix
 /// </summary>
-/// <remarks>
-/// <para>
-/// Use this in place of a bare <see cref="Matrix4x4"/> on shader
-/// sets where you want the renderer to apply the camera
-/// automatically. Carries an implicit conversion from
-/// <see cref="Matrix4x4"/> so call sites stay clean: passing a
-/// model matrix where a <c>Transform</c> is expected just works.
-/// </para>
-/// <para>
-/// When the args struct is passed through
-/// <see cref="Renderer3D.DrawMesh{TVertex,TArgs}(Mesh{TVertex},
-/// Shader{TVertex,TArgs}, in TArgs)"/> with a non-null
-/// <see cref="Renderer3D.Camera"/>, the value the GPU sees is
-/// <c>Matrix * camera.GetViewProjection(aspect)</c> -- so the
-/// caller passes a model matrix and the shader receives an MVP.
-/// </para>
-/// </remarks>
 [StructLayout(LayoutKind.Sequential)]
 public struct TransformArgs : IUniformArgs<TransformArgs>
 {

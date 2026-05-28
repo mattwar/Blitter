@@ -3,8 +3,7 @@ using System.Numerics;
 namespace Blitter;
 
 /// <summary>
-/// World-space placement of 3D geometry: position, orientation, and
-/// uniform scale. The 3D analog of <see cref="Pose2D"/>.
+/// World-space placement of 3D geometry: position, orientation, and uniform scale. 
 /// </summary>
 public readonly struct Pose3D
 {

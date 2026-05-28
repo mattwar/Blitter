@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Blitter is the public NuGet metapackage. It produces a single
-    .nupkg containing the DLLs (and PDBs) of every project it references,
+    Blitter is the public NuGet metapackage. 
+    It produces a single .nupkg containing the DLLs (and PDBs) of every project it references,
     plus the public package metadata, readme, icon, and notices.
 
-    The project itself has no source files of its own. Future slim/SKU
-    variants can live as sibling projects (e.g. Blitter.Core)
+    The project itself has no source files of its own. 
+    Future slim/SKU variants can live as sibling projects (e.g. Blitter.Core)
     that reference a different subset of libraries.
   -->
 
@@ -103,6 +103,8 @@
     PackageReferences in Blitter.csproj.
   -->
   <ItemGroup>
+    <PackageReference Include="NLayer" Version="1.16.0" />
+    <PackageReference Include="NVorbis" Version="0.10.5" />
     <PackageReference Include="SDL3-CS" Version="3.2.20" />
     <PackageReference Include="SDL3-CS.Native" Version="3.2.24" />
     <PackageReference Include="SDL3-CS.Native.Shadercross" Version="3.0.0" />

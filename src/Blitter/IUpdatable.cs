@@ -1,13 +1,11 @@
 namespace Blitter;
 
 /// <summary>
-/// Implemented by stateful objects that advance once per frame from a
-/// per-frame inputs context.
+/// Implemented by stateful objects that advance once per frame from a per-frame inputs context.
 /// </summary>
 /// <typeparam name="TCtx">
-/// The context shape this object needs. Constraining to a specific
-/// interface (e.g. <see cref="IUpdateContext2D"/>) lets the
-/// implementation receive typed extras without boxing.
+/// The context shape this object needs. Constraining to a specific interface 
+/// (e.g. <see cref="IUpdateContext2D"/>) lets the implementation receive typed extras without boxing.
 /// </typeparam>
 public interface IUpdatable<TCtx> where TCtx : IUpdateContext
 {
@@ -17,8 +15,7 @@ public interface IUpdatable<TCtx> where TCtx : IUpdateContext
 
 /// <summary>
 /// Implemented by objects that issue draws against a 2D renderer.
-/// Pair with <see cref="IUpdatable{TCtx}"/> when the object also has
-/// per-frame state to advance.
+/// Pair with <see cref="IUpdatable{TCtx}"/> when the object also has per-frame state to advance.
 /// </summary>
 public interface IDrawable2D
 {
@@ -26,9 +23,8 @@ public interface IDrawable2D
 }
 
 /// <summary>
-/// Implemented by objects that issue draws against (or otherwise
-/// manipulate the state of) a 3D renderer. A controller that only
-/// pushes scene state (camera assignment, light registration) and
+/// Implemented by objects that issue draws against (or otherwise manipulate the state of) a 3D renderer. 
+/// A controller that only pushes scene state (camera assignment, light registration) and
 /// emits no geometry is still a valid <see cref="IDrawable3D"/>.
 /// </summary>
 public interface IDrawable3D

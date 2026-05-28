@@ -6,14 +6,14 @@ namespace Blitter;
 /// texture, no upload-wallpaper staging, and no download readback --
 /// rendering writes straight into the bitmap's underlying texture.
 /// </summary>
-internal sealed class GpuBitmapRenderer : GpuRenderer
+internal sealed class GpuBitmapRenderer3D : GpuRenderer3D
 {
     private readonly GpuBitmap _target;
     private readonly SDL.GPUTextureFormat _format;
     private readonly uint _width;
     private readonly uint _height;
 
-    internal GpuBitmapRenderer(GpuDevice device, GpuBitmap target)
+    internal GpuBitmapRenderer3D(GpuDevice device, GpuBitmap target)
         : base(device)
     {
         ArgumentNullException.ThrowIfNull(target);

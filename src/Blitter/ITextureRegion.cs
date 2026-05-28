@@ -15,5 +15,5 @@ public interface ITextureRegion
     /// <summary>
     /// Sub-rectangle of <see cref="Source"/> exposed by this region, in source pixel coordinates.
     /// </summary>
-    Rect SourceRect { get; }
+    Rect Region { get; }
 }

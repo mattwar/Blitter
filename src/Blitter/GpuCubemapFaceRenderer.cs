@@ -5,7 +5,7 @@ namespace Blitter;
 /// <see cref="GpuCubemap"/>. Used by GPU cubemap bakers (diffuse,
 /// specular IBL) that issue one fullscreen pass per face/mip.
 /// </summary>
-internal sealed class GpuCubemapFaceRenderer : GpuRenderer
+internal sealed class GpuCubemapFaceRenderer : GpuRenderer3D
 {
     private readonly GpuCubemap _target;
     private readonly CubeFace _face;
