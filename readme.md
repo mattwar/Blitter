@@ -150,6 +150,8 @@ Blitter stands on the shoulders of some excellent open-source projects:
 - [SDL3-CS](https://github.com/edwardgushchin/SDL3-CS) by Edward Gushchin — the C# bindings for SDL3.
 - [SkiaSharp](https://github.com/mono/SkiaSharp) — image decoding (PNG, JPEG, etc.) and 2D canvas drawing into bitmaps. Blitter bridges those bitmaps onto the screen.
 - [SharpGLTF](https://github.com/vpenades/SharpGLTF) by Vicente Penades — glTF 2.0 (`.glb` / `.gltf`) parsing used by `Model.Load`.
+- [NLayer](https://github.com/naudio/NLayer) by Mark Heath, Andrew Ward and contributors — managed MP3 decoder used by `Sound.Load`.
+- [NVorbis](https://github.com/NVorbis/NVorbis) by Andrew Ward — managed Ogg Vorbis decoder used by `Sound.Load`.
 
 Full copyright notices and license texts are reproduced in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
