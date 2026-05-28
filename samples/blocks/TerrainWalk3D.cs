@@ -35,13 +35,14 @@ using Blitter.Blocks3D;
 const float TerrainSize = 40f;
 const int   TerrainSubdivisions = 80;
 
-const float PlayerRadius = 0.5f;
+const float PlayerRadius = 0.3f;
+const float PlayerHeight = 1.0f;   // cylindrical body height
 const float WalkSpeed = 4.5f;
 const float SprintMultiplier = 1.8f;
 const float JumpSpeed = 6.0f;
-// Eye sits a bit above the sphere's center so the camera clears the
-// avatar when the player drops into a dip.
-const float EyeOffsetY = 0.6f;
+// Eye sits just above the top of the capsule (h + r + a little
+// clearance) so the camera isn't inside the avatar mesh.
+const float EyeOffsetY = 0.85f;
 
 var terrainMesh = BuildTerrainMesh(TerrainSize, TerrainSubdivisions, HeightAt, NormalAt);
 var terrain = new TerrainBarrier3D(terrainMesh);
@@ -83,12 +84,12 @@ var walkController = new WalkController3D(window, camera)
 
 var player = new Sprite3D
 {
-    // Sphere visual + SphereHitShape3D. Mesh collision currently only
-    // implements sphere×triangle contact, so a sphere player is the
-    // shape that actually responds to the terrain.
-    Visual = MeshVisual3D.Sphere(
+    // Capsule visual along the Y axis; collides against the terrain
+    // via the matching CapsuleHitShape3D.
+    Visual = MeshVisual3D.Capsule(
         color: new Color(220, 130, 90, 0),  // 0 alpha to be invisible
-        radius: PlayerRadius),
+        radius: PlayerRadius,
+        height: PlayerHeight),
     // Drop in from a few units up so the player settles onto the
     // surface via gravity + bounce.
     Position = new Vector3(0f, HeightAt(0f, 0f) + 4f, 0f),

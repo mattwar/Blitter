@@ -204,6 +204,7 @@ public readonly struct HitPrimitive3D
             (HitKind3D.Capsule, HitKind3D.Cylinder) => CapsuleCylinder(in this, in other),
             (HitKind3D.Capsule, HitKind3D.Box) => CapsuleBox(in this, in other),
             (HitKind3D.Capsule, HitKind3D.Wall) => CapsuleWall(in this, in other),
+            (HitKind3D.Capsule, HitKind3D.Triangle) => CapsuleTriangle(in this, in other),
 
             // Cylinder row.
             (HitKind3D.Cylinder, HitKind3D.Sphere) => SphereCylinder(in other, in this),
@@ -211,22 +212,28 @@ public readonly struct HitPrimitive3D
             (HitKind3D.Cylinder, HitKind3D.Cylinder) => CylinderCylinder(in this, in other),
             (HitKind3D.Cylinder, HitKind3D.Box) => CylinderBox(in this, in other),
             (HitKind3D.Cylinder, HitKind3D.Wall) => CylinderWall(in this, in other),
+            (HitKind3D.Cylinder, HitKind3D.Triangle) => CylinderTriangle(in this, in other),
 
             // Box row.
             (HitKind3D.Box, HitKind3D.Sphere) => SphereBox(in other, in this),
             (HitKind3D.Box, HitKind3D.Capsule) => CapsuleBox(in other, in this),
             (HitKind3D.Box, HitKind3D.Cylinder) => CylinderBox(in other, in this),
             (HitKind3D.Box, HitKind3D.Box) => BoxBox(in this, in other),
+            (HitKind3D.Box, HitKind3D.Triangle) => BoxTriangle(in this, in other),
 
-            // Wall row — sphere/capsule/cylinder fall through to the
-            // mirrored cases above. Wall-vs-box and wall-vs-wall are
-            // intentionally not implemented yet (no current use case).
+            // Wall row — wall-vs-wall is intentionally not implemented
+            // yet (no current use case).
             (HitKind3D.Wall, HitKind3D.Sphere) => SphereWall(in other, in this),
             (HitKind3D.Wall, HitKind3D.Capsule) => CapsuleWall(in other, in this),
             (HitKind3D.Wall, HitKind3D.Cylinder) => CylinderWall(in other, in this),
+            (HitKind3D.Wall, HitKind3D.Triangle) => WallTriangle(in this, in other),
 
-            // Triangle row — only sphere×triangle is closed-form so far.
+            // Triangle row.
             (HitKind3D.Triangle, HitKind3D.Sphere) => SphereTriangle(in other, in this),
+            (HitKind3D.Triangle, HitKind3D.Capsule) => CapsuleTriangle(in other, in this),
+            (HitKind3D.Triangle, HitKind3D.Cylinder) => CylinderTriangle(in other, in this),
+            (HitKind3D.Triangle, HitKind3D.Box) => BoxTriangle(in other, in this),
+            (HitKind3D.Triangle, HitKind3D.Wall) => WallTriangle(in other, in this),
 
             _ => false,
         };
@@ -392,6 +399,44 @@ public readonly struct HitPrimitive3D
     private static bool BoxBox(in HitPrimitive3D a, in HitPrimitive3D b) =>
         Geometry3D.BoxesOverlap(a.P0, a.Q, a.P1, b.P0, b.Q, b.P1);
 
+    // ---- Triangle (segment / box / wall pairs) ----
+
+    private static bool CapsuleTriangle(in HitPrimitive3D capsule, in HitPrimitive3D tri)
+    {
+        var v2 = new Vector3(tri.Q.X, tri.Q.Y, tri.Q.Z);
+        float distSq = Geometry3D.SegmentTriangleClosestPoints(
+            capsule.P0, capsule.P1, tri.P0, tri.P1, v2,
+            out _, out _);
+        return distSq <= capsule.R * capsule.R;
+    }
+
+    private static bool CylinderTriangle(in HitPrimitive3D cyl, in HitPrimitive3D tri)
+    {
+        // Capsule approximation (slight false positives near the flat
+        // caps), matching the rest of the cylinder pair handlers.
+        var v2 = new Vector3(tri.Q.X, tri.Q.Y, tri.Q.Z);
+        float distSq = Geometry3D.SegmentTriangleClosestPoints(
+            cyl.P0, cyl.P1, tri.P0, tri.P1, v2,
+            out _, out _);
+        return distSq <= cyl.R * cyl.R;
+    }
+
+    private static bool BoxTriangle(in HitPrimitive3D box, in HitPrimitive3D tri)
+    {
+        var v2 = new Vector3(tri.Q.X, tri.Q.Y, tri.Q.Z);
+        return Geometry3D.BoxIntersectsTriangle(
+            box.P0, box.Q, box.P1, tri.P0, tri.P1, v2);
+    }
+
+    private static bool WallTriangle(in HitPrimitive3D wall, in HitPrimitive3D tri)
+    {
+        // Wall = degenerate box with Z half-extent 0.
+        var v2 = new Vector3(tri.Q.X, tri.Q.Y, tri.Q.Z);
+        var h = new Vector3(wall.P1.X, wall.P1.Y, 0f);
+        return Geometry3D.BoxIntersectsTriangle(
+            wall.P0, wall.Q, h, tri.P0, tri.P1, v2);
+    }
+
     // ---- TryGetContact pair table -------------------------------------
     //
     // Closed-form contact for primitive pairs. Convention: for
@@ -399,9 +444,11 @@ public readonly struct HitPrimitive3D
     // <c>b</c> toward <c>a</c>. Asymmetric pairs reuse the canonical
     // direction and flip the result.
     //
-    // Currently implemented: every Sphere row pair. The remaining pairs
-    // return false (intersect-only via <see cref="Intersects"/>); they
-    // can be added as the need arises without breaking callers.
+    // Currently implemented: every Sphere row pair, plus every
+    // primitive against Triangle. Remaining pairs (Capsule-Box,
+    // Capsule-Wall, Cylinder-Box, Cylinder-Wall, Box-Box, etc.) return
+    // false from <see cref="TryGetContact"/> for now; they can be added
+    // as the need arises without breaking callers.
 
     /// <summary>
     /// Computes a closed-form contact between this primitive and
@@ -426,6 +473,14 @@ public readonly struct HitPrimitive3D
                 return SphereCylinderContact(in this, in other, out contact);
             case (HitKind3D.Sphere, HitKind3D.Triangle):
                 return SphereTriangleContact(in this, in other, out contact);
+            case (HitKind3D.Capsule, HitKind3D.Triangle):
+                return CapsuleTriangleContact(in this, in other, out contact);
+            case (HitKind3D.Cylinder, HitKind3D.Triangle):
+                return CylinderTriangleContact(in this, in other, out contact);
+            case (HitKind3D.Box, HitKind3D.Triangle):
+                return BoxTriangleContact(in this, in other, out contact);
+            case (HitKind3D.Wall, HitKind3D.Triangle):
+                return WallTriangleContact(in this, in other, out contact);
 
             // Reverse direction: swap args, then flip the normal.
             case (HitKind3D.Box, HitKind3D.Sphere):
@@ -455,6 +510,30 @@ public readonly struct HitPrimitive3D
             case (HitKind3D.Triangle, HitKind3D.Sphere):
             {
                 bool hit = SphereTriangleContact(in other, in this, out contact);
+                if (hit) contact = contact.Flipped();
+                return hit;
+            }
+            case (HitKind3D.Triangle, HitKind3D.Capsule):
+            {
+                bool hit = CapsuleTriangleContact(in other, in this, out contact);
+                if (hit) contact = contact.Flipped();
+                return hit;
+            }
+            case (HitKind3D.Triangle, HitKind3D.Cylinder):
+            {
+                bool hit = CylinderTriangleContact(in other, in this, out contact);
+                if (hit) contact = contact.Flipped();
+                return hit;
+            }
+            case (HitKind3D.Triangle, HitKind3D.Box):
+            {
+                bool hit = BoxTriangleContact(in other, in this, out contact);
+                if (hit) contact = contact.Flipped();
+                return hit;
+            }
+            case (HitKind3D.Triangle, HitKind3D.Wall):
+            {
+                bool hit = WallTriangleContact(in other, in this, out contact);
                 if (hit) contact = contact.Flipped();
                 return hit;
             }
@@ -602,34 +681,154 @@ public readonly struct HitPrimitive3D
         return SphereCapsuleContact(in sphere, in cyl, out contact);
     }
 
+    private static Vector3 SafeFaceNormal(in Vector3 v0, in Vector3 v1, in Vector3 v2)
+    {
+        var face = Vector3.Cross(v1 - v0, v2 - v0);
+        float fl = face.LengthSquared();
+        return fl > 1e-12f ? face / MathF.Sqrt(fl) : Vector3.UnitY;
+    }
+
+    // True when `delta` is (approximately) parallel to the triangle's
+    // face normal, i.e. the closest-tri-point came from the
+    // perpendicular projection of the query point onto the face — not
+    // from an edge/vertex clamp. In that case the contact is a face
+    // contact and should be resolved one-sidedly along faceNormal.
+    private static bool IsFaceAligned(in Vector3 delta, in Vector3 faceNormal)
+    {
+        float deltaLenSq = delta.LengthSquared();
+        // Delta exactly zero (query point on the plane) counts as a
+        // face contact; the caller will use faceNormal directly.
+        if (deltaLenSq < 1e-12f) return true;
+        float crossLenSq = Vector3.Cross(delta, faceNormal).LengthSquared();
+        // |a × b|² <= ε² · |a|² · |b|² with |b|=1 → angle below ~tiny.
+        return crossLenSq <= 1e-8f * deltaLenSq;
+    }
+
     private static bool SphereTriangleContact(in HitPrimitive3D sphere, in HitPrimitive3D tri, out HitContact3D contact)
     {
         var v0 = tri.P0;
         var v1 = tri.P1;
         var v2 = new Vector3(tri.Q.X, tri.Q.Y, tri.Q.Z);
+        var faceNormal = SafeFaceNormal(v0, v1, v2);
+
         var closest = Geometry3D.ClosestPointOnTriangle(sphere.P0, v0, v1, v2);
-        var d = sphere.P0 - closest;
-        float distSq = d.LengthSquared();
+        var delta = sphere.P0 - closest;
+        float distSq = delta.LengthSquared();
+
+        // Face contact: closest-tri-point is the perpendicular
+        // projection of the sphere center onto the triangle's plane
+        // and lies inside the triangle. Treat the triangle as
+        // one-sided so the sphere is always pushed along +faceNormal,
+        // and use the signed plane distance so deep penetrations from
+        // the "back" side report the correct depth (R + |d|, not
+        // R - |d|).
+        if (IsFaceAligned(delta, faceNormal))
+        {
+            float signedDist = Vector3.Dot(sphere.P0 - v0, faceNormal);
+            float pen = sphere.R - signedDist;
+            if (pen <= 0f)
+            {
+                contact = default;
+                return false;
+            }
+            contact = new HitContact3D(faceNormal, closest, pen);
+            return true;
+        }
+
         if (distSq > sphere.R * sphere.R)
         {
             contact = default;
             return false;
         }
-        Vector3 normal;
-        if (distSq > 1e-12f)
+        float dist = MathF.Sqrt(distSq);
+        Vector3 normal = dist > 1e-6f ? delta / dist : faceNormal;
+        contact = new HitContact3D(normal, closest, sphere.R - dist);
+        return true;
+    }
+
+    private static bool CapsuleTriangleContact(in HitPrimitive3D capsule, in HitPrimitive3D tri, out HitContact3D contact)
+    {
+        var v0 = tri.P0;
+        var v1 = tri.P1;
+        var v2 = new Vector3(tri.Q.X, tri.Q.Y, tri.Q.Z);
+        var faceNormal = SafeFaceNormal(v0, v1, v2);
+
+        float distSq = Geometry3D.SegmentTriangleClosestPoints(
+            capsule.P0, capsule.P1, v0, v1, v2,
+            out var cs, out var ct);
+        var delta = cs - ct;
+
+        // Face contact: the closest segment point projects
+        // perpendicularly onto the triangle's interior. Treat the
+        // triangle as one-sided (see SphereTriangleContact for the
+        // rationale).
+        if (IsFaceAligned(delta, faceNormal))
         {
-            normal = d / MathF.Sqrt(distSq);
+            float signedDist = Vector3.Dot(cs - v0, faceNormal);
+            // SegmentTriangleClosestPoints collapses a piercing
+            // segment to its plane-intersection point (distSq≈0,
+            // signedDist≈0), losing depth information. Recover the
+            // true depth from whichever endpoint sits further on the
+            // -faceNormal side.
+            if (distSq < 1e-10f)
+            {
+                float sd0 = Vector3.Dot(capsule.P0 - v0, faceNormal);
+                float sd1 = Vector3.Dot(capsule.P1 - v0, faceNormal);
+                signedDist = MathF.Min(sd0, sd1);
+            }
+            float pen = capsule.R - signedDist;
+            if (pen <= 0f)
+            {
+                contact = default;
+                return false;
+            }
+            contact = new HitContact3D(faceNormal, ct, pen);
+            return true;
         }
-        else
+
+        if (distSq > capsule.R * capsule.R)
         {
-            // Sphere center on the triangle plane: use the triangle's
-            // outward face normal (right-hand winding).
-            var face = Vector3.Cross(v1 - v0, v2 - v0);
-            float fl = face.LengthSquared();
-            normal = fl > 1e-12f ? face / MathF.Sqrt(fl) : Vector3.UnitY;
+            contact = default;
+            return false;
         }
-        float pen = sphere.R - MathF.Sqrt(distSq);
-        contact = new HitContact3D(normal, closest, pen);
+        float dist = MathF.Sqrt(distSq);
+        Vector3 normal = dist > 1e-6f ? delta / dist : faceNormal;
+        contact = new HitContact3D(normal, ct, capsule.R - dist);
+        return true;
+    }
+
+    private static bool CylinderTriangleContact(in HitPrimitive3D cyl, in HitPrimitive3D tri, out HitContact3D contact)
+    {
+        // Capsule approximation: reuse the capsule path.
+        return CapsuleTriangleContact(in cyl, in tri, out contact);
+    }
+
+    private static bool BoxTriangleContact(in HitPrimitive3D box, in HitPrimitive3D tri, out HitContact3D contact)
+    {
+        var v2 = new Vector3(tri.Q.X, tri.Q.Y, tri.Q.Z);
+        if (!Geometry3D.BoxTriangleContact(
+                box.P0, box.Q, box.P1, tri.P0, tri.P1, v2,
+                out var normal, out var point, out var pen))
+        {
+            contact = default;
+            return false;
+        }
+        contact = new HitContact3D(normal, point, pen);
+        return true;
+    }
+
+    private static bool WallTriangleContact(in HitPrimitive3D wall, in HitPrimitive3D tri, out HitContact3D contact)
+    {
+        var v2 = new Vector3(tri.Q.X, tri.Q.Y, tri.Q.Z);
+        var h = new Vector3(wall.P1.X, wall.P1.Y, 0f);
+        if (!Geometry3D.BoxTriangleContact(
+                wall.P0, wall.Q, h, tri.P0, tri.P1, v2,
+                out var normal, out var point, out var pen))
+        {
+            contact = default;
+            return false;
+        }
+        contact = new HitContact3D(normal, point, pen);
         return true;
     }
 

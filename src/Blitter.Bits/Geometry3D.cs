@@ -86,7 +86,19 @@ public static class Geometry3D
     /// Squared distance between two finite segments. Reference:
     /// Ericson, <i>Real-Time Collision Detection</i>, §5.1.9.
     /// </summary>
-    public static float SegmentSegmentDistanceSquared(Vector3 p1, Vector3 q1, Vector3 p2, Vector3 q2)
+    public static float SegmentSegmentDistanceSquared(Vector3 p1, Vector3 q1, Vector3 p2, Vector3 q2) =>
+        SegmentSegmentClosestPoints(p1, q1, p2, q2, out _, out _);
+
+    /// <summary>
+    /// Closest points on two finite segments and the squared distance
+    /// between them. <paramref name="c1"/> lies on
+    /// <paramref name="p1"/>–<paramref name="q1"/>, <paramref name="c2"/>
+    /// on <paramref name="p2"/>–<paramref name="q2"/>. Reference:
+    /// Ericson, <i>Real-Time Collision Detection</i>, §5.1.9.
+    /// </summary>
+    public static float SegmentSegmentClosestPoints(
+        Vector3 p1, Vector3 q1, Vector3 p2, Vector3 q2,
+        out Vector3 c1, out Vector3 c2)
     {
         var d1 = q1 - p1;
         var d2 = q2 - p2;
@@ -99,7 +111,11 @@ public static class Geometry3D
 
         float s, t;
         if (a <= eps && e <= eps)
+        {
+            c1 = p1;
+            c2 = p2;
             return (p1 - p2).LengthSquared();
+        }
 
         if (a <= eps)
         {
@@ -135,9 +151,108 @@ public static class Geometry3D
             }
         }
 
-        var c1 = p1 + d1 * s;
-        var c2 = p2 + d2 * t;
+        c1 = p1 + d1 * s;
+        c2 = p2 + d2 * t;
         return (c1 - c2).LengthSquared();
+    }
+
+    /// <summary>
+    /// True when <paramref name="p"/> lies inside (or on the edge of)
+    /// triangle <c>v0–v1–v2</c>. The point is assumed to be in or near
+    /// the triangle's plane; the test projects <paramref name="p"/>
+    /// onto the plane via barycentric coordinates and accepts the
+    /// in-plane case.
+    /// </summary>
+    public static bool PointInTriangle(Vector3 p, Vector3 v0, Vector3 v1, Vector3 v2)
+    {
+        var e1 = v1 - v0;
+        var e2 = v2 - v0;
+        var dp = p - v0;
+        float d11 = Vector3.Dot(e1, e1);
+        float d12 = Vector3.Dot(e1, e2);
+        float d22 = Vector3.Dot(e2, e2);
+        float d1p = Vector3.Dot(e1, dp);
+        float d2p = Vector3.Dot(e2, dp);
+        float denom = d11 * d22 - d12 * d12;
+        if (MathF.Abs(denom) <= 1e-12f)
+            return false;
+        float inv = 1f / denom;
+        float u = (d22 * d1p - d12 * d2p) * inv;
+        float v = (d11 * d2p - d12 * d1p) * inv;
+        const float slack = 1e-5f;
+        return u >= -slack && v >= -slack && u + v <= 1f + slack;
+    }
+
+    /// <summary>
+    /// Closest points between a finite segment <c>a–b</c> and a
+    /// triangle <c>v0–v1–v2</c>, with their squared distance.
+    /// <paramref name="cs"/> lies on the segment;
+    /// <paramref name="ct"/> on the triangle (interior, edge, or
+    /// vertex). When the segment pierces the triangle they coincide
+    /// and the returned distance is zero.
+    /// </summary>
+    public static float SegmentTriangleClosestPoints(
+        Vector3 a, Vector3 b,
+        Vector3 v0, Vector3 v1, Vector3 v2,
+        out Vector3 cs, out Vector3 ct)
+    {
+        // 1. Segment endpoints projected onto the triangle.
+        var ta = ClosestPointOnTriangle(a, v0, v1, v2);
+        float best = (a - ta).LengthSquared();
+        cs = a;
+        ct = ta;
+
+        var tb = ClosestPointOnTriangle(b, v0, v1, v2);
+        float db = (b - tb).LengthSquared();
+        if (db < best)
+        {
+            best = db;
+            cs = b;
+            ct = tb;
+        }
+
+        // 2. Segment vs each triangle edge.
+        TryEdge(a, b, v0, v1, ref best, ref cs, ref ct);
+        TryEdge(a, b, v1, v2, ref best, ref cs, ref ct);
+        TryEdge(a, b, v2, v0, ref best, ref cs, ref ct);
+
+        // 3. Does the segment actually pierce the triangle interior?
+        var normal = Vector3.Cross(v1 - v0, v2 - v0);
+        float nLenSq = normal.LengthSquared();
+        if (nLenSq > 1e-12f)
+        {
+            float d0 = Vector3.Dot(normal, a - v0);
+            float d1 = Vector3.Dot(normal, b - v0);
+            // Strict sign change → an interior crossing exists at
+            // parameter t ∈ (0,1). Touch/coplanar cases are handled
+            // by the endpoint and edge tests above.
+            if ((d0 > 0f && d1 < 0f) || (d0 < 0f && d1 > 0f))
+            {
+                float t = d0 / (d0 - d1);
+                var p = a + t * (b - a);
+                if (PointInTriangle(p, v0, v1, v2))
+                {
+                    cs = p;
+                    ct = p;
+                    return 0f;
+                }
+            }
+        }
+
+        return best;
+
+        static void TryEdge(
+            Vector3 a, Vector3 b, Vector3 e0, Vector3 e1,
+            ref float best, ref Vector3 cs, ref Vector3 ct)
+        {
+            float d = SegmentSegmentClosestPoints(a, b, e0, e1, out var p, out var q);
+            if (d < best)
+            {
+                best = d;
+                cs = p;
+                ct = q;
+            }
+        }
     }
 
     /// <summary>
@@ -303,5 +418,188 @@ public static class Geometry3D
         1 => v.Y,
         _ => v.Z,
     };
+
+    /// <summary>
+    /// True when the oriented box (world center / rotation / local
+    /// half-extents) overlaps triangle <c>v0–v1–v2</c>. Uses the
+    /// 13-axis Separating Axis Theorem: 3 box face normals, 1 triangle
+    /// face normal, and 9 cross-products of box edges with triangle
+    /// edges.
+    /// </summary>
+    public static bool BoxIntersectsTriangle(
+        Vector3 boxCenter, Quaternion boxRotation, Vector3 boxHalfExtents,
+        Vector3 v0, Vector3 v1, Vector3 v2)
+    {
+        ToBoxLocal(boxCenter, boxRotation, v0, v1, v2,
+            out var lv0, out var lv1, out var lv2);
+        return BoxTriangleSat(boxHalfExtents, lv0, lv1, lv2,
+            wantContact: false,
+            out _, out _);
+    }
+
+    /// <summary>
+    /// Computes the contact between an oriented box and a triangle via
+    /// SAT, using the axis of minimum penetration. Returns
+    /// <see langword="false"/> when the shapes are separated.
+    /// <paramref name="normal"/> points from the triangle toward the
+    /// box; <paramref name="point"/> is the triangle point closest to
+    /// the box center (a stable, useful proxy for the contact location
+    /// for the typical "push box off a static triangle" use).
+    /// </summary>
+    public static bool BoxTriangleContact(
+        Vector3 boxCenter, Quaternion boxRotation, Vector3 boxHalfExtents,
+        Vector3 v0, Vector3 v1, Vector3 v2,
+        out Vector3 normal, out Vector3 point, out float penetration)
+    {
+        ToBoxLocal(boxCenter, boxRotation, v0, v1, v2,
+            out var lv0, out var lv1, out var lv2);
+
+        if (!BoxTriangleSat(boxHalfExtents, lv0, lv1, lv2,
+                wantContact: true,
+                out var localNormal, out penetration))
+        {
+            normal = default;
+            point = default;
+            return false;
+        }
+
+        normal = Vector3.Transform(localNormal, boxRotation);
+
+        // Pick a representative contact point: triangle point closest
+        // to box center (= local origin). Useful for moving-barrier
+        // surface velocity queries and visual debugging.
+        var localClosest = ClosestPointOnTriangle(Vector3.Zero, lv0, lv1, lv2);
+        point = boxCenter + Vector3.Transform(localClosest, boxRotation);
+        return true;
+    }
+
+    private static void ToBoxLocal(
+        Vector3 boxCenter, Quaternion boxRotation,
+        Vector3 v0, Vector3 v1, Vector3 v2,
+        out Vector3 lv0, out Vector3 lv1, out Vector3 lv2)
+    {
+        var inv = Quaternion.Conjugate(boxRotation);
+        lv0 = Vector3.Transform(v0 - boxCenter, inv);
+        lv1 = Vector3.Transform(v1 - boxCenter, inv);
+        lv2 = Vector3.Transform(v2 - boxCenter, inv);
+    }
+
+    // SAT body shared by box-vs-triangle intersect and contact. The
+    // triangle is given in box-local coordinates (box is the AABB
+    // ±halfExtents at the origin). On overlap, returns the local-frame
+    // contact normal (pointing from the triangle toward the box) and
+    // the penetration depth along that normal.
+    private static bool BoxTriangleSat(
+        Vector3 halfExtents, Vector3 lv0, Vector3 lv1, Vector3 lv2,
+        bool wantContact,
+        out Vector3 localNormal, out float penetration)
+    {
+        localNormal = default;
+        penetration = 0f;
+
+        var triNormal = Vector3.Cross(lv1 - lv0, lv2 - lv0);
+        // Triangle edges; the three box edge directions are the local
+        // unit axes (UnitX/Y/Z) so we compute the nine box-edge ×
+        // triangle-edge axes inline below.
+        var e0 = lv1 - lv0;
+        var e1 = lv2 - lv1;
+        var e2 = lv0 - lv2;
+
+        float bestPen = float.PositiveInfinity;
+        Vector3 bestAxis = default;
+
+        // 1) box face normals
+        if (!TryAxis(Vector3.UnitX, halfExtents, lv0, lv1, lv2, wantContact, ref bestPen, ref bestAxis)) return false;
+        if (!TryAxis(Vector3.UnitY, halfExtents, lv0, lv1, lv2, wantContact, ref bestPen, ref bestAxis)) return false;
+        if (!TryAxis(Vector3.UnitZ, halfExtents, lv0, lv1, lv2, wantContact, ref bestPen, ref bestAxis)) return false;
+
+        // 2) triangle face normal
+        if (!TryAxis(triNormal, halfExtents, lv0, lv1, lv2, wantContact, ref bestPen, ref bestAxis)) return false;
+
+        // 3) nine edge-edge cross products
+        if (!TryAxis(Vector3.Cross(Vector3.UnitX, e0), halfExtents, lv0, lv1, lv2, wantContact, ref bestPen, ref bestAxis)) return false;
+        if (!TryAxis(Vector3.Cross(Vector3.UnitX, e1), halfExtents, lv0, lv1, lv2, wantContact, ref bestPen, ref bestAxis)) return false;
+        if (!TryAxis(Vector3.Cross(Vector3.UnitX, e2), halfExtents, lv0, lv1, lv2, wantContact, ref bestPen, ref bestAxis)) return false;
+        if (!TryAxis(Vector3.Cross(Vector3.UnitY, e0), halfExtents, lv0, lv1, lv2, wantContact, ref bestPen, ref bestAxis)) return false;
+        if (!TryAxis(Vector3.Cross(Vector3.UnitY, e1), halfExtents, lv0, lv1, lv2, wantContact, ref bestPen, ref bestAxis)) return false;
+        if (!TryAxis(Vector3.Cross(Vector3.UnitY, e2), halfExtents, lv0, lv1, lv2, wantContact, ref bestPen, ref bestAxis)) return false;
+        if (!TryAxis(Vector3.Cross(Vector3.UnitZ, e0), halfExtents, lv0, lv1, lv2, wantContact, ref bestPen, ref bestAxis)) return false;
+        if (!TryAxis(Vector3.Cross(Vector3.UnitZ, e1), halfExtents, lv0, lv1, lv2, wantContact, ref bestPen, ref bestAxis)) return false;
+        if (!TryAxis(Vector3.Cross(Vector3.UnitZ, e2), halfExtents, lv0, lv1, lv2, wantContact, ref bestPen, ref bestAxis)) return false;
+
+        if (wantContact)
+        {
+            // Guard against an all-degenerate-axis case (collinear
+            // triangle in a box-aligned configuration); pick the box's
+            // smallest-half-extent axis so we still produce a sane
+            // push direction.
+            if (!float.IsFinite(bestPen))
+            {
+                bestAxis = Vector3.UnitY;
+                bestPen = 0f;
+            }
+            localNormal = bestAxis;
+            penetration = bestPen;
+        }
+        return true;
+
+        static bool TryAxis(
+            Vector3 axis, Vector3 h,
+            Vector3 lv0, Vector3 lv1, Vector3 lv2,
+            bool wantContact,
+            ref float bestPen, ref Vector3 bestAxis)
+        {
+            float ll = axis.LengthSquared();
+            if (ll < 1e-12f)
+                // Degenerate axis (parallel edges) → carries no info.
+                // Skip rather than treating as separating.
+                return true;
+            var unit = axis / MathF.Sqrt(ll);
+
+            // Box radius along an arbitrary unit axis is the sum of
+            // |axis · faceNormal| * halfExtent over the three faces.
+            float rb = MathF.Abs(unit.X) * h.X + MathF.Abs(unit.Y) * h.Y + MathF.Abs(unit.Z) * h.Z;
+
+            float p0 = Vector3.Dot(lv0, unit);
+            float p1 = Vector3.Dot(lv1, unit);
+            float p2 = Vector3.Dot(lv2, unit);
+            float triMin = MathF.Min(p0, MathF.Min(p1, p2));
+            float triMax = MathF.Max(p0, MathF.Max(p1, p2));
+
+            if (triMin > rb || triMax < -rb)
+                return false;
+
+            if (!wantContact)
+                return true;
+
+            // Two escape directions. To push the box in -axis until it
+            // clears the triangle, the box's +face must drop to triMin
+            // (cost = rb - triMin). To push the box in +axis until it
+            // clears, the box's -face must rise to triMax
+            // (cost = triMax + rb). Smaller cost wins; the contact
+            // normal (b → a, here triangle → box) is the direction the
+            // box moves to escape.
+            float pushNeg = rb - triMin;
+            float pushPos = triMax + rb;
+            float pen;
+            Vector3 dir;
+            if (pushNeg < pushPos)
+            {
+                pen = pushNeg;
+                dir = -unit;
+            }
+            else
+            {
+                pen = pushPos;
+                dir = unit;
+            }
+            if (pen < bestPen)
+            {
+                bestPen = pen;
+                bestAxis = dir;
+            }
+            return true;
+        }
+    }
 }
 

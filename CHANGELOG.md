@@ -24,8 +24,15 @@ All notable changes to this project will be documented in this file.
   triangle clamp. First inhabitant of a new home for 3D geometric
   primitives (closest-point queries, intersections).
 - `Geometry3D` grows `PointSegmentDistanceSquared`,
-  `SegmentSegmentDistanceSquared`, `SegmentIntersectsAabb`
-  (Liang–Barsky slab test), and `BoxesOverlap` (15-axis OBB SAT).
+  `SegmentSegmentDistanceSquared`, `SegmentSegmentClosestPoints`,
+  `SegmentTriangleClosestPoints`, `PointInTriangle`,
+  `SegmentIntersectsAabb` (Liang–Barsky slab test), `BoxesOverlap`
+  (15-axis OBB SAT), and `BoxIntersectsTriangle` /
+  `BoxTriangleContact` (13-axis box-vs-triangle SAT).
+- `HitPrimitive3D` triangle pair coverage extended: every primitive
+  (sphere / capsule / cylinder / box / wall) now produces both an
+  intersection result and a closed-form contact against triangles,
+  unblocking mesh-vs-non-sphere collision.
 - 3D hit primitives gain `Cylinder` (solid right cylinder with flat
   caps), `Box` (solid oriented box), and `Wall` (two-sided oriented
   rectangle). `HitPrimitive3D` now carries a `Quaternion` orientation
@@ -129,6 +136,14 @@ All notable changes to this project will be documented in this file.
 - `Pinball` sample: a bagatelle-style cabinet with bumpers,
   slingshots, two shift-controlled flippers, and a procedurally-drawn
   chrome ball (SkiaSharp radial gradient — no asset files).
+
+### Fixed
+- Sphere/capsule × triangle contact normal no longer flips downward
+  when the query primitive dips slightly below the triangle's plane.
+  Face contacts now resolve one-sidedly along the triangle's outward
+  normal and report the true penetration depth (R + |signed dist|),
+  so a walking capsule on procedural terrain no longer gets pushed
+  *into* the ground when gravity nudges it past the surface.
 
 ### Changed
 - **Breaking:** the `Blitter.Blocks` project and namespace are renamed
