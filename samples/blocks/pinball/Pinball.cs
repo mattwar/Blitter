@@ -16,7 +16,7 @@ using System.Numerics;
 
 using Blitter;
 using Blitter.Bits;
-using Blitter.Blocks;
+using Blitter.Blocks2D;
 
 using SkiaSharp;
 
@@ -323,7 +323,7 @@ sealed class Wall : LineBarrier2D
     public Wall(Vector2 start, Vector2 end)
         : base(start, end)
     {
-        Material = BarrierMaterial.Metal;
+        PhysicsMaterial = PhysicsMaterial.Metal;
     }
 
     public override void Draw(Renderer2D renderer)
@@ -344,7 +344,7 @@ sealed class Bumper : CircleBarrier2D
     public Bumper(float x, float y, float radius)
         : base(x, y, radius)
     {
-        Material = new BarrierMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 320f);
+        PhysicsMaterial = new PhysicsMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 320f);
     }
 
     public override void Draw(Renderer2D renderer)
@@ -382,7 +382,7 @@ sealed class Slingshot : LineBarrier2D
         : base(start, end)
     {
         OneSided = true;
-        Material = new BarrierMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 180f);
+        PhysicsMaterial = new PhysicsMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 180f);
     }
 
     public override void Draw(Renderer2D renderer)

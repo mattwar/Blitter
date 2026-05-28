@@ -14,7 +14,8 @@
 - **Images** - load, save, manipulate pixels, apply filters
 - **Shaders** - load, save, dynamic compilation
 - **Blitter.Bits** - beyond the basics: useful tidbits for graphical apps
-- **Blitter.Blocks** - building blocks: sprites, scenes, panels and more
+- **Blitter.Blocks2D** - building blocks: sprites, scenes, panels and more
+- **Blitter.Blocks3D** - building blocks for 3D scenes (in development)
 
 ## A 2D example
 

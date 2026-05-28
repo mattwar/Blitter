@@ -55,10 +55,7 @@ public class StandardMaterializer : Materializer
                 // Hand-built parts with white vertices + a colored
                 // material won't see the tint; revisit when materials
                 // grow a per-draw uniform tier.
-                var texture = lit.DiffuseTexture ?? Textures.White;
-                var args = new LitArgs(transform);
-                MeshDispatcher.For(mesh).DrawTextured(
-                    renderer, mesh, texture, Shaders.LitTexture, in args);
+                DrawLitMesh(renderer, mesh, lit, in transform);
                 break;
 
             case PbrMaterial pbr:
@@ -68,6 +65,34 @@ public class StandardMaterializer : Materializer
             default:
                 throw new MaterializerNotSupportedException(mesh, material);
         }
+    }
+
+    // LitTextureMaterial works against two vertex families: vertices
+    // that carry UVs (LitTextureVertex3D, used by Meshes.Textured*)
+    // route through the sampling LitTexture shader, while vertices
+    // that carry only inline color (LitVertex3D, used by the bulk of
+    // Meshes.*) route through LitColor, whose texture layout is empty
+    // and which reads Kd straight off the vertex color. The two
+    // shaders share LitArgs, so the per-draw uniform is identical.
+    private static void DrawLitMesh(
+        Renderer3D renderer, Mesh mesh, LitTextureMaterial lit, in Matrix4x4 transform)
+    {
+        var args = new LitArgs(transform);
+        var vt = mesh.VertexType;
+        if (vt == typeof(LitTextureVertex3D))
+        {
+            var texture = lit.DiffuseTexture ?? Textures.White;
+            MeshDispatcher.For(mesh).DrawTextured(
+                renderer, mesh, texture, Shaders.LitTexture, in args);
+            return;
+        }
+        if (vt == typeof(LitVertex3D))
+        {
+            MeshDispatcher.For(mesh).DrawColored(
+                renderer, mesh, Shaders.LitColor, in args);
+            return;
+        }
+        throw new MaterializerNotSupportedException(mesh, lit);
     }
 
     private static void DrawPbrMesh(
@@ -139,12 +164,15 @@ public class StandardMaterializer : Materializer
         ArgumentNullException.ThrowIfNull(material);
 
         // Today's only built-in instanced surface shader pairs
-        // LitTextureMaterial with TransformAndColorInstance. Other
-        // material kinds, or other per-instance struct shapes, need a
+        // LitTextureMaterial + LitTextureVertex3D meshes with
+        // TransformAndColorInstance. Other material kinds, other
+        // vertex layouts (e.g. LitVertex3D — no UVs, no LitColorInstanced
+        // shader yet), or other per-instance struct shapes need a
         // custom Materializer subclass that registers the matching
         // shader.
         if (material is LitTextureMaterial lit
-            && typeof(TInstance) == typeof(TransformAndColorInstance))
+            && typeof(TInstance) == typeof(TransformAndColorInstance)
+            && mesh.VertexType == typeof(LitTextureVertex3D))
         {
             var texture = lit.DiffuseTexture ?? Textures.White;
             var args = default(LitArgs); // Model unused; per-instance transform replaces it.

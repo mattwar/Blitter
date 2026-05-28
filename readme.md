@@ -34,7 +34,8 @@ SDL3 is fantastic, but using it directly from C# means a lot of P/Invoke, unsafe
 - **Images** - load, save, manipulate pixels, apply filters
 - **Shaders** - load, save, dynamic compilation
 - **Blitter.Bits** - beyond the basics: useful tidbits for graphical apps
-- **Blitter.Blocks** - building blocks: sprites, scenes, panels and more
+- **Blitter.Blocks2D** - building blocks: sprites, scenes, panels and more
+- **Blitter.Blocks3D** - building blocks for 3D scenes (in development)
 
 ## Installation
 
@@ -117,8 +118,9 @@ More examples live in [samples/](samples/) — each is a single `.cs` file you c
 | --- | --- |
 | `Blitter` | Core library: windows, rendering (BMP), input, audio. |
 | `Blitter.Bits` | Beyond the basics: useful tidbits for graphical apps |
-| `Blitter.Blocks` | Building blocks: sprites, scenes, panels and more |
-| `Blitter.Package` | Packaging project — bundles `Blitter` and `Blitter.Blocks` into the `Blitter` NuGet package. |
+| `Blitter.Blocks2D` | Building blocks: sprites, scenes, panels and more |
+| `Blitter.Blocks3D` | Building blocks for 3D scenes (in development) |
+| `Blitter.Package` | Packaging project — bundles `Blitter`, `Blitter.Blocks2D` and `Blitter.Blocks3D` into the `Blitter` NuGet package. |
 
 ## Building from Source
 

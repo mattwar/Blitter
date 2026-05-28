@@ -13,6 +13,20 @@ namespace Blitter.Bits;
 internal interface IMeshDrawAdapter
 {
     /// <summary>
+    /// Calls <see cref="Renderer3D.DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>
+    /// after casting <paramref name="mesh"/> and <paramref name="shader"/> to
+    /// the adapter's vertex/args types. The no-texture variant, for
+    /// vertex layouts that carry their color inline (e.g.
+    /// <c>LitVertex3D</c>) and shaders whose texture layout is empty.
+    /// </summary>
+    void DrawColored<TArgs>(
+        Renderer3D renderer,
+        Mesh mesh,
+        Shader shader,
+        in TArgs args)
+        where TArgs : unmanaged, IUniformArgs<TArgs>;
+
+    /// <summary>
     /// Calls <see cref="Renderer3D.DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Texture2D, Shader{TVertex,TArgs}, in TArgs)"/>
     /// after casting <paramref name="mesh"/> and <paramref name="shader"/> to
     /// the adapter's vertex/args types.
@@ -61,6 +75,18 @@ internal interface IMeshDrawAdapter
 internal sealed class MeshDrawAdapter<TVertex> : IMeshDrawAdapter
     where TVertex : unmanaged
 {
+    public void DrawColored<TArgs>(
+        Renderer3D renderer,
+        Mesh mesh,
+        Shader shader,
+        in TArgs args)
+        where TArgs : unmanaged, IUniformArgs<TArgs>
+    {
+        var typedMesh = (Mesh<TVertex>)mesh;
+        var typedShader = (Shader<TVertex, TArgs>)shader;
+        renderer.DrawMesh(typedMesh, typedShader, in args);
+    }
+
     public void DrawTextured<TArgs>(
         Renderer3D renderer,
         Mesh mesh,

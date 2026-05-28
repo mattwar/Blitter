@@ -5,6 +5,95 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `Blitter.Blocks3D` barriers: `SphereBarrier3D`, `WallBarrier3D`
+  (finite oriented rectangle with `OneSided` flag and
+  `Floor`/`Ceiling`/`Vertical` helpers), `BoxBarrier3D` (axis-aligned
+  or oriented), `MeshBarrier3D<TVertex>` (generic over any vertex
+  implementing `IPositionVertex3D`; wraps a `Mesh<TVertex>` so the
+  same instance drives collision and debug drawing, with a flat
+  position cache for the inner triangle loop).
+- `Barrier3D.PhysicsMaterial` (defaults to `PhysicsMaterial.Ideal`) and
+  `Barrier3D.SurfaceVelocityAt(Vector3)` hooks for future bounce /
+  contact behaviors.
+- `PhysicsMaterial` (renamed from `BarrierMaterial`) lives in the
+  `Blitter.Bits` namespace so 2D and 3D barriers share one type and
+  one set of presets. `Barrier2D.Material` / `Barrier3D.Material` are
+  now `Barrier2D.PhysicsMaterial` / `Barrier3D.PhysicsMaterial`.
+- `Geometry3D` static class in `Blitter.Bits`:
+  `ClosestPointOnTriangle(p, a, b, c)` — Ericson's RTCD §5.1.5
+  triangle clamp. First inhabitant of a new home for 3D geometric
+  primitives (closest-point queries, intersections).
+- `Geometry3D` grows `PointSegmentDistanceSquared`,
+  `SegmentSegmentDistanceSquared`, `SegmentSegmentClosestPoints`,
+  `SegmentTriangleClosestPoints`, `PointInTriangle`,
+  `SegmentIntersectsAabb` (Liang–Barsky slab test), `BoxesOverlap`
+  (15-axis OBB SAT), and `BoxIntersectsTriangle` /
+  `BoxTriangleContact` (13-axis box-vs-triangle SAT).
+- `HitPrimitive3D` triangle pair coverage extended: every primitive
+  (sphere / capsule / cylinder / box / wall) now produces both an
+  intersection result and a closed-form contact against triangles,
+  unblocking mesh-vs-non-sphere collision.
+- 3D hit primitives gain `Cylinder` (solid right cylinder with flat
+  caps), `Box` (solid oriented box), and `Wall` (two-sided oriented
+  rectangle). `HitPrimitive3D` now carries a `Quaternion` orientation
+  alongside `P0` / `P1` / `R`.
+- 3D hit shapes: `CylinderHitShape3D`, `BoxHitShape3D`,
+  `WallHitShape3D`.
+- 2D hit primitive gains a `Box` kind (solid oriented rectangle);
+  `HitPrimitive2D` now carries a `Rotation` (radians) field.
+- 2D hit shape: `BoxHitShape2D` (with Klein-4 flip family).
+- `MeshVisual3D` (mesh + material) and `ModelVisual3D` (multi-part
+  model) in `Blitter.Bits`, with implicit conversions from `Mesh` and
+  `Model` to `Visual3D` mirroring the 2D `Texture2D → Visual2D` sugar.
+- `MeshVisual3D` primitive factories — `Cube`, `Sphere`, `Capsule`,
+  `Cylinder`, `Plane`, `Cone`, `Torus`, `Icosphere`, `Tetrahedron`,
+  `Octahedron`, `Icosahedron` — each wired up to the tightest matching
+  `HitShape3D` (box / sphere / capsule / cylinder / wall), with the
+  auto-fit cache covering the rest.
+- Mesh / model visuals auto-fit a `HitShape3D` from the geometry,
+  picking the smallest-volume of box / sphere / capsule / cylinder
+  candidates (the 3D analog of the 2D opaque-pixel fit). For models,
+  each part's mesh is fit independently and the results are bundled
+  in a new `CompositeHitShape3D` so a multi-part model gets one
+  primitive per part.
+- `HitShape3DCache` (mirroring 2D `HitShapeCache`) shares fits across
+  visuals that reference the same `Mesh` or `Model`; subclass to
+  customize.
+- `CompositeHitShape3D`: a `HitShape3D` made of one or more sub-shapes;
+  hit-tests short-circuit on first overlap, primitive enumeration
+  concatenates across all subs.
+- `BoundingSphere.Encapsulate(BoundingSphere)` overload.
+- `MeshVisual3D` / `ModelVisual3D` apply the sprite-level tint by
+  routing the draw through the existing `LitTextureInstanced` shader
+  as a single stack-allocated `TransformAndColorInstance`, so tint
+  works on `LitTextureMaterial` surfaces with zero per-frame heap
+  allocations. The no-tint case stays on the non-instanced shader.
+- `MeshBounds.ComputeBoundingBox(this Mesh)` and
+  `MeshBounds.ComputeBoundingSphere(this Mesh)` non-generic overloads
+  that dispatch across the stock vertex layouts.
+- `Blitter.Blocks3D` basic building blocks: `Scene3D`, `Layer3D`,
+  `CustomLayer3D`, `SceneBehavior3D`, `Behavior3D`, `SpriteBehavior3D`,
+  `Sprite3D`, `Barrier3D`, `PlayField3D`.
+- `Blitter.Blocks3D` sprite behaviors: `Motion3D` (integrates
+  `Velocity` and `AngularVelocity` into `Position` and `Orientation`,
+  with sub-millisecond delta buffering), `BarrierBounce3D` (sphere-vs-
+  wall / box / sphere reflection with `PhysicsMaterial` composition
+  and `OnBounce` callback), and `SpeedClamp3D` (min/max magnitude
+  clamp, direction-preserving).
+- First playfield-based 3D sample: `samples/blocks/Breakout3D.cs` — a
+  first-person Breakout inside a closed 3D arena with X/Y paddle
+  movement, position-based english on the paddle, a 5x7 colored
+  brick grid, score / lives HUD via `DebugDraw`, and a launch /
+  drain / win flow driven by a single `SceneBehavior3D` controller.
+- `Visual3D` in `Blitter.Bits`: abstract 3D visual with state, bounding
+  sphere, hit shape, and `Draw(Renderer3D, in Pose3D, Color, TimeSpan)`.
+- `HitShape3D` family in `Blitter.Bits`: `HitShape3D`, `PosedHitShape3D`,
+  `SphereHitShape3D`, `CapsuleHitShape3D`, `HitPrimitive3D`,
+  `HitTester3D` + `IntersectsHitTester3D`.
+- `Pose3D` struct: position + quaternion rotation + uniform scale,
+  with `Transform(Vector3)` and `ToMatrix()`.
+- `RunState` enum moved to `Blitter` namespace so scenes in any
+  dimension share it.
 - `Audio.DeviceRotationPlayCount` periodically tears down and reopens
   the SDL audio subsystem to work around an SDL3/WASAPI heap crash
   inside `PutAudioStreamData` during sustained playback. Rotation is
@@ -35,12 +124,12 @@ All notable changes to this project will be documented in this file.
   before the sprite resolves contact, so state changes affect this
   frame's bounce. For score, sound, flash, or drop-target reactions.
   Default is a no-op.
-- `BarrierMaterial` record struct + `Barrier2D.Material` virtual:
-  per-barrier elasticity, friction, and active kick speed. Presets
-  for `Ideal`, `Metal`, `Wood`, `Concrete`, `Dirt`, `Grass`, `Sand`,
-  `Rubber`, `Felt`, `Pillow`, `Ice`, `OilSlick`, and `Trampoline`.
-  `BarrierBounce2D` composes the ball-side knobs with the barrier
-  material.
+- `PhysicsMaterial` record struct + `Barrier2D.PhysicsMaterial`
+  virtual: per-barrier elasticity, friction, and active kick speed.
+  Presets for `Ideal`, `Metal`, `Wood`, `Concrete`, `Dirt`, `Grass`,
+  `Sand`, `Rubber`, `Felt`, `Pillow`, `Ice`, `OilSlick`, and
+  `Trampoline`. `BarrierBounce2D` composes the ball-side knobs with
+  the barrier material.
 - `Barrier2D.SurfaceVelocityAt(Vector2)` virtual generalizes the
   flipper's moving-surface kick so any animated barrier can
   participate in the bounce. Default returns zero.
@@ -48,7 +137,19 @@ All notable changes to this project will be documented in this file.
   slingshots, two shift-controlled flippers, and a procedurally-drawn
   chrome ball (SkiaSharp radial gradient — no asset files).
 
+### Fixed
+- Sphere/capsule × triangle contact normal no longer flips downward
+  when the query primitive dips slightly below the triangle's plane.
+  Face contacts now resolve one-sidedly along the triangle's outward
+  normal and report the true penetration depth (R + |signed dist|),
+  so a walking capsule on procedural terrain no longer gets pushed
+  *into* the ground when gravity nudges it past the surface.
+
 ### Changed
+- **Breaking:** the `Blitter.Blocks` project and namespace are renamed
+  to `Blitter.Blocks2D` (assembly `Blitter.Blocks2D.dll`). Update any
+  `using Blitter.Blocks;` to `using Blitter.Blocks2D;`. A future
+  `Blitter.Blocks3D` will host the 3D scene/actor types.
 - `PlayField2D` runs adaptive global substepping for sprite
   collisions: when the fastest sprite would move more than half its
   hit radius in one frame, the per-frame update loop runs N times

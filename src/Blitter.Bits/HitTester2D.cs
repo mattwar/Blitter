@@ -1,53 +1,24 @@
 namespace Blitter.Bits;
 
 /// <summary>
-/// Determines if two <see cref="PosedHitShape2D"/>'s or their primitives overlap.
+/// Strategy object that resolves primitive-vs-primitive intersection
+/// and contact between two <see cref="HitPrimitive2D"/> values.
+/// Shapes own iteration; the tester owns the math.
 /// </summary>
-public abstract class HitTester2D
+public class HitTester2D
 {
-    /// <summary>
-    /// Returns true if either shape 'hits' the other.
-    /// </summary>
-    public bool TestHit(in PosedHitShape2D a, in PosedHitShape2D b) =>
-        // should call back on TestHit(ReadOnlySpan<HitPrimitive2D>, in PosedHitShape2D) below
-        a.Shape.TestHit(in a.Pose, in b, this);
+    /// <summary>Shared default tester using stock primitive math.</summary>
+    public static HitTester2D Default { get; } = new();
+
+    /// <summary>True when primitives <paramref name="a"/> and <paramref name="b"/> overlap.</summary>
+    public virtual bool TestHit(in HitPrimitive2D a, in HitPrimitive2D b) =>
+        a.Intersects(in b);
 
     /// <summary>
-    /// Returns true if any of the primitives 'hit' the shape.
+    /// Computes the closed-form contact between <paramref name="a"/>
+    /// and <paramref name="b"/>. Normal points from <paramref name="b"/>
+    /// toward <paramref name="a"/>.
     /// </summary>
-    public bool TestHit(ReadOnlySpan<HitPrimitive2D> a, in PosedHitShape2D b) =>
-        // should call back on TestHit(ReadOnlySpan<HitPrimitive2D>, ReadOnlySpan<HitPrimitive2D>) below
-        b.Shape.TestHitWith(in b.Pose, a, this);
-
-    /// <summary>
-    /// Returns true if any of the primitives in 'a' hit any of the primitives in 'b'.
-    /// </summary>
-    public abstract bool TestHit(ReadOnlySpan<HitPrimitive2D> a, ReadOnlySpan<HitPrimitive2D> b);
-}
-
-/// <summary>
-/// A <see cref="HitTester2D"/> that determines if any primitives intersect.
-/// </summary>
-public sealed class IntersectsHitTester2D : HitTester2D
-{
-    /// <summary>
-    /// Shared instance — the tester holds no state.
-    /// </summary>
-    public static readonly IntersectsHitTester2D Instance = new();
-
-    private IntersectsHitTester2D() { }
-
-    /// <inheritdoc/>
-    public override bool TestHit(ReadOnlySpan<HitPrimitive2D> a, ReadOnlySpan<HitPrimitive2D> b)
-    {
-        for (int i = 0; i < a.Length; i++)
-        {
-            for (int j = 0; j < b.Length; j++)
-            {
-                if (a[i].Intersects(b[j]))
-                    return true;
-            }
-        }
-        return false;
-    }
+    public virtual bool TryGetContact(in HitPrimitive2D a, in HitPrimitive2D b, out HitContact2D contact) =>
+        a.TryGetContact(in b, out contact);
 }
