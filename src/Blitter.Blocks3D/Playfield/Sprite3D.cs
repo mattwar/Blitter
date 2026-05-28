@@ -49,19 +49,39 @@ public class Sprite3D : IUpdatable<UpdateContext3D>, IDrawable3D
     /// <summary>The sprite is active and not about to be culled.</summary>
     public bool IsAlive { get; set; } = true;
 
-    /// <summary>The <see cref="PlayField3D"/> this sprite belongs to.</summary>
-    public PlayField3D PlayField =>
-        _playField ?? throw new InvalidOperationException("Sprite is not attached to a PlayField. Access PlayField only while the sprite is a member of one.");
+    /// <summary>
+    /// The host this sprite belongs to.
+    /// </summary>
+    public ISpriteHost3D? Host 
+    {
+        get; 
 
-    // PlayField backing field.
-    internal PlayField3D? _playField;
+        set
+        {
+            if (value != field)
+            {
+                if (field is {} oldHost)
+                {
+                    oldHost.RemoveSprite(this);             
+                }
 
-    // Time sprite was added to its current playfield.
-    internal TimeSpan _spawnedAt;
+                field = value;
 
-    /// <summary>How long this sprite has been a member of its current <see cref="PlayField"/>.</summary>
+                if (value is {} newHost)
+                {
+                    newHost.AddSprite(this);
+                    _spawnedAt = newHost.Elapsed;
+                }               
+            }
+        }
+    }
+        
+    // Time sprite was added to its current host.
+    private TimeSpan _spawnedAt;
+
+    /// <summary>How long this sprite has been a member of its current <see cref="Host"/>.</summary>
     public TimeSpan Age =>
-        _playField is { } p
+        this.Host is { } p
             ? p.Elapsed - _spawnedAt
             : TimeSpan.Zero;
 
