@@ -4,10 +4,10 @@ using System.Runtime.InteropServices;
 namespace Blitter;
 
 /// <summary>
-/// Per-instance data for the built-in <c>*Instanced</c> shader sets: a
-/// 4x4 world transform plus an 8-bit RGBA color. The color is multiplied
-/// into the mesh's vertex / sampled color in the shader, so
-/// <see cref="Color.White"/> leaves the source color unchanged.
+/// Per-instance data for the built-in <c>*Instanced</c> shader sets: 
+/// a 4x4 world transform plus an 8-bit RGBA color. 
+/// The color is multiplied into the mesh's vertex / sampled color in the shader, 
+/// so <see cref="Color.White"/> leaves the source color unchanged.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct TransformAndColorInstance

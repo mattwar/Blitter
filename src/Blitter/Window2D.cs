@@ -119,7 +119,7 @@ public class Window2D : Window
     /// <summary>
     /// A 2D renderer that draws into a <see cref="Window2D"/>'s swapchain.
     /// </summary>
-    private sealed class Window2DRenderer : BitmapRenderer2D
+    private sealed class Window2DRenderer : TextureRenderer2D
     {
         private readonly Window2D _window;
 

@@ -1,5 +1,8 @@
 namespace Blitter;
 
+/// <summary>
+/// A color palette, used by palettized textures in specific low bits-per-pixel formats.
+/// </summary>
 public sealed class Palette : IDisposable
 {
     private nint _paletteId;

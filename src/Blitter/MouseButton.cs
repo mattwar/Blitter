@@ -1,6 +1,8 @@
 namespace Blitter;
 
-/// <summary>Mouse buttons.</summary>
+/// <summary>
+/// Mouse buttons.
+/// </summary>
 public enum MouseButton : byte
 {
     Left = 1,

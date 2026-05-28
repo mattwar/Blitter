@@ -109,7 +109,7 @@ public sealed class GpuBitmap : Texture2D
         ArgumentNullException.ThrowIfNull(renderAction);
         if (IsDisposed)
             throw new ObjectDisposedException(nameof(GpuBitmap));
-        using var renderer = new GpuBitmapRenderer(_device, this);
+        using var renderer = new GpuBitmapRenderer3D(_device, this);
         renderer.Configure(backgroundColor);
         renderAction(renderer);
         renderer.Render();

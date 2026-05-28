@@ -3,65 +3,84 @@ using System.Runtime.InteropServices;
 namespace Blitter;
 
 /// <summary>
-/// CPU-side mesh data used by the high-level renderer. Mesh instances are
-/// compared by reference identity; reuse the same instance frame-to-frame to
-/// reuse the cached GPU vertex buffer.
+/// A base class for mesh data declared in CPU memory. 
 /// </summary>
 public abstract class Mesh
 {
+    /// <summary>
+    /// Private so subtypes are limited to the generic <see cref="Mesh{TVertex}"/> implementation.
+    /// </summary>
     private protected Mesh() { }
 
+    /// <summary>
+    /// The number of vertices in the mesh.
+    /// </summary>
     public abstract int VertexCount { get; }
+
+    /// <summary>
+    /// The number of indices in the mesh. 
+    /// If zero, the mesh is rendered as laid out in vertex order.
+    /// </summary>
     public abstract int IndexCount { get; }
+
+    /// <summary>
+    /// Gets a span of the mesh's vertex data as raw bytes. 
+    /// The renderer uses this to upload the vertex buffer to the GPU.
+    /// </summary>
+    /// <returns></returns>
     internal abstract ReadOnlySpan<byte> GetVertexBytes();
+
+    /// <summary>
+    /// Gets a span of the mesh's index buffer. 
+    /// The renderer uses this to upload the index buffer to the GPU.
+    /// </summary>
     public abstract ReadOnlySpan<uint> Indices { get; }
 
     /// <summary>
-    /// The CLR type of this mesh's vertices (the <c>TVertex</c> in
-    /// <see cref="Mesh{TVertex}"/>). Lets non-generic code dispatch on
-    /// vertex format without reflection at every call.
+    /// The CLR type of this mesh's vertices.
+    /// This is the type argument <c>TVertex</c> of the concrete <see cref="Mesh{TVertex}"/> subclass.
     /// </summary>
     public abstract Type VertexType { get; }
 
     /// <summary>
-    /// How the mesh's vertices are grouped into rendered shapes
-    /// (triangles, lines, points). Set at construction; immutable for
-    /// the mesh's lifetime.
+    /// How the mesh's vertices are grouped into rendered shapes (triangles, lines, points).
     /// </summary>
     public abstract Topology Topology { get; }
 
     /// <summary>
-    /// Bumped each time the mesh's contents are replaced. The renderer uses
-    /// this to detect when its cached GPU vertex buffer needs to be re-uploaded.
+    /// Bumped each time the mesh's contents are replaced. 
+    /// The renderer uses this to detect when its cached GPU vertex buffer needs to be re-uploaded.
     /// </summary>
     public int Version { get; private protected set; }
 
     /// <summary>
-    /// Creates a <see cref="Mesh{TVertex}"/> by copying the provided vertices.
-    /// Convenient for collection expressions (e.g. <c>Mesh.Create([v0, v1, v2])</c>),
-    /// which would otherwise be ambiguous between the span and immutable-array
-    /// constructor overloads.
+    /// Creates a <see cref="Mesh{TVertex}"/> with only vertices.
     /// </summary>
     public static Mesh<TVertex> Create<TVertex>(
         ReadOnlySpan<TVertex> vertices,
         Topology topology = Topology.TriangleList)
-        where TVertex : unmanaged =>
+        where TVertex : unmanaged 
+        =>
         new Mesh<TVertex>(vertices, ReadOnlySpan<uint>.Empty, topology);
 
     /// <summary>
-    /// Creates a <see cref="Mesh{TVertex}"/> by copying the provided vertices and indices.
+    /// Creates a <see cref="Mesh{TVertex}"/> with vertices and indices
+    /// to describe the order and reuse of vertices.
     /// </summary>
     public static Mesh<TVertex> Create<TVertex>(
         ReadOnlySpan<TVertex> vertices,
         ReadOnlySpan<uint> indices,
         Topology topology = Topology.TriangleList)
-        where TVertex : unmanaged =>
+        where TVertex : unmanaged 
+        =>
         new Mesh<TVertex>(vertices, indices, topology);
 }
 
 /// <summary>
-/// CPU-side mesh data used by <see cref="Renderer3D"/>. Can be updated with
-/// fresh vertex/index data via <see cref="Update(ReadOnlySpan{TVertex})"/>.
+/// A <see cref="Mesh"/> with strongly-typed vertex data.
+/// The renderer uploads the mesh's data to the GPU as needed.
+/// The mesh can be updated, but only one version will be uploaded per frame.
+/// Similar to behavior of the <see cref="Bitmap"/> class.
 /// </summary>
 public class Mesh<TVertex> : Mesh
     where TVertex : unmanaged
@@ -94,31 +113,31 @@ public class Mesh<TVertex> : Mesh
         Version = 1;
     }
 
+    // <inheritdoc/>
     public override int VertexCount => _vertexCount;
 
+    // <inheritdoc/>
     public override int IndexCount => _indexCount;
 
+    // <inheritdoc/>
     public override Topology Topology { get; }
 
+    // <inheritdoc/>
     public override Type VertexType => typeof(TVertex);
 
-    /// <summary>
-    /// Read-only view over the mesh's vertex data as the strongly-typed
-    /// <typeparamref name="TVertex"/>. Cheap (no copy); the span is valid
-    /// until the next <see cref="Update(ReadOnlySpan{TVertex})"/>.
-    /// </summary>
+    // <inheritdoc/>
     public ReadOnlySpan<TVertex> Vertices => _vertices.AsSpan(0, _vertexCount);
 
+    // <inheritdoc/>
     internal override ReadOnlySpan<byte> GetVertexBytes() =>
         MemoryMarshal.AsBytes(_vertices.AsSpan(0, _vertexCount));
 
+    // <inheritdoc/>
     public override ReadOnlySpan<uint> Indices =>
         _indices.AsSpan(0, _indexCount);
 
     /// <summary>
-    /// Replaces the vertex data with new contents copied from the supplied
-    /// span; the index buffer is left unchanged. Bumps <see cref="Mesh.Version"/>
-    /// so the renderer re-uploads the GPU buffer on the next draw.
+    /// Updates the vertex data.
     /// </summary>
     public void Update(ReadOnlySpan<TVertex> vertices)
     {
@@ -129,8 +148,7 @@ public class Mesh<TVertex> : Mesh
     }
 
     /// <summary>
-    /// Replaces both vertex and index data with new contents copied from the
-    /// supplied spans. Bumps <see cref="Mesh.Version"/>.
+    /// Updates the vertex and index data.
     /// </summary>
     public void Update(ReadOnlySpan<TVertex> vertices, ReadOnlySpan<uint> indices)
     {

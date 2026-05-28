@@ -4,16 +4,34 @@ using System.Runtime.InteropServices;
 namespace Blitter;
 
 /// <summary>
-/// A rectangle defined by a position (top-left) and a size, using floating-point coordinates.
+/// A rectangle defined by a position (top-left) and size.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct Rect : IEquatable<Rect>
 {
+    /// <summary>
+    /// The X coordinate of the rectangle's top-left corner.
+    /// </summary>
     public readonly float X;
+
+    /// <summary>
+    /// The Y coordinate of the rectangle's top-left corner.
+    /// </summary>
     public readonly float Y;
+
+    /// <summary>
+    /// The width of the rectangle.
+    /// </summary>
     public readonly float Width;
+
+    /// <summary>
+    /// The height of the rectangle.
+    /// </summary>
     public readonly float Height;
 
+    /// <summary>
+    /// Constructs a rectangle from its position and size.
+    /// </summary>
     public Rect(float x, float y, float width, float height)
     {
         X = x;
@@ -22,14 +40,35 @@ public readonly struct Rect : IEquatable<Rect>
         Height = height;
     }
 
+    /// <summary>
+    /// Constructs a rectangle from its position and size.
+    /// </summary>
     public Rect(Vector2 position, float width, float height)
         : this(position.X, position.Y, width, height) { }
 
-    public float Left   => X;
-    public float Top    => Y;
-    public float Right  => X + Width;
+    /// <summary>
+    /// The left edge of the rectangle.
+    /// </summary>
+    public float Left => X;
+
+    /// <summary>
+    /// The top edge of the rectangle.
+    /// </summary>
+    public float Top => Y;
+
+    /// <summary>
+    /// The right edge of the rectangle.
+    /// </summary>
+    public float Right => X + Width;
+
+    /// <summary>
+    /// The bottom edge of the rectangle.
+    /// </summary>
     public float Bottom => Y + Height;
 
+    /// <summary>
+    /// The top-left corner of the rectangle.
+    /// </summary>
     public Vector2 Position => new(X, Y);
 
     public static implicit operator SDL.FRect(Rect r) => new() { X = r.X, Y = r.Y, W = r.Width, H = r.Height };
@@ -39,7 +78,7 @@ public readonly struct Rect : IEquatable<Rect>
     public static implicit operator Rect(SDL.Rect r) => new(r.X, r.Y, r.W, r.H);
 
     public bool Equals(Rect other) =>
-        X == other.X && Y == other.Y && Width == other.Width && Height == other.Height;
+        X == other.X && Y == other.Y && Width == other.Width && Height == other.Height;        
     public override bool Equals(object? obj) => obj is Rect other && Equals(other);
     public override int GetHashCode() => HashCode.Combine(X, Y, Width, Height);
     public static bool operator ==(Rect a, Rect b) => a.Equals(b);

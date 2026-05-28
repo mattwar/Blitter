@@ -3,16 +3,6 @@ namespace Blitter;
 /// <summary>
 /// Creation-time flags for a <see cref="Window"/>.
 /// </summary>
-/// <remarks>
-/// Only flags that cannot be changed after the window has been created are
-/// represented here. Runtime-toggleable state (resizable, bordered, fullscreen,
-/// always-on-top, grab, etc.) is exposed as properties on <see cref="Window"/>,
-/// and transient state (minimized, maximized, hidden, focus, occlusion) is
-/// exposed either as methods or as read-only properties.
-///
-/// Values mirror the underlying <c>SDL_WindowFlags</c> bit pattern so they
-/// can be cast at the SDL boundary.
-/// </remarks>
 [Flags]
 public enum WindowFlags : ulong
 {

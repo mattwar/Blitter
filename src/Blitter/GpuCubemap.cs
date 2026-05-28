@@ -1,12 +1,7 @@
 namespace Blitter;
 
 /// <summary>
-/// A <see cref="TextureCube"/> whose six faces live on the GPU as
-/// a single layered <c>SDL_GPUTexture</c> (<c>TexturetypeCube</c>).
-/// Use when the cubemap's contents are produced by the GPU (e.g.
-/// baked diffuse / specular environment maps) and
-/// never need to be read back to the CPU. Renderers bind it directly
-/// with no upload cost.
+/// A <see cref="TextureCube"/> whose six faces live on the GPU.
 /// </summary>
 public sealed class GpuCubemap : TextureCube, IDisposable
 {
@@ -30,23 +25,24 @@ public sealed class GpuCubemap : TextureCube, IDisposable
         if (renderTarget)
             usage |= SDL.GPUTextureUsageFlags.ColorTarget;
 
-        _texture = GpuTexture.Create(device, new GpuTextureCreateInfo
-        {
-            Type = SDL.GPUTextureType.TexturetypeCube,
-            Format = GpuPixelFormatMap.ToGpu(format),
-            Usage = usage,
-            Width = (uint)size,
-            Height = (uint)size,
-            LayerCountOrDepth = 6,
-            NumLevels = (uint)levels,
-            SampleCount = SDL.GPUSampleCount.SampleCount1,
-        });
+        _texture = GpuTexture.Create(
+            device, 
+            new GpuTextureCreateInfo
+            {
+                Type = SDL.GPUTextureType.TexturetypeCube,
+                Format = GpuPixelFormatMap.ToGpu(format),
+                Usage = usage,
+                Width = (uint)size,
+                Height = (uint)size,
+                LayerCountOrDepth = 6,
+                NumLevels = (uint)levels,
+                SampleCount = SDL.GPUSampleCount.SampleCount1,
+            });
         _version = 1;
     }
 
     /// <summary>
-    /// Allocates a GPU-resident cubemap of the given edge size using
-    /// the process's default GPU device.
+    /// Allocates cubemap of the given edge size in the GPU VRAM.
     /// </summary>
     /// <param name="size">Edge length per face, in pixels.</param>
     /// <param name="format">Pixel format. Must have a GPU equivalent.</param>
@@ -83,18 +79,18 @@ public sealed class GpuCubemap : TextureCube, IDisposable
         _texture ?? throw new ObjectDisposedException(nameof(GpuCubemap));
 
     /// <summary>
-    /// Render into each of the six faces of this cubemap, preserving
-    /// any existing pixels in each face. The callback runs once per
-    /// face (base mip level) with a renderer already targeting that
-    /// face. The user sets up their own camera per face if needed.
+    /// Render into each of the six faces of this cubemap, 
+    /// preserving any existing pixels in each face. 
+    /// The callback runs once per face (base mip level) with a renderer already targeting that face. 
+    /// The user sets up their own camera per face if needed.
     /// </summary>
     /// <param name="drawAction">Callback invoked for each face.</param>
     public void Render(Action<Renderer3D, CubeFace> drawAction)
         => RenderCore(null, drawAction);
 
     /// <summary>
-    /// Render into each of the six faces of this cubemap, clearing
-    /// each face to <paramref name="backgroundColor"/> first.
+    /// Render into each of the six faces of this cubemap, 
+    /// clearing each face to <paramref name="backgroundColor"/> first.
     /// </summary>
     /// <param name="backgroundColor">The background painted behind the draws on every face.</param>
     /// <param name="drawAction">Callback invoked for each face.</param>

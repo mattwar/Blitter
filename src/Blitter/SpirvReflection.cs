@@ -8,17 +8,13 @@ namespace Blitter;
 /// Result of reflecting a SPIR-V module: the shader stage, the entry-point
 /// name, and the resource counts SDL3 GPU needs to create the shader.
 /// </summary>
-internal sealed record SpirvShaderInfo(
-    ShaderKind Stage,
-    string Entrypoint,
-    ShaderResourceCounts Resources);
+internal sealed record SpirvShaderInfo(ShaderKind Stage, string Entrypoint, ShaderResourceCounts Resources);
 
 /// <summary>
-/// A small SPIR-V binary reflector. Walks a SPIR-V module to extract the
-/// information SDL3 GPU needs to create a <see cref="StageShader"/> from raw
-/// bytes -- the stage kind, entry-point name, and resource counts -- so
-/// callers don't have to track that metadata separately when loading
-/// precompiled shaders.
+/// A small SPIR-V binary 'reader'. 
+/// Walks a SPIR-V module to extract the information SDL3 GPU needs to create a <see cref="StageShader"/> 
+/// from raw bytes -- the stage kind, entry-point name, and resource counts -- 
+/// so callers don't have to track that metadata separately when loading precompiled shaders.
 /// </summary>
 /// <remarks>
 /// This is not a full SPIR-V validator; it inspects only the opcodes needed

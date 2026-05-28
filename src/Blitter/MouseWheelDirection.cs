@@ -1,6 +1,8 @@
 namespace Blitter;
 
-/// <summary>Mouse wheel scroll direction.</summary>
+/// <summary>
+/// Mouse wheel scroll direction.
+/// </summary>
 public enum MouseWheelDirection
 {
     Normal = 0,

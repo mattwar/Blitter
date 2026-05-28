@@ -1,45 +1,21 @@
 namespace Blitter;
 
 /// <summary>
-/// A 3D renderer that draws into an image.
+/// A <see cref="Renderer3D"/> that draws into an <see cref="Bitmap"/>.
 /// </summary>
-internal sealed class BitmapRenderer3D : GpuRenderer
+internal sealed class BitmapRenderer3D : GpuRenderer3D
 {
-    // SDL_GPU's R8G8B8A8Unorm color targets store pixels as in-memory
-    // bytes R, G, B, A. SDL's PixelFormat.ABGR8888 -- a packed uint32
-    // with A in the high byte -- has the same byte order on
-    // little-endian platforms, so we can memcpy texels straight into
-    // the surface (the "fast path"). RGBA64Float maps to
-    // R16G16B16A16Float and also direct-copies because the half-float
-    // byte order matches. Any other PixelFormat takes the "slow path":
-    // the GPU target stays R8G8B8A8Unorm and per-pixel Get/Set against
-    // the user's image converts to/from the surface's native layout.
-
     private readonly Bitmap _image;
     private readonly uint _width;
     private readonly uint _height;
     private readonly bool _directCopy;
     private readonly SDL.GPUTextureFormat _colorTargetFormat;
-    // Bytes per pixel for the GPU color target. Equals the image's
-    // BytesPerPixel on the direct-copy path; equals 4 on the slow path
-    // (the GPU target is R8G8B8A8Unorm regardless).
-    private readonly uint _gpuBpp;
+    private readonly uint _gpuBpp; // Bytes per pixel for the GPU color target
     private GpuTexture? _ownedColorTarget;
     private GpuDownloadBuffer? _downloadBuffer;
-    // Lazily created when the user requests additive rendering: holds
-    // the image's existing pixels so they can be uploaded into the GPU
-    // target before the render pass and preserved underneath new draws.
     private GpuUploadBuffer? _wallpaperBuffer;
-    // Slow-path scratch: an R,G,B,A byte buffer matching the GPU
-    // target's layout. Used for both staging the wallpaper upload and
-    // receiving the downloaded pixels before we per-pixel-convert them
-    // into the user's image.
     private byte[]? _scratch;
     private bool _uploadWallpaper;
-    // When non-null, the wallpaper is composited with this color
-    // (SrcOver) on the CPU before upload. Only the translucent case
-    // uses this path -- opaque colors take the GPU clear path, and
-    // null backgroundColor just preserves the wallpaper as-is.
     private Color? _tint;
 
     internal BitmapRenderer3D(GpuDevice device, Bitmap image)
@@ -78,11 +54,9 @@ internal sealed class BitmapRenderer3D : GpuRenderer
     protected override (int Width, int Height) GetTargetSize() =>
         ((int)_width, (int)_height);
 
-    // Picks the GPU color target format for an image of the given
-    // surface pixel format, and reports whether the GPU bytes and the
-    // surface bytes have identical layout (so a render pass result can
-    // be memcpy'd straight into the surface). Throws for formats with
-    // no GPU equivalent we know how to render into.
+    // Picks the GPU color target format for an image of the given surface pixel format, 
+    // and reports whether the GPU bytes and the surface bytes have identical layout 
+    // (so a render pass result can be memcpy'd straight into the surface). 
     private static (SDL.GPUTextureFormat Format, bool DirectCopy) MapPixelFormatToGpu(PixelFormat format) => 
         format switch
         {
@@ -110,12 +84,9 @@ internal sealed class BitmapRenderer3D : GpuRenderer
         };
 
     /// <summary>
-    /// Configures the renderer for either a clear-then-draw frame
-    /// (<paramref name="backgroundColor"/> opaque), an additive
-    /// frame that preserves the image's existing pixels as wallpaper
-    /// (<paramref name="backgroundColor"/> null), or a translucent
-    /// background blended over the wallpaper using SrcOver
-    /// (<paramref name="backgroundColor"/> with alpha &lt; 255).
+    /// Configures the renderer for either a clear-then-draw frame (<paramref name="backgroundColor"/> opaque), 
+    /// an additive frame that preserves the image's existing pixels as wallpaper (<paramref name="backgroundColor"/> null), 
+    /// or a translucent background blended over the wallpaper using SrcOver (<paramref name="backgroundColor"/> with alpha &lt; 255).
     /// Must be called before <see cref="Renderer3D.Render"/>.
     /// </summary>
     internal void Configure(Color? backgroundColor)
@@ -132,10 +103,9 @@ internal sealed class BitmapRenderer3D : GpuRenderer
             }
             else
             {
-                // Translucent (or alpha 0): preserve the image's
-                // existing pixels as wallpaper, then SrcOver the tint
-                // over them on the CPU before upload. alpha==0 is a
-                // no-op blend but takes the same path; that's fine.
+                // Translucent (or alpha 0): preserve the image's existing pixels as wallpaper, 
+                // then SrcOver the tint over them on the CPU before upload. alpha==0 is a
+                // no-op blend but takes the same path
                 if (!_directCopy && _gpuBpp != 4 ||
                     _directCopy && _colorTargetFormat == SDL.GPUTextureFormat.R16G16B16A16Float)
                 {
@@ -167,17 +137,15 @@ internal sealed class BitmapRenderer3D : GpuRenderer
 
         var byteCount = checked(_width * _height * _gpuBpp);
 
-        // Allocate the upload staging buffer once per renderer
-        // instance; reused across frames if the user calls Render
-        // multiple times.
+        // Allocate the upload staging buffer once per renderer instance; 
+        // reused across frames if the user calls Render multiple times.
         _wallpaperBuffer ??= (GpuUploadBuffer)GpuUploadBuffer.Create(Device, byteCount);
 
         ReadOnlySpan<byte> source;
         if (_directCopy && _tint is null)
         {
-            // Fast path: image bytes already in R,G,B,A order and no
-            // tint to compose, so we can upload straight from the
-            // surface.
+            // Fast path: image bytes already in R,G,B,A order and no tint to compose, 
+            // so we can upload straight from the surface.
             var pixels = _image.GetPixels();
             source = pixels.Length == (int)byteCount ? pixels : pixels[..(int)byteCount];
         }

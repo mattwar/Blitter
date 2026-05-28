@@ -1,13 +1,8 @@
 namespace Blitter;
 
 /// <summary>
-/// Pixel format identifiers for <see cref="Texture2D"/> and related GPU/CPU
-/// surfaces.
+/// Pixel format identifiers for <see cref="Texture2D"/>.
 /// </summary>
-/// <remarks>
-/// Values mirror the underlying <c>SDL_PixelFormat</c> bit pattern exactly so
-/// they can be cast at the SDL boundary.
-/// </remarks>
 public enum PixelFormat : uint
 {
     Unknown = 0x00000000,

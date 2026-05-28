@@ -7,9 +7,9 @@ using Blitter.Utilities;
 namespace Blitter;
 
 /// <summary>
-/// A high-level renderer for drawing a scene using the GPU pipeline.
+/// A <see cref="Renderer3D"/> that draws a using the GPU pipeline.
 /// </summary>
-internal class GpuRenderer : Renderer3D, IDisposable
+internal class GpuRenderer3D : Renderer3D, IDisposable
 {
     /// <summary>
     /// Number of frames a cached mesh or texture upload may go unused
@@ -92,12 +92,14 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private SDL.GPUSampleCount _currentSampleCount = SDL.GPUSampleCount.SampleCount1;
     private uint _currentTargetWidth;
     private uint _currentTargetHeight;
+    
     // For 2D and swapchain targets these are always zero. Subclasses
     // that target a single (face, mip) of a layered texture (e.g.
     // GpuCubemapFaceRenderer) populate them so the color attachment
     // points at the right slice.
     private uint _currentTargetLayer;
     private uint _currentTargetMipLevel;
+
     // One vertex buffer per DrawDebugText call within a frame. Each draw
     // gets its own array so the array-keyed mesh cache resolves to a
     // distinct Mesh per draw; otherwise multiple text strings in the same
@@ -114,7 +116,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private SDL.GPUTextureFormat _colorFormat;
     private SDL.FColor _clearColor;
 
-    internal GpuRenderer(GpuDevice device, Window3D window)
+    internal GpuRenderer3D(GpuDevice device, Window3D window)
     {
         _device = device;
         _window = window;
@@ -122,12 +124,11 @@ internal class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Constructor for subclasses that own their own color target (no
-    /// window/swapchain). They must override <see cref="TryAcquireColorTarget"/>
-    /// and <see cref="PresentFrame"/>; <see cref="ApplySyncMode"/> becomes a
-    /// no-op (sync mode is meaningful only for swapchain presentation).
+    /// Constructor for subclasses that own their own color target (no window/swapchain). 
+    /// They must override <see cref="TryAcquireColorTarget"/> and <see cref="PresentFrame"/>; 
+    /// <see cref="ApplySyncMode"/> becomes a no-op (sync mode is meaningful only for swapchain presentation).
     /// </summary>
-    private protected GpuRenderer(GpuDevice device)
+    private protected GpuRenderer3D(GpuDevice device)
     {
         _device = device;
         _window = null;

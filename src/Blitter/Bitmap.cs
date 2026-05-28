@@ -5,7 +5,7 @@ namespace Blitter;
 /// <summary>
 /// Represents an image bitmap in memory.
 /// </summary>
-public sealed class Bitmap : ReadableTexture2D
+public sealed partial class Bitmap : ReadableTexture2D
 {
     private readonly Application _application;
     internal nint _imageId;
@@ -105,7 +105,7 @@ public sealed class Bitmap : ReadableTexture2D
     {
         ArgumentNullException.ThrowIfNull(renderAction);
         ThrowIfDisposed();
-        using var renderer = Renderer.Create(this);
+        using var renderer = BitmapRenderer2D.Create(this);
 
         // Skip the implicit clear so existing surface pixels stay
         // visible underneath the new draws.
@@ -124,7 +124,7 @@ public sealed class Bitmap : ReadableTexture2D
     {
         ArgumentNullException.ThrowIfNull(renderAction);
         ThrowIfDisposed();
-        using var renderer = Renderer.Create(this);
+        using var renderer = BitmapRenderer2D.Create(this);
 
         if (backgroundColor.A == 255)
         {
@@ -726,53 +726,6 @@ public sealed class Bitmap : ReadableTexture2D
             }
         }
         return result;
-    }
-
-    /// <summary>
-    /// A 2D renderer that draws into an <see cref="Bitmap"/> in CPU memory using
-    /// SDL's software renderer. Pixels written by this renderer land directly
-    /// in the image's surface.
-    /// </summary>
-    private sealed class Renderer : BitmapRenderer2D
-    {
-        private readonly Bitmap _image;
-
-        private Renderer(Bitmap image, nint rendererId)
-            : base(rendererId)
-        {
-            _image = image;
-        }
-
-        /// <summary>
-        /// Creates a software renderer that draws into <paramref name="image"/>.
-        /// </summary>
-        public static Renderer Create(Bitmap image)
-        {
-            ArgumentNullException.ThrowIfNull(image);
-            image.ThrowIfDisposed();
-
-            _ = Application.Current;
-            SDL.InitSubSystem(SDL.InitFlags.Video);
-
-            var rendererId = SDL.CreateSoftwareRenderer(image._imageId);
-            if (rendererId == 0)
-                throw new InvalidOperationException(
-                    $"Failed to create software renderer for image: {SDL.GetError()}");
-
-            return new Renderer(image, rendererId);
-        }
-
-        /// <summary>The <see cref="Blitter.Bitmap"/> this renderer draws into.</summary>
-        public Bitmap Bitmap => _image;
-
-        protected override void OnDisposed()
-        {
-            // Pixels were written through SDL's renderer rather than the
-            // version-tracked SetPixel path, so any cached GPU upload of this
-            // image needs to re-stage on next use.
-            if (!_image.IsDisposed)
-                _image.Invalidate();
-        }
     }
 }
 

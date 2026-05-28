@@ -1,7 +1,9 @@
 namespace Blitter;
 
 /// <summary>
-/// An explicit (CPU-side) mipmap chain of images.
+/// An ordered set of similar images, decreasing in resolution, used to better render textures at distance.
+/// Mipmaps are uploaded to the GPU by the renderer as needed.
+/// Use this to create a custom mipmap chain, as opposed to relying on the GPU to generate mipmaps from a base texture.
 /// </summary>
 public sealed class Mipmap : Texture2D
 {
@@ -16,7 +18,9 @@ public sealed class Mipmap : Texture2D
     /// </summary>
     public IReadOnlyList<Texture2D> Levels { get; }
 
-    /// <summary>The highest-resolution level (mip 0).</summary>
+    /// <summary>
+    /// The highest-resolution level (mip 0).
+    /// </summary>
     public Texture2D Base => Levels[0];
 
     /// <inheritdoc/>
@@ -67,10 +71,9 @@ public sealed class Mipmap : Texture2D
     }
 
     /// <summary>
-    /// Builds a mipmapped image from an ordered list of levels. The
-    /// first entry is the base level; each subsequent entry must have
-    /// dimensions <c>max(1, prev / 2)</c> and share the base's
-    /// <see cref="Blitter.PixelFormat"/>.
+    /// Builds a mipmapped image from an ordered list of textures. 
+    /// The first texture is the base level and each subsequent entry must have
+    /// dimensions <c>max(1, prev / 2)</c> and share the base's <see cref="Blitter.PixelFormat"/>.
     /// </summary>
     public static Mipmap Create(params Texture2D[] levels)
     {
@@ -113,10 +116,8 @@ public sealed class Mipmap : Texture2D
     }
 
     /// <summary>
-    /// Convenience: builds a single-level chain wrapping a plain
-    /// <see cref="Texture2D"/>. Useful when an API takes
-    /// <c>MipmappedImage</c> uniformly but most callers only have one
-    /// level.
+    /// Builds a one level mipmap from a single texture.
+    /// This is not different than just using the texture normally.
     /// </summary>
     public static Mipmap FromBase(Texture2D baseLevel)
     {

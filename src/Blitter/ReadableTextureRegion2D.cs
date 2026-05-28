@@ -1,14 +1,11 @@
 namespace Blitter;
 
 /// <summary>
-/// A <see cref="ReadableTexture2D"/> that exposes a sub-rectangle of
-/// another readable texture as a standalone texture. <see cref="GetPixel"/>
-/// reads from the source at the offset. Renderers recognize this type
-/// (via <see cref="ITextureRegion"/>) and route draws accordingly.
+/// A <see cref="ReadableTexture2D"/> that is a rectangular region of another readable texture. 
 /// </summary>
-public sealed class ReadableTextureSegment2D : ReadableTexture2D, ITextureRegion
+public sealed class ReadableTextureRegion2D : ReadableTexture2D, ITextureRegion
 {
-    public ReadableTextureSegment2D(ReadableTexture2D source, Rect sourceRect)
+    public ReadableTextureRegion2D(ReadableTexture2D source, Rect sourceRect)
     {
         ArgumentNullException.ThrowIfNull(source);
         if (sourceRect.Width <= 0 || sourceRect.Height <= 0)
@@ -21,22 +18,24 @@ public sealed class ReadableTextureSegment2D : ReadableTexture2D, ITextureRegion
             throw new ArgumentOutOfRangeException(nameof(sourceRect), "Segment lies outside the source texture.");
         }
         Source = source;
-        SourceRect = sourceRect;
+        Region = sourceRect;
     }
 
-    /// <summary>The backing texture this segment reads from.</summary>
+    /// <summary>
+    /// The backing texture this segment reads from.
+    /// </summary>
     public ReadableTexture2D Source { get; }
 
     /// <inheritdoc/>
-    public Rect SourceRect { get; }
+    public Rect Region { get; }
 
     Texture2D ITextureRegion.Source => Source;
 
     /// <inheritdoc/>
-    public override int Width => (int)SourceRect.Width;
+    public override int Width => (int)Region.Width;
 
     /// <inheritdoc/>
-    public override int Height => (int)SourceRect.Height;
+    public override int Height => (int)Region.Height;
 
     /// <inheritdoc/>
     public override PixelFormat PixelFormat => Source.PixelFormat;
@@ -61,5 +60,5 @@ public sealed class ReadableTextureSegment2D : ReadableTexture2D, ITextureRegion
 
     /// <inheritdoc/>
     public override Color GetPixel(int x, int y) =>
-        Source.GetPixel((int)SourceRect.X + x, (int)SourceRect.Y + y);
+        Source.GetPixel((int)Region.X + x, (int)Region.Y + y);
 }

@@ -3,24 +3,11 @@
 namespace Blitter;
 
 /// <summary>
-/// A camera describes how 3D world-space points should be projected
-/// onto the 2D screen. It produces a view matrix (where the camera is
-/// and what it's looking at) and, via a subclass, a projection matrix
-/// (perspective or orthographic).
+/// A camera describes how 3D world-space points should be projected onto the 2D screen. 
+/// It produces a view matrix (where the camera is and what it's looking at) and, 
+/// via a subclass, a projection matrix (perspective or orthographic).
 /// </summary>
-/// <remarks>
-/// <para>
-/// Mental model: a telescope with two lenses. The view matrix is the
-/// objective lens that aims at the scene; the projection matrix is the
-/// eyepiece that focuses what was gathered into the shape of the
-/// screen. Looking through the assembled telescope -- the combined
-/// view-projection matrix -- is what produces the picture you see.
-/// </para>
-/// <para>
-/// A camera is a CPU-side helper -- it doesn't interact with the GPU directly.
-/// </para>
-/// </remarks>
-public abstract class Camera
+public abstract class Camera3D
 {
     /// <summary>
     /// World-space position the camera is looking from.
