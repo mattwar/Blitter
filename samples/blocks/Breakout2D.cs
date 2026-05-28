@@ -276,17 +276,12 @@ sealed class Paddle : Barrier2D
         VelocityX = dt > 0f ? (Center.X - _previousCenter.X) / dt : 0f;
     }
 
-    public override bool Intersects(BoundingCircle circle)
-    {
-        if (circle.IsEmpty) return false;
-        // Capsule: closest point on the horizontal segment, then
-        // compare to combined radius (half-height of capsule + ball).
-        var hx = HalfWidth;
-        var cx = Math.Clamp(circle.Center.X, Center.X - hx, Center.X + hx);
-        var closest = new Vector2(cx, Center.Y);
-        var r = HalfHeight + circle.Radius;
-        return Vector2.DistanceSquared(closest, circle.Center) <= r * r;
-    }
+    public override PosedHitShape2D HitShape =>
+        new(new CapsuleHitShape2D(
+                new Vector2(-HalfWidth, 0f),
+                new Vector2( HalfWidth, 0f),
+                HalfHeight),
+            new Pose2D(Center, 0f, 1f));
 
     public override void OnHitSprite(Sprite2D hitter, in UpdateContext2D context)
     {
@@ -369,15 +364,11 @@ sealed class Brick : Barrier2D
         Points = points;
     }
 
-    public override bool Intersects(BoundingCircle circle)
-    {
-        if (!IsAlive || circle.IsEmpty) return false;
-        var cx = Math.Clamp(circle.Center.X, Center.X - HalfWidth,  Center.X + HalfWidth);
-        var cy = Math.Clamp(circle.Center.Y, Center.Y - HalfHeight, Center.Y + HalfHeight);
-        var dx = circle.Center.X - cx;
-        var dy = circle.Center.Y - cy;
-        return dx * dx + dy * dy <= circle.Radius * circle.Radius;
-    }
+    public override PosedHitShape2D HitShape =>
+        IsAlive
+            ? new(new BoxHitShape2D(Vector2.Zero, new Vector2(HalfWidth, HalfHeight)),
+                  new Pose2D(Center, 0f, 1f))
+            : new(HitShape2D.None, Pose2D.Identity);
 
     public override void OnHitSprite(Sprite2D hitter, in UpdateContext2D context)
     {
