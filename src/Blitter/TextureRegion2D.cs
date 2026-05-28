@@ -54,6 +54,23 @@ public class TextureRegion2D : Texture2D, ITextureRegion
     /// <inheritdoc/>
     public override void Dispose() { /* doesn't own source */ }
 
+    /// <inheritdoc/>
+    public override Texture2D Slice(Rect region) =>
+        new TextureRegion2D(Source, OffsetSlice(Region, region, nameof(region)));
+
+    internal static Rect OffsetSlice(Rect outer, Rect inner, string paramName)
+    {
+        if (inner.Width <= 0 || inner.Height <= 0)
+            throw new ArgumentOutOfRangeException(paramName, "Segment must have positive size.");
+        if (inner.X < 0 || inner.Y < 0
+            || inner.X + inner.Width > outer.Width
+            || inner.Y + inner.Height > outer.Height)
+        {
+            throw new ArgumentOutOfRangeException(paramName, "Segment lies outside this region.");
+        }
+        return new Rect(outer.X + inner.X, outer.Y + inner.Y, inner.Width, inner.Height);
+    }
+
     /// <summary>
     /// If <paramref name="texture"/> is an <see cref="ITextureRegion"/>, 
     /// replaces it with the region's <see cref="ITextureRegion.Source"/> 

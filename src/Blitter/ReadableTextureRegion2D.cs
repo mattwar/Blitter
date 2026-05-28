@@ -61,4 +61,8 @@ public sealed class ReadableTextureRegion2D : ReadableTexture2D, ITextureRegion
     /// <inheritdoc/>
     public override Color GetPixel(int x, int y) =>
         Source.GetPixel((int)Region.X + x, (int)Region.Y + y);
+
+    /// <inheritdoc/>
+    public override ReadableTexture2D Slice(Rect region) =>
+        new ReadableTextureRegion2D(Source, TextureRegion2D.OffsetSlice(Region, region, nameof(region)));
 }
