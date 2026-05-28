@@ -86,7 +86,7 @@ var anims = atlas.ToAnimationCatalog([
 ]);
 
 var visual = new AnimatedVisual2D(anims, initialState: "idle-right");
-var standSize = ((ITextureRegion)atlas[0]).SourceRect;
+var standSize = ((ITextureRegion)atlas[0]).Region;
 float feetOffset = standSize.Height * 0.5f * SpriteScale;
 
 var spaceman = new Spaceman
