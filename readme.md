@@ -15,7 +15,7 @@
 SDL3 is fantastic, but using it directly from C# means a lot of P/Invoke, unsafe code, and boilerplate. Blitter exists to give .NET developers a small, approachable surface for:
 
 - Managing windows and events
-- Drawing/animating 2D images and primitives
+- Drawing/animating 2D bitmaps and primitives
 - Drawing/animating 3D meshes, models and text with lighting
 - Reading keyboard, mouse, gamepad, and touch input
 - Loading/Playing sounds
@@ -26,16 +26,16 @@ SDL3 is fantastic, but using it directly from C# means a lot of P/Invoke, unsafe
 
 ## Features
 
-- **Window2D** - bitmap/sprite-style 2D rendering
+- **Window2D** - simple 2D rendering
 - **Window3D** - GPU-accelerated 3D rendering
-- **SkiaSharp** Integration - Fonts, Filters, Canvas and more
+- **SkiaSharp** - integration for advanced 2D rendering
 - **Input** - keyboard, mouse, gamepad, and touch via simple events
 - **Audio** - load, play & mix wav, mp3 and ogg sound files
 - **Images** - load, save, manipulate pixels, apply filters
 - **Shaders** - load, save, dynamic compilation
 - **Blitter.Bits** - beyond the basics: useful tidbits for graphical apps
-- **Blitter.Blocks2D** - building blocks: sprites, scenes, panels and more
-- **Blitter.Blocks3D** - building blocks for 3D scenes (in development)
+- **Blitter.Blocks2D** - building blocks to compose scenes, sprites, behaviors and more.
+- **Blitter.Blocks3D** - Similar to Blocks2D, but with even more D.
 
 ## Installation
 
@@ -45,7 +45,7 @@ Blitter is published as a NuGet package:
 dotnet add package Blitter
 ```
 
-The native SDL3 binaries are pulled in automatically via the `SDL3-CS.Native` and `SDL3-CS.Native.Shadercross` package dependencies — there is nothing to install separately.
+All required native binaries are pulled in automatically — there is nothing to install separately.
 
 Targets **.NET 10**.
 
