@@ -1,12 +1,10 @@
 namespace Blitter.Blocks3D;
 
 /// <summary>
-/// The 3D "world" layer: owns a set of <see cref="Sprite3D"/>s and
-/// <see cref="Barrier3D"/>s, drives their per-frame updates, and runs
-/// the collision pass that dispatches <see cref="Sprite3D.OnHitSprite"/>
-/// and <see cref="Sprite3D.OnHitBarrier"/>.
+/// The 3D "world" layer, containing a set of sprites and barriers
+/// that interact with each other.
 /// </summary>
-public class PlayField3D : Layer3D
+public class PlayField3D : Layer3D, ISpriteHost3D
 {
     private readonly List<Sprite3D> _sprites = new();
     private readonly List<Barrier3D> _barriers = new();
@@ -26,59 +24,59 @@ public class PlayField3D : Layer3D
 
     public PlayField3D(IEnumerable<Sprite3D> sprites)
     {
-        AdoptSprites(sprites);
+        AddSprites(sprites);
     }
 
     public PlayField3D(IEnumerable<Sprite3D> sprites, IEnumerable<Barrier3D> barriers)
     {
-        AdoptSprites(sprites);
-        foreach (var b in barriers)
-            _barriers.Add(b);
+        AddSprites(sprites);
+        AddBarriers(barriers);
     }
 
-    private void AdoptSprites(IEnumerable<Sprite3D> sprites)
-    {
-        foreach (var s in sprites)
-        {
-            s._playField?.RemoveImmediate(s);
-            s._playField = this;
-            s._spawnedAt = Elapsed;
-            _sprites.Add(s);
-        }
-    }
-
-    /// <summary>The sprites currently in this playfield.</summary>
+    /// <summary>
+    /// The sprites currently in this playfield.
+    /// </summary>
     public IReadOnlyList<Sprite3D> Sprites => _sprites;
 
     /// <summary>
-    /// Static, non-sprite obstacles in this playfield. Tested against
-    /// every sprite's <see cref="Sprite3D.HitSphere"/> each frame.
+    /// Static, non-sprite obstacles in this playfield.
     /// </summary>
     public IReadOnlyList<Barrier3D> Barriers => _barriers;
 
     /// <summary>
-    /// Total time accumulated from <see cref="UpdateContext3D"/> deltas
-    /// passed through this playfield's <see cref="Update"/>. Used as
-    /// the clock for <see cref="Sprite3D.Age"/>.
+    /// Total time since construction of the playfield.
     /// </summary>
     public TimeSpan Elapsed { get; private set; }
 
     /// <summary>Adds a sprite to the playfield.</summary>
     public void AddSprite(Sprite3D sprite)
     {
-        var existing = sprite._playField;
-        if (existing == this)
+        if (sprite.Host == this)
         {
-            _pendingRemoveSprites.Remove(sprite);
-            return;
+            if (_updating)
+            {
+                _pendingRemoveSprites.Remove(sprite);
+            }
+            else
+            {
+                this.RemoveImmediate(sprite);
+            }
         }
-        existing?.RemoveImmediate(sprite);
-        sprite._playField = this;
-        sprite._spawnedAt = Elapsed;
+        else if (sprite.Host is {} otherHost)
+        {
+            otherHost.RemoveSprite(sprite); 
+        }
+
+        sprite.Host = this;
+
         if (_updating)
-            _pendingAddSprites.Add(sprite);
+        {
+            _pendingAddSprites.Add(sprite);           
+        }
         else
-            _sprites.Add(sprite);
+        {
+            _sprites.Add(sprite);            
+        }
     }
 
     /// <summary>Adds multiple sprites to the playfield.</summary>
@@ -97,7 +95,7 @@ public class PlayField3D : Layer3D
     /// </summary>
     public void RemoveSprite(Sprite3D sprite)
     {
-        if (sprite._playField != this)
+        if (sprite.Host != this)
             return;
         if (_updating)
         {
@@ -149,8 +147,8 @@ public class PlayField3D : Layer3D
 
     private void Detach(Sprite3D sprite, bool retired)
     {
-        if (sprite._playField == this)
-            sprite._playField = null;
+        if (sprite.Host == this)
+            sprite.Host = null;
         if (retired)
             OnSpriteRetired(sprite);
     }

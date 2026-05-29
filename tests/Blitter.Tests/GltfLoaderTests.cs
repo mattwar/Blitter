@@ -25,7 +25,7 @@ public class GltfLoaderTests
             .WithMetallicRoughnessShader()
             .WithBaseColor(baseColor);
 
-        var mesh = new MeshBuilder<VertexPositionNormal>("tri");
+        var mesh = new SharpGLTF.Geometry.MeshBuilder<VertexPositionNormal>("tri");
         var prim = mesh.UsePrimitive(mat);
         var n = Vector3.UnitZ;
         prim.AddTriangle(
@@ -79,7 +79,7 @@ public class GltfLoaderTests
         // bake node.WorldMatrix into positions).
         var path = CreateTempPath(".glb");
         var mat = new MaterialBuilder("tri").WithMetallicRoughnessShader();
-        var mesh = new MeshBuilder<VertexPositionNormal>("tri");
+        var mesh = new SharpGLTF.Geometry.MeshBuilder<VertexPositionNormal>("tri");
         var prim = mesh.UsePrimitive(mat);
         var n = Vector3.UnitZ;
         prim.AddTriangle(
@@ -122,7 +122,7 @@ public class GltfLoaderTests
         try
         {
             var mat = new MaterialBuilder("tri").WithMetallicRoughnessShader();
-            var mesh = new MeshBuilder<VertexPositionNormal>("tri");
+            var mesh = new SharpGLTF.Geometry.MeshBuilder<VertexPositionNormal>("tri");
             var prim = mesh.UsePrimitive(mat);
             var n = Vector3.UnitZ;
             prim.AddTriangle(
