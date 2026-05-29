@@ -126,11 +126,14 @@ public static class VoxelMesher
             var src = region.Source;
             float sw = src.Width;
             float sh = src.Height;
+            // Half-texel inset: stops bilinear filtering at tile edges
+            // from bleeding into neighbor tiles in a shared atlas.
+            const float inset = 0.5f;
             return (src,
-                r.X / sw,
-                r.Y / sh,
-                (r.X + r.Width) / sw,
-                (r.Y + r.Height) / sh);
+                (r.X + inset) / sw,
+                (r.Y + inset) / sh,
+                (r.X + r.Width - inset) / sw,
+                (r.Y + r.Height - inset) / sh);
         }
         return (texture, 0f, 0f, 1f, 1f);
     }

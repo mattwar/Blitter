@@ -227,7 +227,7 @@ sealed class WalkController3D : SpriteBehavior3D
     private readonly Window _window;
     private readonly PerspectiveCamera _camera;
     private TimeSpan _elapsed;
-    private TimeSpan _lastGroundedAt = TimeSpan.MinValue;
+    private TimeSpan? _lastGroundedAt;
 
     // Window after a ground contact during which Space still counts as
     // a jump — covers single-frame lift-offs and helps the input feel
@@ -294,10 +294,11 @@ sealed class WalkController3D : SpriteBehavior3D
 
         // ---- Jump: edge-triggered, gated by coyote window.
         if (_window.Input.WasJustPressed(Key.Space)
-            && (_elapsed - _lastGroundedAt).TotalSeconds <= CoyoteWindowSeconds)
+            && _lastGroundedAt is { } groundedAt
+            && (_elapsed - groundedAt).TotalSeconds <= CoyoteWindowSeconds)
         {
             v.Y = JumpSpeed;
-            _lastGroundedAt = TimeSpan.MinValue;   // consume
+            _lastGroundedAt = null;   // consume
         }
         target.Velocity = v;
 
