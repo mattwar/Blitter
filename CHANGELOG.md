@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `Renderer3D.TextureSampling` (`ImageSampling.Linear` default,
+  `Nearest` for crisp pixel-art / Minecraft-style atlases). Linear
+  keeps the existing mipmapped + anisotropic sampler; nearest is
+  point-sampled with no mip blending and no anisotropy.
+- `VoxelType` per-face textures: `TopTexture`, `BottomTexture`,
+  `SideTexture` (in addition to `Texture`). When only one is set every
+  face resolves to it; for variation set each side explicitly.
+  `VoxelMesher` now resolves the UV rect per face via
+  `VoxelType.GetFaceTexture(int face)`.
+- `WalkController3D` (`Blitter.Blocks3D`): first-person walk + jump +
+  mouse-look behavior with a coyote-window jump grace, configurable
+  key bindings, and an optional `Camera3D` it slaves to the sprite's
+  eye each frame. Replaces the local copies in
+  `samples/blocks/TerrainWalk3D.cs` and `samples/blocks/VoxelWalk3D.cs`.
 - `Blitter.Blocks3D` barriers: `SphereBarrier3D`, `WallBarrier3D`
   (finite oriented rectangle with `OneSided` flag and
   `Floor`/`Ceiling`/`Vertical` helpers), `BoxBarrier3D` (axis-aligned
