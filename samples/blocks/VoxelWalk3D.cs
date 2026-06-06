@@ -147,6 +147,7 @@ var player = new Sprite3D
     Visual = MeshVisual3D.Sphere(
         color: new Color(220, 130, 90, 0),
         radius: PlayerRadius),
+    Visible = false,
     Position = new Vector3(spawnX, groundY + 4f, spawnZ),
     Behaviors =
     {

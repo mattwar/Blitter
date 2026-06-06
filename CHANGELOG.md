@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `SparseVoxelWorld` + `IVoxelGenerator`: dictionary-backed
+  `IVoxelWorld` that lazily generates chunks on first read and exposes
+  `EnsureChunk` / `UnloadChunk` for streaming.
+- `VoxelChunkSource3D`: `GeneratedChunkSource3D` that wraps each
+  voxel chunk in a `Chunk3D` with a `VoxelChunkBarrier3D`, bridging
+  voxels into `ChunkedPlayField3D`.
+- `GeneratedChunkSource3D.TrimChunksOutside(min, max)` + virtual
+  `OnChunkUnloaded(Chunk3D)` for bounded-memory streaming.
+- New sample: `samples/blocks/VoxelWalkInfinite3D.cs` — endless voxel
+  world streamed around the player.
 - `Renderer3D.TextureSampling` (`ImageSampling.Linear` default,
   `Nearest` for crisp pixel-art / Minecraft-style atlases). Linear
   keeps the existing mipmapped + anisotropic sampler; nearest is

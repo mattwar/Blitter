@@ -21,6 +21,13 @@ public class WalkController3D : SpriteBehavior3D
     private readonly Window _window;
     private TimeSpan _elapsed;
     private TimeSpan? _lastGroundedAt;
+    // Wall normals recorded from OnHitBarrier during the most recent
+    // collision pass. Consumed on the next Apply to clip requested
+    // motion against each wall independently, so corners (two walls
+    // hit in the same frame) stop the player cleanly instead of
+    // letting one wall's projection push into the other.
+    private readonly Vector3[] _wallNormals = new Vector3[4];
+    private int _wallCount;
 
     public WalkController3D(Window window, Camera3D? camera = null)
     {
@@ -117,6 +124,33 @@ public class WalkController3D : SpriteBehavior3D
             ? Vector3.Zero
             : Vector3.Normalize(move) * speed;
 
+        // Clip the requested motion against every wall recorded last
+        // collision pass. Two iterations are enough to settle a corner:
+        // the first removes the inward component of one wall, which
+        // may reintroduce inward motion into another, and the second
+        // removes that. Without this, summing corner normals into a
+        // single 45° plane would still let motion slide into a wall.
+        if (_wallCount > 0)
+        {
+            for (int iter = 0; iter < 2; iter++)
+            {
+                bool clipped = false;
+                for (int i = 0; i < _wallCount; i++)
+                {
+                    var n = _wallNormals[i];
+                    var into = Vector3.Dot(horiz, n);
+                    if (into < 0f)
+                    {
+                        horiz -= n * into;
+                        clipped = true;
+                    }
+                }
+                if (!clipped)
+                    break;
+            }
+            _wallCount = 0;
+        }
+
         var v = target.Velocity;
         v.X = horiz.X;
         v.Z = horiz.Z;
@@ -154,7 +188,32 @@ public class WalkController3D : SpriteBehavior3D
         // Normal convention: contact.Normal points from the barrier
         // surface toward the sprite. A sufficiently upward normal means
         // we're on ground (not bumping a near-vertical wall).
-        if (contact.Normal.Y > GroundNormalY)
+        var n = contact.Normal;
+        if (n.Y > GroundNormalY)
+        {
             _lastGroundedAt = _elapsed;
+            return;
+        }
+
+        // Wall contact: remember the horizontal component so the next
+        // Apply can project requested motion tangent to it. If multiple
+        // walls are hit in one step (corner), accumulate so we don't
+        // squeeze through the seam.
+        var horizN = new Vector3(n.X, 0f, n.Z);
+        var len2 = horizN.LengthSquared();
+        if (len2 <= 1e-6f)
+            return;
+        horizN /= MathF.Sqrt(len2);
+
+        // De-dupe near-parallel normals (multiple voxel cells of the
+        // same wall report the same axis-aligned normal) and cap the
+        // buffer.
+        for (int i = 0; i < _wallCount; i++)
+        {
+            if (Vector3.Dot(_wallNormals[i], horizN) > 0.99f)
+                return;
+        }
+        if (_wallCount < _wallNormals.Length)
+            _wallNormals[_wallCount++] = horizN;
     }
 }

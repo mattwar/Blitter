@@ -493,6 +493,7 @@ public class Chunk3D
 public abstract class GeneratedChunkSource3D : ChunkSource3D
 {
     private readonly Dictionary<ChunkCoord, Chunk3D> _chunks = new();
+    private readonly List<ChunkCoord> _trimScratch = new();
 
     public override Chunk3D? GetChunk(in ChunkCoord coord)
     {
@@ -509,4 +510,42 @@ public abstract class GeneratedChunkSource3D : ChunkSource3D
     }
 
     protected abstract Chunk3D? GenerateChunk(in ChunkCoord coord);
+
+    /// <summary>
+    /// Drops every loaded chunk whose coord falls outside the inclusive
+    /// box <paramref name="min"/>..<paramref name="max"/>. Call this
+    /// after updating <see cref="ChunkedPlayField3D.MinChunk"/> /
+    /// <see cref="ChunkedPlayField3D.MaxChunk"/> each frame to bound
+    /// memory while a viewer walks an unbounded world.
+    /// </summary>
+    public void TrimChunksOutside(ChunkCoord min, ChunkCoord max)
+    {
+        if (_chunks.Count == 0)
+            return;
+        _trimScratch.Clear();
+        foreach (var key in _chunks.Keys)
+        {
+            if (key.X < min.X || key.X > max.X ||
+                key.Y < min.Y || key.Y > max.Y ||
+                key.Z < min.Z || key.Z > max.Z)
+            {
+                _trimScratch.Add(key);
+            }
+        }
+        for (int i = 0; i < _trimScratch.Count; i++)
+        {
+            var key = _trimScratch[i];
+            var chunk = _chunks[key];
+            _chunks.Remove(key);
+            OnChunkUnloaded(chunk);
+        }
+    }
+
+    /// <summary>
+    /// Hook invoked once per chunk evicted by
+    /// <see cref="TrimChunksOutside"/>. Default does nothing; subclasses
+    /// override to release any resources tied to the chunk (voxel
+    /// storage, GPU buffers, etc.).
+    /// </summary>
+    protected virtual void OnChunkUnloaded(Chunk3D chunk) { }
 }
