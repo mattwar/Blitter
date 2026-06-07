@@ -55,6 +55,7 @@ internal class GpuRenderer3D : Renderer3D, IDisposable
     // Bytes per packed light: two vec4s (Position+Range, Color+Intensity).
     private const int PointLightStrideBytes = 32;
     private GpuSampler? _defaultSampler;
+    private GpuSampler? _nearestSampler;
     private GpuSampler? _debugTextSampler;
     private GpuSampler? _cubemapSampler;
     private Bitmap? _debugFontAtlas;
@@ -193,10 +194,16 @@ internal class GpuRenderer3D : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// A default linear-filtered, repeating sampler used by
-    /// <see cref="DrawMesh{TVertex}(Mesh{TVertex}, Shader{TVertex})"/> when the caller does not supply one.
+    /// Resolved sampler for textured 2D draws. Switches between a
+    /// linear-filtered + mipmapped + anisotropic sampler and a
+    /// nearest-neighbor sampler based on
+    /// <see cref="Renderer3D.TextureSampling"/>.
     /// </summary>
-    internal GpuSampler DefaultSampler => _defaultSampler ??= _device.CreateSampler(new GpuSamplerCreateInfo
+    internal GpuSampler DefaultSampler => TextureSampling == ImageSampling.Nearest
+        ? NearestSampler
+        : LinearSampler;
+
+    private GpuSampler LinearSampler => _defaultSampler ??= _device.CreateSampler(new GpuSamplerCreateInfo
     {
         MinFilter = SDL.GPUFilter.Linear,
         MagFilter = SDL.GPUFilter.Linear,
@@ -216,6 +223,17 @@ internal class GpuRenderer3D : Renderer3D, IDisposable
         // is actually elongated, so always-on is the right default.
         EnableAnisotropy = true,
         MaxAnisotropy = 16f,
+    });
+
+    private GpuSampler NearestSampler => _nearestSampler ??= _device.CreateSampler(new GpuSamplerCreateInfo
+    {
+        MinFilter = SDL.GPUFilter.Nearest,
+        MagFilter = SDL.GPUFilter.Nearest,
+        MipmapMode = SDL.GPUSamplerMipmapMode.Nearest,
+        AddressModeU = SDL.GPUSamplerAddressMode.Repeat,
+        AddressModeV = SDL.GPUSamplerAddressMode.Repeat,
+        AddressModeW = SDL.GPUSamplerAddressMode.Repeat,
+        MaxLod = 1000f,
     });
 
     /// <summary>

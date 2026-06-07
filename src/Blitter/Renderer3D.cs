@@ -183,6 +183,15 @@ public abstract class Renderer3D
     public Antialiasing Antialiasing { get; set; } = Antialiasing.None;
 
     /// <summary>
+    /// Filter used when sampling diffuse 2D textures. <see cref="ImageSampling.Linear"/>
+    /// (default) is bilinear with mipmaps and anisotropy. <see cref="ImageSampling.Nearest"/>
+    /// is point-sampled and disables mip and anisotropic filtering — pick it
+    /// for crisp Minecraft-style pixel-art atlases that get magnified across
+    /// large surfaces.
+    /// </summary>
+    public ImageSampling TextureSampling { get; set; } = ImageSampling.Linear;
+
+    /// <summary>
     /// The camera used to compose view-projection matrices for
     /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex},
     /// Shader{TVertex,TArgs}, in TArgs)"/>. <see langword="null"/>

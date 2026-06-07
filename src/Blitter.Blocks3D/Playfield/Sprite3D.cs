@@ -43,6 +43,14 @@ public class Sprite3D : IUpdatable<UpdateContext3D>, IDrawable3D
     /// </summary>
     public bool CanBeHit { get; set; } = true;
 
+    /// <summary>
+    /// Whether <see cref="Draw"/> renders the <see cref="Visual"/>.
+    /// Set to <c>false</c> to keep the visual purely as a collision
+    /// proxy (e.g. an invisible first-person body shape) — the hit
+    /// shape is still derived from it.
+    /// </summary>
+    public bool Visible { get; set; } = true;
+
     /// <summary>Behaviors attached to this sprite. Run in list order each frame.</summary>
     public List<SpriteBehavior3D> Behaviors { get; } = new();
 
@@ -146,6 +154,8 @@ public class Sprite3D : IUpdatable<UpdateContext3D>, IDrawable3D
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer3D renderer)
     {
+        if (!this.Visible)
+            return;
         this.Visual?.Draw(renderer, new Pose3D(Position, Orientation, Scale), this.Tint, this.Age);
     }
 }

@@ -42,16 +42,19 @@ public static class VoxelMesher
         new( 0f, 0f, 1f), // +Z
     };
 
-    // Per face: origin corner (unit-cell coords) and two edge axes.
-    // origin + e1 + e2 + (cross e1 e2 = normal) gives an outward-CCW quad.
-    private static readonly (Vector3 Origin, Vector3 E1, Vector3 E2)[] _faceCorners =
+    // Per face: origin corner (unit-cell coords), two edge axes, and
+    // a flag indicating whether the U axis follows E1 or E2.
+    // origin + e1 + e2 + (cross e1 e2 = normal) gives an outward-CCW
+    // quad. The UV swap is needed on +X and -Z because their E1 runs
+    // vertically (+Y) while the texture's U is the horizontal axis.
+    private static readonly (Vector3 Origin, Vector3 E1, Vector3 E2, bool UAlongE1)[] _faceCorners =
     {
-        (new(0f, 0f, 0f), new(0f, 0f, 1f), new(0f, 1f, 0f)), // -X
-        (new(1f, 0f, 0f), new(0f, 1f, 0f), new(0f, 0f, 1f)), // +X
-        (new(0f, 0f, 0f), new(1f, 0f, 0f), new(0f, 0f, 1f)), // -Y
-        (new(0f, 1f, 0f), new(0f, 0f, 1f), new(1f, 0f, 0f)), // +Y
-        (new(0f, 0f, 0f), new(0f, 1f, 0f), new(1f, 0f, 0f)), // -Z
-        (new(0f, 0f, 1f), new(1f, 0f, 0f), new(0f, 1f, 0f)), // +Z
+        (new(0f, 0f, 0f), new(0f, 0f, 1f), new(0f, 1f, 0f), true ),  // -X: U=+Z, V=+Y
+        (new(1f, 0f, 0f), new(0f, 1f, 0f), new(0f, 0f, 1f), false),  // +X: U=+Z, V=+Y
+        (new(0f, 0f, 0f), new(1f, 0f, 0f), new(0f, 0f, 1f), true ),  // -Y
+        (new(0f, 1f, 0f), new(0f, 0f, 1f), new(1f, 0f, 0f), true ),  // +Y
+        (new(0f, 0f, 0f), new(0f, 1f, 0f), new(1f, 0f, 0f), false),  // -Z: U=+X, V=+Y
+        (new(0f, 0f, 1f), new(1f, 0f, 0f), new(0f, 1f, 0f), true ),  // +Z: U=+X, V=+Y
     };
 
     private static readonly (int DX, int DY, int DZ)[] _faceOffsets =
@@ -78,15 +81,13 @@ public static class VoxelMesher
             if (type.Shape != VoxelShape.FullBlock)
                 continue;
 
-            // Resolve source texture + normalized UV sub-rect once per cell.
-            var (sourceTexture, u0, v0, u1, v1) = ResolveUvRect(type.Texture);
-
             for (int face = 0; face < 6; face++)
             {
                 var off = _faceOffsets[face];
                 if (palette.IsOpaque(grid.GetVoxel(x + off.DX, y + off.DY, z + off.DZ)))
                     continue;
 
+                var (sourceTexture, u0, v0, u1, v1) = ResolveUvRect(type.GetFaceTexture(face));
                 EmitFace(sink, sourceTexture, x, y, z, cellSize, face, u0, v0, u1, v1);
             }
         }
@@ -100,7 +101,7 @@ public static class VoxelMesher
         int face,
         float u0, float v0, float u1, float v1)
     {
-        var (origin, e1, e2) = _faceCorners[face];
+        var (origin, e1, e2, uAlongE1) = _faceCorners[face];
         var normal = _faceNormals[face];
         var cellOrigin = new Vector3(cellX, cellY, cellZ) * cellSize;
 
@@ -109,10 +110,29 @@ public static class VoxelMesher
         var c2 = c1 + e2 * cellSize;
         var c3 = c0 + e2 * cellSize;
 
-        var v0v = new LitTextureVertex3D(c0, normal, new Vector2(u0, v1));
-        var v1v = new LitTextureVertex3D(c1, normal, new Vector2(u1, v1));
-        var v2v = new LitTextureVertex3D(c2, normal, new Vector2(u1, v0));
-        var v3v = new LitTextureVertex3D(c3, normal, new Vector2(u0, v0));
+        // U follows the horizontal edge, V follows the other edge.
+        // V=v0 is the texture's top, so the corner farthest along the
+        // V edge gets v0 and the corner at the V edge origin gets v1.
+        Vector2 uv0, uv1, uv2, uv3;
+        if (uAlongE1)
+        {
+            uv0 = new Vector2(u0, v1);
+            uv1 = new Vector2(u1, v1);
+            uv2 = new Vector2(u1, v0);
+            uv3 = new Vector2(u0, v0);
+        }
+        else
+        {
+            uv0 = new Vector2(u0, v1);
+            uv1 = new Vector2(u0, v0);
+            uv2 = new Vector2(u1, v0);
+            uv3 = new Vector2(u1, v1);
+        }
+
+        var v0v = new LitTextureVertex3D(c0, normal, uv0);
+        var v1v = new LitTextureVertex3D(c1, normal, uv1);
+        var v2v = new LitTextureVertex3D(c2, normal, uv2);
+        var v3v = new LitTextureVertex3D(c3, normal, uv3);
         sink.EmitQuad(sourceTexture, in v0v, in v1v, in v2v, in v3v);
     }
 

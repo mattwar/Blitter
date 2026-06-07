@@ -37,11 +37,43 @@ public sealed class VoxelType
     public VoxelShape Shape { get; init; } = VoxelShape.FullBlock;
 
     /// <summary>
-    /// Texture sampled for every face of this voxel. Use a
-    /// <see cref="TextureRegion2D"/> to share an atlas across types.
-    /// Null leaves the mesher to use a default / untextured material.
+    /// Texture sampled for every face of this voxel unless one of the
+    /// per-face overrides is set. Use a <see cref="TextureRegion2D"/>
+    /// to share an atlas across types. Null leaves the mesher to use a
+    /// default / untextured material.
     /// </summary>
     public Texture2D? Texture { get; init; }
+
+    /// <summary>Override texture for the +Y (top) face. Null falls back through the resolution chain.</summary>
+    public Texture2D? TopTexture { get; init; }
+
+    /// <summary>Override texture for the -Y (bottom) face. Null falls back through the resolution chain.</summary>
+    public Texture2D? BottomTexture { get; init; }
+
+    /// <summary>Override texture shared by the four side faces (±X, ±Z). Null falls back through the resolution chain.</summary>
+    public Texture2D? SideTexture { get; init; }
+
+    /// <summary>
+    /// Resolves the texture for one face of this voxel.
+    /// <paramref name="face"/> uses the mesher's index convention:
+    /// 0=-X, 1=+X, 2=-Y, 3=+Y, 4=-Z, 5=+Z. If only one of
+    /// <see cref="Texture"/>, <see cref="TopTexture"/>, <see cref="BottomTexture"/>,
+    /// or <see cref="SideTexture"/> is set, every face resolves to it;
+    /// for per-face variation, set each side explicitly.
+    /// </summary>
+    public Texture2D? GetFaceTexture(int face)
+    {
+        // Any non-null property acts as the fallback for unset faces,
+        // so a voxel with only TopTexture set looks identical on every
+        // face. Order: prefer Texture, then Side, then Top, then Bottom.
+        var fallback = Texture ?? SideTexture ?? TopTexture ?? BottomTexture;
+        return face switch
+        {
+            3 => TopTexture    ?? fallback,
+            2 => BottomTexture ?? fallback,
+            _ => SideTexture   ?? fallback,
+        };
+    }
 
     /// <summary>Physics material the voxel reports when it acts as a collision surface.</summary>
     public PhysicsMaterial Physics { get; init; } = PhysicsMaterial.Ideal;

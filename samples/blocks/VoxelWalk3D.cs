@@ -45,26 +45,34 @@ const float PlayerRadius = 0.45f;
 const float WalkSpeed = 4.5f;
 const float SprintMultiplier = 1.8f;
 const float JumpSpeed = 6.0f;
-const float EyeOffsetY = 0.35f;
+// Eye sits ~2 voxels above the ground the player is standing on.
+// Sphere center is PlayerRadius above the ground when grounded, so
+// EyeOffsetY = 2 - PlayerRadius keeps the camera at "two blocks high".
+const float EyeOffsetY = 1.55f;
 
-// ---- Atlas: three solid-color tiles packed side-by-side. The mesher
-// only samples one UV rect per voxel type, so the per-tile resolution
-// can be tiny; 8 px gives a comfortable margin away from tile edges
-// for any bilinear filtering.
-const int Tile = 8;
-var atlas = Bitmap.Create(Tile * 3, Tile);
-FillTile(atlas, 0, Color.Green);    // grass
-FillTile(atlas, 1, Color.Brown);    // dirt
-FillTile(atlas, 2, Color.Gray);   // stone
+// ---- Atlas: Blocks.png is a 10×6 grid of 16×16 Minecraft-style
+// tiles. Each VoxelType references one or more tiles via
+// TextureRegion2D so the whole world meshes into one atlas-keyed
+// bucket. Grass demonstrates per-face textures: a green top, a
+// dirt-with-grass side, and a plain dirt bottom.
+var atlas = Bitmap.Load(Asset.GetPathRelativeToCaller("Blocks.png"));
 
-var grassTex = new TextureRegion2D(atlas, new Rect(0,        0, Tile, Tile));
-var dirtTex  = new TextureRegion2D(atlas, new Rect(Tile,     0, Tile, Tile));
-var stoneTex = new TextureRegion2D(atlas, new Rect(Tile * 2, 0, Tile, Tile));
+var grassTopTex  = AtlasTile(atlas, col: 4, row: 4);
+var grassSideTex = AtlasTile(atlas, col: 1, row: 3);
+var dirtTex      = AtlasTile(atlas, col: 4, row: 3);
+var stoneTex     = AtlasTile(atlas, col: 1, row: 4);
 
 var palette = new VoxelPalette();
 var stone = palette.Add(new VoxelType { Id = 1, Name = "stone", Texture = stoneTex });
 var dirt  = palette.Add(new VoxelType { Id = 2, Name = "dirt",  Texture = dirtTex  });
-var grass = palette.Add(new VoxelType { Id = 3, Name = "grass", Texture = grassTex });
+var grass = palette.Add(new VoxelType
+{
+    Id = 3,
+    Name = "grass",
+    TopTexture    = grassTopTex,
+    SideTexture   = grassSideTex,
+    BottomTexture = dirtTex,
+});
 
 var world = new ArrayVoxelWorld(WorldWidth, WorldHeight, WorldDepth, palette);
 
@@ -100,10 +108,14 @@ var window = new Window3D
     CloseKey = Key.Escape,
 };
 
-window.Renderer.AmbientLight = new Color(95, 110, 130);
+window.Renderer.AmbientLight = new Color(140, 150, 165);
 window.Renderer.DirectionalLight = new DirectionalLight(
     Vector3.Normalize(new Vector3(-0.4f, -0.8f, -0.5f)),
-    new Color(255, 246, 230));
+    new Color(140, 135, 125));
+// Nearest-neighbor sampling keeps the 16×16 atlas tiles crisp when
+// stretched across whole voxel faces, instead of blurring into a
+// soft averaged color.
+window.Renderer.TextureSampling = ImageSampling.Nearest;
 
 float spawnX = WorldWidth * 0.5f;
 float spawnZ = WorldDepth * 0.5f;
@@ -135,6 +147,7 @@ var player = new Sprite3D
     Visual = MeshVisual3D.Sphere(
         color: new Color(220, 130, 90, 0),
         radius: PlayerRadius),
+    Visible = false,
     Position = new Vector3(spawnX, groundY + 4f, spawnZ),
     Behaviors =
     {
@@ -223,106 +236,5 @@ static float Hash01(int x, int z)
     return (h & 0xFFFFFF) / (float)0x1000000;
 }
 
-static void FillTile(Bitmap atlas, int tileX, Color color)
-{
-    int x0 = tileX * 8;
-    for (int y = 0; y < 8; y++)
-        for (int x = 0; x < 8; x++)
-            atlas.SetPixel(x0 + x, y, color);
-}
-
-// ---- types ------------------------------------------------------------
-
-// Same controller as TerrainWalk3D — drives the host sprite's
-// horizontal velocity from WASD, jumps on Space when recently
-// grounded, and slaves the camera to the sprite each frame.
-sealed class WalkController3D : SpriteBehavior3D
-{
-    private readonly Window _window;
-    private readonly PerspectiveCamera _camera;
-    private TimeSpan _elapsed;
-    private TimeSpan? _lastGroundedAt;
-
-    private const float CoyoteWindowSeconds = 0.12f;
-
-    public float Yaw { get; set; }
-    public float Pitch { get; set; }
-    public float MaxPitch { get; set; } = MathF.PI / 2f - 0.05f;
-
-    public float MoveSpeed { get; set; } = 4.5f;
-    public float SprintMultiplier { get; set; } = 1.8f;
-    public float JumpSpeed { get; set; } = 6.0f;
-    public float EyeOffsetY { get; set; } = 0.6f;
-    public float LookSpeed { get; set; } = 0.005f;
-
-    public WalkController3D(Window window, PerspectiveCamera camera)
-    {
-        ArgumentNullException.ThrowIfNull(window);
-        ArgumentNullException.ThrowIfNull(camera);
-        _window = window;
-        _camera = camera;
-    }
-
-    public override void Apply(Sprite3D target, in UpdateContext3D context)
-    {
-        _elapsed += context.ElapsedSinceLastUpdate;
-        var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
-        if (dt <= 0f)
-            return;
-
-        var delta = _window.Input.MouseDelta;
-        if (delta != Vector2.Zero)
-        {
-            Yaw -= delta.X * LookSpeed;
-            Pitch = Math.Clamp(Pitch - delta.Y * LookSpeed, -MaxPitch, MaxPitch);
-        }
-
-        var forwardFlat = new Vector3(-MathF.Sin(Yaw), 0f, -MathF.Cos(Yaw));
-        var rightFlat = Vector3.Normalize(Vector3.Cross(forwardFlat, Vector3.UnitY));
-
-        var move = Vector3.Zero;
-        if (Keyboard.IsDown(Key.W)) move += forwardFlat;
-        if (Keyboard.IsDown(Key.S)) move -= forwardFlat;
-        if (Keyboard.IsDown(Key.D)) move += rightFlat;
-        if (Keyboard.IsDown(Key.A)) move -= rightFlat;
-
-        float speed = MoveSpeed;
-        if (Keyboard.IsDown(Key.LShift) || Keyboard.IsDown(Key.RShift))
-            speed *= SprintMultiplier;
-
-        var horiz = move == Vector3.Zero
-            ? Vector3.Zero
-            : Vector3.Normalize(move) * speed;
-
-        var v = target.Velocity;
-        v.X = horiz.X;
-        v.Z = horiz.Z;
-
-        if (_window.Input.WasJustPressed(Key.Space)
-            && _lastGroundedAt is { } groundedAt
-            && (_elapsed - groundedAt).TotalSeconds <= CoyoteWindowSeconds)
-        {
-            v.Y = JumpSpeed;
-            _lastGroundedAt = null;
-        }
-        target.Velocity = v;
-
-        var eye = target.Position + new Vector3(0f, EyeOffsetY, 0f);
-        var cosP = MathF.Cos(Pitch);
-        var look = new Vector3(
-            -cosP * MathF.Sin(Yaw),
-             MathF.Sin(Pitch),
-            -cosP * MathF.Cos(Yaw));
-        _camera.Position = eye;
-        _camera.Target = eye + look;
-        _camera.Up = Vector3.UnitY;
-    }
-
-    public override void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext3D context)
-    {
-        if (!self.HitShape.TryGetContact(barrier.HitShape, out var contact))
-            return;
-        if (contact.Normal.Y > 0.5f)
-            _lastGroundedAt = _elapsed;
-    }
-}
+static TextureRegion2D AtlasTile(Bitmap atlas, int col, int row)
+    => new(atlas, new Rect(col * 16, row * 16, 16, 16));
