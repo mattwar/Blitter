@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitNone>true</ImplicitNone>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.6.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.4" />
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+  </PackageReference>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Blitter.Blocks3D\Blitter.Blocks3D.csproj" />
+    <ProjectReference Include="..\..\src\Blitter\Blitter.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Source.Generator" Version="1.1.1" />
+  </ItemGroup>
+</Project>
