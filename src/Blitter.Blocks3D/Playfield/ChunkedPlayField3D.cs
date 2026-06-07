@@ -512,10 +512,8 @@ public abstract class GeneratedChunkSource3D : ChunkSource3D
     protected abstract Chunk3D? GenerateChunk(in ChunkCoord coord);
 
     /// <summary>
-    /// Drops every loaded chunk whose coord falls outside the inclusive
-    /// box <paramref name="min"/>..<paramref name="max"/>. Call this
-    /// after updating <see cref="ChunkedPlayField3D.MinChunk"/> /
-    /// <see cref="ChunkedPlayField3D.MaxChunk"/> each frame to bound
+    /// Drops every loaded chunk whose coord falls outside the inclusive box <paramref name="min"/>..<paramref name="max"/>. 
+    /// Call this/ after updating <see cref="ChunkedPlayField3D.MinChunk"/> / <see cref="ChunkedPlayField3D.MaxChunk"/> each frame to bound
     /// memory while a viewer walks an unbounded world.
     /// </summary>
     public void TrimChunksOutside(ChunkCoord min, ChunkCoord max)
