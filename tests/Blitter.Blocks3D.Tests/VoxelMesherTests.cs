@@ -14,6 +14,7 @@ public class VoxelMesherTests
 
         public void AddQuad(
             Texture2D? sourceTexture,
+            bool alphaCutout,
             in LitTextureVertex3D v0,
             in LitTextureVertex3D v1,
             in LitTextureVertex3D v2,
@@ -21,6 +22,7 @@ public class VoxelMesherTests
 
         public void AddTriangle(
             Texture2D? sourceTexture,
+            bool alphaCutout,
             in LitTextureVertex3D v0,
             in LitTextureVertex3D v1,
             in LitTextureVertex3D v2) => TriangleCount++;

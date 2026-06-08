@@ -30,6 +30,15 @@ public sealed class LitTextureMaterial : Material
     public Texture2D? DiffuseTexture { get; init; }
 
     /// <summary>
+    /// When true, fragments whose <see cref="DiffuseTexture"/> alpha is
+    /// below 0.5 are discarded rather than drawn, giving crisp
+    /// see-through holes (foliage, grates) that still write depth and
+    /// need no back-to-front sorting. When false (default) the alpha
+    /// channel is ignored for opaque draws.
+    /// </summary>
+    public bool AlphaCutout { get; init; }
+
+    /// <summary>
     /// A featureless white material. Useful as a default.
     /// </summary>
     public static LitTextureMaterial Default { get; } = new();

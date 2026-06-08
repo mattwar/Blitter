@@ -20,8 +20,26 @@ public sealed class CubeVoxelShape : VoxelShape
     /// </summary>
     public VoxelTexture? Texture { get; }
 
-    /// <summary>Creates a cube textured by <paramref name="texture"/>.</summary>
-    public CubeVoxelShape(VoxelTexture? texture) => Texture = texture;
+    /// <summary>
+    /// When true, the cube is drawn with alpha-cutout: texels whose
+    /// texture alpha is below 0.5 are discarded, leaving crisp
+    /// see-through holes (foliage, grates). The faces still write depth
+    /// and need no sorting. Pair with <see cref="VoxelType.IsOpaque"/>
+    /// set to false so neighbors keep the faces they share with this
+    /// cube.
+    /// </summary>
+    public bool AlphaCutout { get; }
+
+    /// <summary>
+    /// Creates a cube textured by <paramref name="texture"/>. Set
+    /// <paramref name="alphaCutout"/> to draw it as a see-through
+    /// alpha-cutout surface.
+    /// </summary>
+    public CubeVoxelShape(VoxelTexture? texture, bool alphaCutout = false)
+    {
+        Texture = texture;
+        AlphaCutout = alphaCutout;
+    }
 
     /// <inheritdoc/>
     public override bool FillsVoxel => true;
@@ -61,13 +79,14 @@ public sealed class CubeVoxelShape : VoxelShape
                 continue;
 
             var (source, u0, v0, u1, v1) = ResolveUvRect(Texture?.GetFace((VoxelFace)face));
-            EmitFace(builder, source, context.X, context.Y, context.Z, cellSize, face, u0, v0, u1, v1);
+            EmitFace(builder, source, AlphaCutout, context.X, context.Y, context.Z, cellSize, face, u0, v0, u1, v1);
         }
     }
 
     private static void EmitFace(
         IChunkMeshBuilder builder,
         Texture2D? sourceTexture,
+        bool alphaCutout,
         int cellX, int cellY, int cellZ,
         Vector3 cellSize,
         int face,
@@ -105,7 +124,7 @@ public sealed class CubeVoxelShape : VoxelShape
         var v1v = new LitTextureVertex3D(c1, normal, uv1);
         var v2v = new LitTextureVertex3D(c2, normal, uv2);
         var v3v = new LitTextureVertex3D(c3, normal, uv3);
-        builder.AddQuad(sourceTexture, in v0v, in v1v, in v2v, in v3v);
+        builder.AddQuad(sourceTexture, alphaCutout, in v0v, in v1v, in v2v, in v3v);
     }
 
     private static (Texture2D? Source, float U0, float V0, float U1, float V1) ResolveUvRect(Texture2D? texture)

@@ -55,6 +55,7 @@ var grassTopTex  = AtlasTile(atlas, col: 4, row: 4);
 var grassSideTex = AtlasTile(atlas, col: 1, row: 3);
 var dirtTex      = AtlasTile(atlas, col: 4, row: 3);
 var stoneTex     = AtlasTile(atlas, col: 1, row: 4);
+var leavesTex    = AtlasTile(atlas, col: 0, row: 1);
 
 var palette = new VoxelPalette();
 var stone = palette.Add(new VoxelType { Id = 1, Name = "stone", Shape = new CubeVoxelShape(stoneTex) });
@@ -68,8 +69,18 @@ var grass = palette.Add(new VoxelType
         side: grassSideTex,
         bottom: dirtTex)),
 });
+// Leaves: an alpha-cutout cube. IsOpaque = false so neighbors keep the
+// faces they share with it (you can see through the gaps to the blocks
+// behind), and the cutout shader discards the transparent texels.
+var leaves = palette.Add(new VoxelType
+{
+    Id = 4,
+    Name = "leaves",
+    IsOpaque = false,
+    Shape = new CubeVoxelShape(leavesTex, alphaCutout: true),
+});
 
-var generator = new TerrainGenerator(grassId: grass.Id, dirtId: dirt.Id, stoneId: stone.Id);
+var generator = new TerrainGenerator(grassId: grass.Id, dirtId: dirt.Id, stoneId: stone.Id, leavesId: leaves.Id);
 var voxelWorld = new SparseVoxelWorld(palette, generator, ChunkVoxelsX, ChunkVoxelsY, ChunkVoxelsZ);
 var chunkSource = new VoxelChunkSource3D(voxelWorld, Vector3.One, ChunkVoxelsX, ChunkVoxelsY, ChunkVoxelsZ);
 
@@ -194,12 +205,14 @@ sealed class TerrainGenerator : IVoxelGenerator
     private readonly int _grassId;
     private readonly int _dirtId;
     private readonly int _stoneId;
+    private readonly int _leavesId;
 
-    public TerrainGenerator(int grassId, int dirtId, int stoneId)
+    public TerrainGenerator(int grassId, int dirtId, int stoneId, int leavesId)
     {
         _grassId = grassId;
         _dirtId = dirtId;
         _stoneId = stoneId;
+        _leavesId = leavesId;
     }
 
     public void Generate(ChunkCoord coord, int voxelsX, int voxelsY, int voxelsZ, int[] voxels)
@@ -215,6 +228,7 @@ sealed class TerrainGenerator : IVoxelGenerator
                 int wx = originX + lx;
                 int top = SurfaceHeight(wx, wz);
                 int surfaceId = SurfaceVoxel(wx, wz, _grassId, _dirtId, _stoneId);
+                bool canopy = IsCanopy(wx, wz);
                 for (int ly = 0; ly < voxelsY; ly++)
                 {
                     int wy = originY + ly;
@@ -225,6 +239,8 @@ sealed class TerrainGenerator : IVoxelGenerator
                         id = _dirtId;
                     else if (wy == top)
                         id = surfaceId;
+                    else if (canopy && (wy == top + 2 || wy == top + 3))
+                        id = _leavesId;
                     else
                         id = 0;
                     voxels[(lz * voxelsY + ly) * voxelsX + lx] = id;
@@ -249,6 +265,12 @@ sealed class TerrainGenerator : IVoxelGenerator
         if (n > 0.58f) return dirtId;
         return grassId;
     }
+
+    // Broad low-frequency patches that float two voxels above the
+    // surface, forming a leaf canopy you can walk under and see
+    // through the alpha-cutout gaps.
+    public static bool IsCanopy(int x, int z)
+        => ValueNoise(x * 0.08f, z * 0.08f) > 0.70f;
 
     static float ValueNoise(float x, float z)
     {

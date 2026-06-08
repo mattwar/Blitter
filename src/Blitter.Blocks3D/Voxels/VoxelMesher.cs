@@ -16,9 +16,13 @@ internal interface IChunkMeshBuilder
     /// (null means untextured). The four vertices wind CCW seen from
     /// outside the cell (<c>v0 → v1 → v2</c> follows the face normal),
     /// so the builder appends triangles <c>v0,v1,v2</c> and <c>v0,v2,v3</c>.
+    /// When <paramref name="alphaCutout"/> is true the quad is drawn with
+    /// alpha-cutout (see-through holes where the texture alpha is low)
+    /// rather than as a solid surface.
     /// </summary>
     void AddQuad(
         Texture2D? sourceTexture,
+        bool alphaCutout,
         in LitTextureVertex3D v0,
         in LitTextureVertex3D v1,
         in LitTextureVertex3D v2,
@@ -29,10 +33,12 @@ internal interface IChunkMeshBuilder
     /// (null means untextured). The three vertices wind CCW seen from
     /// outside the surface (<c>v0 → v1 → v2</c> follows the face normal).
     /// For shapes that aren't built from quads — slopes, smooth
-    /// surfaces, imported meshes.
+    /// surfaces, imported meshes. <paramref name="alphaCutout"/> selects
+    /// the alpha-cutout surface just like <see cref="AddQuad"/>.
     /// </summary>
     void AddTriangle(
         Texture2D? sourceTexture,
+        bool alphaCutout,
         in LitTextureVertex3D v0,
         in LitTextureVertex3D v1,
         in LitTextureVertex3D v2);

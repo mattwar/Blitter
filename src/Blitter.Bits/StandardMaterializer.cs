@@ -82,8 +82,9 @@ public class StandardMaterializer : Materializer
         if (vt == typeof(LitTextureVertex3D))
         {
             var texture = lit.DiffuseTexture ?? Textures.White;
+            var shader = lit.AlphaCutout ? Shaders.LitTextureCutout : Shaders.LitTexture;
             MeshDispatcher.For(mesh).DrawTextured(
-                renderer, mesh, texture, Shaders.LitTexture, in args);
+                renderer, mesh, texture, shader, in args);
             return;
         }
         if (vt == typeof(LitVertex3D))

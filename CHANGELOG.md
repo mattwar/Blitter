@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Alpha-cutout voxels for see-through surfaces like foliage:
+  `CubeVoxelShape(texture, alphaCutout: true)` draws a cube whose
+  texels below 0.5 alpha are discarded by the shader, leaving crisp
+  holes that still write depth and need no sorting. Pair with
+  `VoxelType.IsOpaque = false` so neighbors keep the faces they share
+  with it. Backed by a new `LitTextureMaterial.AlphaCutout` flag and a
+  `Shaders.LitTextureCutout` shader (an alpha-tested twin of
+  `Shaders.LitTexture`). The `VoxelWalkInfinite3D` sample grows a
+  translucent leaf canopy to show it off.
 - `SparseVoxelWorld` + `IVoxelGenerator`: dictionary-backed
   `IVoxelWorld` that lazily generates chunks on first read. Streaming is
   driven through the cell-based `IVoxelWorld.EnsureVoxels(range)` /

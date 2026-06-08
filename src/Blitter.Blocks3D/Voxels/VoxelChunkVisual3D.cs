@@ -28,12 +28,17 @@ internal sealed class VoxelChunkVisual3D : Visual3D, IChunkMeshBuilder
     // (cells whose VoxelType.Texture is null) is held separately so
     // the dictionary key stays non-nullable.
     private readonly Dictionary<Texture2D, TextureGroup> _groups = new(ReferenceEqualityComparer.Instance);
+    // Parallel bucket for alpha-cutout surfaces (foliage and the like):
+    // same source texture an opaque group would use, but a cutout
+    // material so the shader discards see-through texels.
+    private readonly Dictionary<Texture2D, TextureGroup> _cutoutGroups = new(ReferenceEqualityComparer.Instance);
     private TextureGroup? _untextured;
 
     // Sticky cache: the mesher walks all six faces of a cell in a row,
     // so most AddQuad calls hit the same source texture. Skips the
     // dictionary lookup for the common run.
     private Texture2D? _lastSource;
+    private bool _lastCutout;
     private MeshBuilder<LitTextureVertex3D>? _lastBuilder;
 
     public VoxelChunkVisual3D(VoxelChunkGrid grid)
@@ -75,6 +80,15 @@ internal sealed class VoxelChunkVisual3D : Visual3D, IChunkMeshBuilder
                 continue;
             renderer.DrawMesh(group.Builder.Flush(), group.Material, transform);
         }
+        // Cutout groups draw after the opaque ones. They write depth and
+        // discard see-through texels, so order against opaque geometry
+        // doesn't matter, but drawing opaque first helps early-Z.
+        foreach (var group in _cutoutGroups.Values)
+        {
+            if (group.Builder.IsEmpty)
+                continue;
+            renderer.DrawMesh(group.Builder.Flush(), group.Material, transform);
+        }
     }
 
     /// <summary>Forces a re-mesh on next draw.</summary>
@@ -92,7 +106,10 @@ internal sealed class VoxelChunkVisual3D : Visual3D, IChunkMeshBuilder
         _untextured?.Builder.Clear();
         foreach (var group in _groups.Values)
             group.Builder.Clear();
+        foreach (var group in _cutoutGroups.Values)
+            group.Builder.Clear();
         _lastSource = null;
+        _lastCutout = false;
         _lastBuilder = null;
         _builtVersion = 0;
         _built = false;
@@ -107,10 +124,13 @@ internal sealed class VoxelChunkVisual3D : Visual3D, IChunkMeshBuilder
         _untextured?.Builder.Clear();
         foreach (var group in _groups.Values)
             group.Builder.Clear();
+        foreach (var group in _cutoutGroups.Values)
+            group.Builder.Clear();
 
         // Empty groups are kept around so their mesh + GPU buffers can
         // be reused next rebuild when the same source texture reappears.
         _lastSource = null;
+        _lastCutout = false;
         _lastBuilder = null;
         VoxelMesher.Build(_grid, this);
         // Snapshot the version the mesh was built against.
@@ -120,54 +140,60 @@ internal sealed class VoxelChunkVisual3D : Visual3D, IChunkMeshBuilder
 
     void IChunkMeshBuilder.AddQuad(
         Texture2D? sourceTexture,
+        bool alphaCutout,
         in LitTextureVertex3D v0,
         in LitTextureVertex3D v1,
         in LitTextureVertex3D v2,
         in LitTextureVertex3D v3)
     {
-        ResolveBuilder(sourceTexture).AddQuad(in v0, in v1, in v2, in v3);
+        ResolveBuilder(sourceTexture, alphaCutout).AddQuad(in v0, in v1, in v2, in v3);
     }
 
     void IChunkMeshBuilder.AddTriangle(
         Texture2D? sourceTexture,
+        bool alphaCutout,
         in LitTextureVertex3D v0,
         in LitTextureVertex3D v1,
         in LitTextureVertex3D v2)
     {
-        ResolveBuilder(sourceTexture).AddTriangle(in v0, in v1, in v2);
+        ResolveBuilder(sourceTexture, alphaCutout).AddTriangle(in v0, in v1, in v2);
     }
 
-    private MeshBuilder<LitTextureVertex3D> ResolveBuilder(Texture2D? sourceTexture)
+    private MeshBuilder<LitTextureVertex3D> ResolveBuilder(Texture2D? sourceTexture, bool alphaCutout)
     {
         var builder = _lastBuilder;
-        if (builder is null || !ReferenceEquals(_lastSource, sourceTexture))
+        if (builder is null || !ReferenceEquals(_lastSource, sourceTexture) || _lastCutout != alphaCutout)
         {
-            builder = GetOrCreateGroup(sourceTexture).Builder;
+            builder = GetOrCreateGroup(sourceTexture, alphaCutout).Builder;
             _lastSource = sourceTexture;
+            _lastCutout = alphaCutout;
             _lastBuilder = builder;
         }
         return builder;
     }
 
-    private TextureGroup GetOrCreateGroup(Texture2D? sourceTexture)
+    private TextureGroup GetOrCreateGroup(Texture2D? sourceTexture, bool alphaCutout)
     {
+        // Untextured geometry can't be cutout (there's no alpha to test),
+        // so it always lands in the single opaque untextured group.
         if (sourceTexture is null)
-            return _untextured ??= new TextureGroup(null);
-        if (!_groups.TryGetValue(sourceTexture, out var group))
+            return _untextured ??= new TextureGroup(null, alphaCutout: false);
+        var dict = alphaCutout ? _cutoutGroups : _groups;
+        if (!dict.TryGetValue(sourceTexture, out var group))
         {
-            group = new TextureGroup(sourceTexture);
-            _groups.Add(sourceTexture, group);
+            group = new TextureGroup(sourceTexture, alphaCutout);
+            dict.Add(sourceTexture, group);
         }
         return group;
     }
 
     private sealed record TextureGroup(LitTextureMaterial Material, MeshBuilder<LitTextureVertex3D> Builder)
     {
-        public TextureGroup(Texture2D? sourceTexture)
+        public TextureGroup(Texture2D? sourceTexture, bool alphaCutout)
             : this(
                 sourceTexture is null
                     ? LitTextureMaterial.Default
-                    : new LitTextureMaterial { DiffuseTexture = sourceTexture },
+                    : new LitTextureMaterial { DiffuseTexture = sourceTexture, AlphaCutout = alphaCutout },
                 new MeshBuilder<LitTextureVertex3D>())
         {
         }
