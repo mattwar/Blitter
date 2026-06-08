@@ -56,14 +56,14 @@ public class ArrayVoxelWorldTests
     public void SetVoxel_RaisesSingleCellChange()
     {
         var world = MakeWorld();
-        VoxelChangeEventArgs? seen = null;
-        world.VoxelsChanged += (_, e) => seen = e;
+        VoxelBox? seen = null;
+        world.VoxelsChanged += (IVoxelWorld _, in VoxelBox e) => seen = e;
 
         world.SetVoxel(2, 3, 1, 1);
 
         Assert.NotNull(seen);
-        Assert.Equal((2, 3, 1, 2, 3, 1),
-            (seen!.MinX, seen.MinY, seen.MinZ, seen.MaxX, seen.MaxY, seen.MaxZ));
+        Assert.Equal(new VoxelCoord(2, 3, 1), seen!.Value.Min);
+        Assert.Equal(new VoxelCoord(2, 3, 1), seen.Value.Max);
     }
 
     [Fact]
@@ -90,15 +90,15 @@ public class ArrayVoxelWorldTests
     public void Fill_RaisesSingleBoundingBoxEvent()
     {
         var world = MakeWorld();
-        VoxelChangeEventArgs? seen = null;
+        VoxelBox? seen = null;
         var count = 0;
-        world.VoxelsChanged += (_, e) => { seen = e; count++; };
+        world.VoxelsChanged += (IVoxelWorld _, in VoxelBox e) => { seen = e; count++; };
 
         world.Fill(0, 0, 0, 2, 2, 2, 1);
 
         Assert.Equal(1, count);
-        Assert.Equal((0, 0, 0, 2, 2, 2),
-            (seen!.MinX, seen.MinY, seen.MinZ, seen.MaxX, seen.MaxY, seen.MaxZ));
+        Assert.Equal(new VoxelCoord(0, 0, 0), seen!.Value.Min);
+        Assert.Equal(new VoxelCoord(2, 2, 2), seen.Value.Max);
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class ArrayVoxelWorldTests
     {
         var world = MakeWorld();
         var raised = false;
-        world.VoxelsChanged += (_, _) => raised = true;
+        world.VoxelsChanged += (IVoxelWorld _, in VoxelBox _) => raised = true;
 
         var written = world.Fill(0, 0, 0, 1, 1, 1, 0); // already all air
 

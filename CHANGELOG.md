@@ -6,13 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - `SparseVoxelWorld` + `IVoxelGenerator`: dictionary-backed
-  `IVoxelWorld` that lazily generates chunks on first read and exposes
-  `EnsureChunk` / `UnloadChunk` for streaming.
-- `VoxelChunkSource3D`: `GeneratedChunkSource3D` that wraps each
-  voxel chunk in a `Chunk3D` with a `VoxelChunkBarrier3D`, bridging
-  voxels into `ChunkedPlayField3D`.
-- `GeneratedChunkSource3D.TrimChunksOutside(min, max)` + virtual
-  `OnChunkUnloaded(Chunk3D)` for bounded-memory streaming.
+  `IVoxelWorld` that lazily generates chunks on first read. Streaming is
+  driven through the cell-based `IVoxelWorld.EnsureVoxels(range)` /
+  `TrimVoxelsOutside(range)`, so consumers never need to know the world
+  is chunked. `SparseVoxelWorld` also exposes its own
+  `EnsureChunk` / `UnloadChunk` for direct use.
+- `VoxelChunkSource3D`: `GeneratedChunkSource3D` that buckets a slab of
+  voxels into each `Chunk3D` with a `VoxelChunkBarrier3D`, bridging
+  voxels into `ChunkedPlayField3D`. It picks its own cells-per-chunk and
+  routes `IVoxelWorld.VoxelsChanged` ranges into per-chunk
+  `VoxelChunkGrid.Version` bumps, so the playfield and voxel-world
+  chunkings stay independent and the world roots no chunk meshes.
+- `GeneratedChunkSource3D.TrimChunksOutside(min, max)` (virtual) +
+  virtual `OnChunkUnloaded(Chunk3D)` for bounded-memory streaming.
 - New sample: `samples/blocks/VoxelWalkInfinite3D.cs` — endless voxel
   world streamed around the player.
 - `Renderer3D.TextureSampling` (`ImageSampling.Linear` default,

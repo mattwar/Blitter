@@ -11,7 +11,7 @@ namespace Blitter.Blocks3D;
 /// the chunk's world-origin corner; hit shape and draw come from the
 /// base class's <see cref="Barrier3D.Visual"/> path.
 /// </summary>
-public class VoxelChunkBarrier3D : Barrier3D
+internal sealed class VoxelChunkBarrier3D : Barrier3D
 {
     private readonly VoxelChunkGrid _grid;
     private readonly VoxelHitShape3D _hitShape;

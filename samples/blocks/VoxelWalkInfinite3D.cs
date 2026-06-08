@@ -70,7 +70,7 @@ var grass = palette.Add(new VoxelType
 
 var generator = new TerrainGenerator(grassId: grass.Id, dirtId: dirt.Id, stoneId: stone.Id);
 var voxelWorld = new SparseVoxelWorld(palette, generator, ChunkCellsX, ChunkCellsY, ChunkCellsZ);
-var chunkSource = new VoxelChunkSource3D(voxelWorld, Vector3.One);
+var chunkSource = new VoxelChunkSource3D(voxelWorld, Vector3.One, ChunkCellsX, ChunkCellsY, ChunkCellsZ);
 
 var window = new Window3D
 {

@@ -10,7 +10,7 @@ namespace Blitter.Blocks3D;
 /// cells overlapping the other shape's bounding sphere so cost scales
 /// with the query, not the chunk size.
 /// </summary>
-public sealed class VoxelHitShape3D : HitShape3D
+internal sealed class VoxelHitShape3D : HitShape3D
 {
     private readonly VoxelChunkGrid _grid;
     private readonly Vector3 _halfCell;
@@ -18,11 +18,12 @@ public sealed class VoxelHitShape3D : HitShape3D
     private readonly BoundingSphere _localBoundary;
 
     // Tight Y band of solid cells: layers below _solidMinY and above
-    // _solidMaxY are all air, so queries can skip them outright. Lazy;
-    // -1/-1 means "rescan on next use". Invalidated by VoxelsChanged
-    // when the change bbox overlaps this chunk's XZ footprint.
-    private int _solidMinY = -1;
-    private int _solidMaxY = -1;
+    // _solidMaxY are all air, so queries can skip them outright. Cached
+    // against the chunk's change stamp; _bandVersion != _grid.Version
+    // forces a rescan (an edit may have added or removed solid layers).
+    private int _solidMinY;
+    private int _solidMaxY;
+    private int _bandVersion = -1;
 
     public VoxelHitShape3D(VoxelChunkGrid grid)
     {
@@ -31,22 +32,6 @@ public sealed class VoxelHitShape3D : HitShape3D
         _halfCell = grid.CellSize * 0.5f;
         _localSize = new Vector3(grid.CellsX, grid.CellsY, grid.CellsZ) * grid.CellSize;
         _localBoundary = new BoundingSphere(_localSize * 0.5f, _localSize.Length() * 0.5f);
-        grid.World.VoxelsChanged += OnVoxelsChanged;
-    }
-
-    private void OnVoxelsChanged(object? sender, VoxelChangeEventArgs e)
-    {
-        // Convert change bbox to chunk-local cells and reject if it
-        // misses this chunk's XZ footprint; Y range is what we're
-        // recomputing so we don't gate on it.
-        int lx0 = e.MinX - _grid.OriginCellX;
-        int lx1 = e.MaxX - _grid.OriginCellX;
-        int lz0 = e.MinZ - _grid.OriginCellZ;
-        int lz1 = e.MaxZ - _grid.OriginCellZ;
-        if (lx1 < 0 || lx0 >= _grid.CellsX || lz1 < 0 || lz0 >= _grid.CellsZ)
-            return;
-        _solidMinY = -1;
-        _solidMaxY = -1;
     }
 
     /// <summary>The shared per-chunk data this shape reads from.</summary>
@@ -201,7 +186,8 @@ public sealed class VoxelHitShape3D : HitShape3D
 
     private void EnsureSolidYBand(out int minY, out int maxY)
     {
-        if (_solidMinY >= 0)
+        var version = _grid.Version;
+        if (_bandVersion == version)
         {
             minY = _solidMinY;
             maxY = _solidMaxY;
@@ -222,6 +208,7 @@ public sealed class VoxelHitShape3D : HitShape3D
         // the loops entirely without rescanning every frame.
         _solidMinY = foundMax < 0 ? _grid.CellsY : foundMin;
         _solidMaxY = foundMax;
+        _bandVersion = version;
         minY = _solidMinY;
         maxY = _solidMaxY;
     }

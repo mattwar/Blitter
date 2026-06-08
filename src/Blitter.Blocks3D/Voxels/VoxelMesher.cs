@@ -5,13 +5,12 @@ using Blitter.Bits;
 namespace Blitter.Blocks3D;
 
 /// <summary>
-/// Receives one quad at a time from <see cref="VoxelMesher"/>. The
-/// four vertices are emitted in CCW order when viewed from outside
+/// Receives one quad at a time from <see cref="VoxelMesher"/>. 
+/// The four vertices are emitted in CCW order when viewed from outside
 /// the cell (<c>v0 → v1 → v2</c> winds in the direction of the face
-/// normal), so the sink can append two triangles
-/// <c>v0,v1,v2</c> and <c>v0,v2,v3</c> directly.
+/// normal), so the sink can append two triangles <c>v0,v1,v2</c> and <c>v0,v2,v3</c> directly.
 /// </summary>
-public interface IVoxelMeshSink
+internal interface IVoxelMeshSink
 {
     /// <summary>
     /// Routes a quad to the bucket keyed by <paramref name="sourceTexture"/>.
@@ -30,7 +29,7 @@ public interface IVoxelMeshSink
 /// into the supplied <see cref="IVoxelMeshSink"/>. Naive face culling
 /// only — every face whose neighbor cell is non-opaque is emitted.
 /// </summary>
-public static class VoxelMesher
+internal static class VoxelMesher
 {
     private static readonly Vector3[] _faceNormals =
     {

@@ -9,7 +9,7 @@ namespace Blitter.Blocks3D;
 /// Reads are forwarded straight to the world; neighbor lookups across
 /// chunk edges work for free because the world is OOB-safe.
 /// </summary>
-public sealed class VoxelChunkGrid
+internal sealed class VoxelChunkGrid
 {
     public VoxelChunkGrid(
         IVoxelWorld world,
@@ -65,11 +65,25 @@ public sealed class VoxelChunkGrid
     public VoxelPalette Palette => World.Palette;
 
     /// <summary>
+    /// Change stamp for this chunk's view of the world. Bumped (by the
+    /// owning <see cref="VoxelChunkSource3D"/>, in response to the world's
+    /// <see cref="IVoxelWorld.VoxelsChanged"/>) whenever a voxel this
+    /// chunk's mesh or collision reads — its own cells or the one-cell
+    /// skirt across each face — changes. Derived data snapshots the stamp
+    /// and rebuilds when it no longer matches. Only equality is defined.
+    /// </summary>
+    public int Version { get; private set; }
+
+    /// <summary>Advances <see cref="Version"/> to mark this chunk's
+    /// derived data (mesh, collision band) stale.</summary>
+    internal void BumpVersion() => Version++;
+
+    /// <summary>
     /// Voxel id at chunk-local cell <paramref name="x"/>,
     /// <paramref name="y"/>, <paramref name="z"/>. Coordinates outside
     /// the chunk are forwarded to the world, which returns air for
     /// cells beyond the world's own bounds.
     /// </summary>
     public int GetVoxel(int x, int y, int z) =>
-        World.GetVoxel(OriginCellX + x, OriginCellY + y, OriginCellZ + z);
+        World.GetVoxel(new VoxelCoord(OriginCellX + x, OriginCellY + y, OriginCellZ + z));
 }
