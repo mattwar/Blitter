@@ -30,13 +30,13 @@ public sealed class LitTextureMaterial : Material
     public Texture2D? DiffuseTexture { get; init; }
 
     /// <summary>
-    /// When true, fragments whose <see cref="DiffuseTexture"/> alpha is
-    /// below 0.5 are discarded rather than drawn, giving crisp
-    /// see-through holes (foliage, grates) that still write depth and
-    /// need no back-to-front sorting. When false (default) the alpha
-    /// channel is ignored for opaque draws.
+    /// How this surface's alpha is composited. <see cref="TransparencyMode.Opaque"/>
+    /// (default) ignores alpha; <see cref="TransparencyMode.Cutout"/>
+    /// discards texels below 0.5 alpha for crisp see-through holes; and
+    /// <see cref="TransparencyMode.Blend"/> alpha-blends the surface over
+    /// the scene behind it for tinted glass and the like.
     /// </summary>
-    public bool AlphaCutout { get; init; }
+    public TransparencyMode Transparency { get; init; } = TransparencyMode.Opaque;
 
     /// <summary>
     /// A featureless white material. Useful as a default.

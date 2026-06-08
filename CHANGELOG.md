@@ -5,15 +5,27 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- Alpha-cutout voxels for see-through surfaces like foliage:
-  `CubeVoxelShape(texture, alphaCutout: true)` draws a cube whose
-  texels below 0.5 alpha are discarded by the shader, leaving crisp
-  holes that still write depth and need no sorting. Pair with
-  `VoxelType.IsOpaque = false` so neighbors keep the faces they share
-  with it. Backed by a new `LitTextureMaterial.AlphaCutout` flag and a
-  `Shaders.LitTextureCutout` shader (an alpha-tested twin of
-  `Shaders.LitTexture`). The `VoxelWalkInfinite3D` sample grows a
-  translucent leaf canopy to show it off.
+- See-through voxels via a `TransparencyMode` on `CubeVoxelShape`
+  (`Opaque`, `Cutout`, `Blend`):
+  - `Cutout` discards texels below 0.5 alpha for crisp holes (foliage,
+    grates) that still write depth and need no sorting.
+  - `Blend` alpha-composites the surface over the scene behind it for
+    tinted glass, drawn after the opaque pass with depth writes off.
+  Pair either with `VoxelType.IsOpaque = false` so neighbors keep the
+  faces they share with the voxel. Two adjacent non-opaque voxels of
+  the *same* type now cull the doubled face between them (so a wall of
+  glass reads as a single surface). Backed by a new
+  `LitTextureMaterial.Transparency` property, a `Shaders.LitTextureCutout`
+  shader (an alpha-tested twin of `Shaders.LitTexture`), and a third
+  blend draw pass in the chunk visual. The `VoxelWalkInfinite3D` sample
+  grows alpha-cutout trees and a spawn hut with blended-glass windows.
+- Convenience `CubeVoxelShape` constructors that build the matching
+  `VoxelTexture` for you, covering the common per-face layouts without
+  naming a texture type: a single `Texture2D` (all faces, via the
+  existing implicit conversion); `(topBottom, sides)` for logs and
+  pillars; `(top, sides, bottom)` for grass-style blocks; and the full
+  six-face `(−X, +X, −Y, +Y, −Z, +Z)` set. Each also takes an optional
+  `TransparencyMode`.
 - `SparseVoxelWorld` + `IVoxelGenerator`: dictionary-backed
   `IVoxelWorld` that lazily generates chunks on first read. Streaming is
   driven through the cell-based `IVoxelWorld.EnsureVoxels(range)` /

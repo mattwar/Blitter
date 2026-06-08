@@ -16,13 +16,12 @@ internal interface IChunkMeshBuilder
     /// (null means untextured). The four vertices wind CCW seen from
     /// outside the cell (<c>v0 → v1 → v2</c> follows the face normal),
     /// so the builder appends triangles <c>v0,v1,v2</c> and <c>v0,v2,v3</c>.
-    /// When <paramref name="alphaCutout"/> is true the quad is drawn with
-    /// alpha-cutout (see-through holes where the texture alpha is low)
-    /// rather than as a solid surface.
+    /// <paramref name="transparency"/> selects how the quad's alpha is
+    /// composited (opaque, see-through cutout, or alpha blend).
     /// </summary>
     void AddQuad(
         Texture2D? sourceTexture,
-        bool alphaCutout,
+        TransparencyMode transparency,
         in LitTextureVertex3D v0,
         in LitTextureVertex3D v1,
         in LitTextureVertex3D v2,
@@ -33,12 +32,12 @@ internal interface IChunkMeshBuilder
     /// (null means untextured). The three vertices wind CCW seen from
     /// outside the surface (<c>v0 → v1 → v2</c> follows the face normal).
     /// For shapes that aren't built from quads — slopes, smooth
-    /// surfaces, imported meshes. <paramref name="alphaCutout"/> selects
-    /// the alpha-cutout surface just like <see cref="AddQuad"/>.
+    /// surfaces, imported meshes. <paramref name="transparency"/> selects
+    /// the surface's compositing just like <see cref="AddQuad"/>.
     /// </summary>
     void AddTriangle(
         Texture2D? sourceTexture,
-        bool alphaCutout,
+        TransparencyMode transparency,
         in LitTextureVertex3D v0,
         in LitTextureVertex3D v1,
         in LitTextureVertex3D v2);
@@ -83,6 +82,23 @@ internal readonly struct VoxelMeshContext
         var off = _faceOffsets[(int)face];
         return _grid.Palette.IsOpaque(_grid.GetVoxel(X + off.DX, Y + off.DY, Z + off.DZ));
     }
+
+    /// <summary>
+    /// True when the face toward <paramref name="face"/> can be skipped
+    /// for a cell holding <paramref name="ownVoxel"/>: either the
+    /// neighbor is opaque, or it's the same voxel as this one (so two
+    /// adjacent panes of the same translucent block don't draw the
+    /// doubled interior face between them).
+    /// </summary>
+    public bool IsNeighborOccluding(VoxelFace face, int ownVoxel)
+    {
+        var off = _faceOffsets[(int)face];
+        int neighbor = _grid.GetVoxel(X + off.DX, Y + off.DY, Z + off.DZ);
+        return neighbor == ownVoxel || _grid.Palette.IsOpaque(neighbor);
+    }
+
+    /// <summary>The voxel id stored in this cell.</summary>
+    public int Voxel => _grid.GetVoxel(X, Y, Z);
 }
 
 /// <summary>

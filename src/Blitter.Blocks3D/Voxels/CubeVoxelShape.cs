@@ -21,24 +21,74 @@ public sealed class CubeVoxelShape : VoxelShape
     public VoxelTexture? Texture { get; }
 
     /// <summary>
-    /// When true, the cube is drawn with alpha-cutout: texels whose
-    /// texture alpha is below 0.5 are discarded, leaving crisp
-    /// see-through holes (foliage, grates). The faces still write depth
-    /// and need no sorting. Pair with <see cref="VoxelType.IsOpaque"/>
-    /// set to false so neighbors keep the faces they share with this
-    /// cube.
+    /// How the cube's faces composite their texture alpha.
+    /// <see cref="TransparencyMode.Opaque"/> (default) ignores alpha;
+    /// <see cref="TransparencyMode.Cutout"/> discards texels below 0.5
+    /// alpha for crisp holes (foliage); <see cref="TransparencyMode.Blend"/>
+    /// alpha-blends for tinted glass. For the see-through modes, pair with
+    /// <see cref="VoxelType.IsOpaque"/> set to false so neighbors keep the
+    /// faces they share with this cube.
     /// </summary>
-    public bool AlphaCutout { get; }
+    public TransparencyMode Transparency { get; }
 
     /// <summary>
-    /// Creates a cube textured by <paramref name="texture"/>. Set
-    /// <paramref name="alphaCutout"/> to draw it as a see-through
-    /// alpha-cutout surface.
+    /// Creates a cube textured by <paramref name="texture"/>. Pass a
+    /// <paramref name="transparency"/> mode to draw it as a see-through
+    /// cutout or alpha-blended surface. A single <see cref="Texture2D"/>
+    /// also binds here (via the implicit conversion to
+    /// <see cref="VoxelTexture"/>) for the all-faces-the-same case.
     /// </summary>
-    public CubeVoxelShape(VoxelTexture? texture, bool alphaCutout = false)
+    public CubeVoxelShape(VoxelTexture? texture, TransparencyMode transparency = TransparencyMode.Opaque)
     {
         Texture = texture;
-        AlphaCutout = alphaCutout;
+        Transparency = transparency;
+    }
+
+    /// <summary>
+    /// Creates a cube with one texture on the top and bottom caps
+    /// (<paramref name="topBottom"/>) and another shared by the four
+    /// sides (<paramref name="sides"/>). The classic log / pillar layout.
+    /// </summary>
+    public CubeVoxelShape(
+        Texture2D? topBottom,
+        Texture2D? sides,
+        TransparencyMode transparency = TransparencyMode.Opaque)
+        : this(new TopSideBottomVoxelTexture(topBottom, sides, topBottom), transparency)
+    {
+    }
+
+    /// <summary>
+    /// Creates a cube with a distinct <paramref name="top"/>,
+    /// <paramref name="sides"/>, and <paramref name="bottom"/> texture.
+    /// The classic grass-block layout. Parameter order mirrors
+    /// <see cref="TopSideBottomVoxelTexture"/> (top, sides, bottom).
+    /// </summary>
+    public CubeVoxelShape(
+        Texture2D? top,
+        Texture2D? sides,
+        Texture2D? bottom,
+        TransparencyMode transparency = TransparencyMode.Opaque)
+        : this(new TopSideBottomVoxelTexture(top, sides, bottom), transparency)
+    {
+    }
+
+    /// <summary>
+    /// Creates a cube with a separately declared texture for each of the
+    /// six faces, addressed in <see cref="VoxelFace"/> order
+    /// (−X, +X, −Y, +Y, −Z, +Z).
+    /// </summary>
+    public CubeVoxelShape(
+        Texture2D? negativeX,
+        Texture2D? positiveX,
+        Texture2D? negativeY,
+        Texture2D? positiveY,
+        Texture2D? negativeZ,
+        Texture2D? positiveZ,
+        TransparencyMode transparency = TransparencyMode.Opaque)
+        : this(
+            new SixFaceVoxelTexture(negativeX, positiveX, negativeY, positiveY, negativeZ, positiveZ),
+            transparency)
+    {
     }
 
     /// <inheritdoc/>
@@ -73,20 +123,24 @@ public sealed class CubeVoxelShape : VoxelShape
     internal override void Build(in VoxelMeshContext context, IChunkMeshBuilder builder)
     {
         var cellSize = context.CellSize;
+        // Same-type culling matters for the see-through modes: two
+        // adjacent glass cubes shouldn't draw the doubled face between
+        // them. For opaque cubes this is equivalent to IsNeighborOpaque.
+        int ownVoxel = context.Voxel;
         for (int face = 0; face < 6; face++)
         {
-            if (context.IsNeighborOpaque((VoxelFace)face))
+            if (context.IsNeighborOccluding((VoxelFace)face, ownVoxel))
                 continue;
 
             var (source, u0, v0, u1, v1) = ResolveUvRect(Texture?.GetFace((VoxelFace)face));
-            EmitFace(builder, source, AlphaCutout, context.X, context.Y, context.Z, cellSize, face, u0, v0, u1, v1);
+            EmitFace(builder, source, Transparency, context.X, context.Y, context.Z, cellSize, face, u0, v0, u1, v1);
         }
     }
 
     private static void EmitFace(
         IChunkMeshBuilder builder,
         Texture2D? sourceTexture,
-        bool alphaCutout,
+        TransparencyMode transparency,
         int cellX, int cellY, int cellZ,
         Vector3 cellSize,
         int face,
@@ -124,7 +178,7 @@ public sealed class CubeVoxelShape : VoxelShape
         var v1v = new LitTextureVertex3D(c1, normal, uv1);
         var v2v = new LitTextureVertex3D(c2, normal, uv2);
         var v3v = new LitTextureVertex3D(c3, normal, uv3);
-        builder.AddQuad(sourceTexture, alphaCutout, in v0v, in v1v, in v2v, in v3v);
+        builder.AddQuad(sourceTexture, transparency, in v0v, in v1v, in v2v, in v3v);
     }
 
     private static (Texture2D? Source, float U0, float V0, float U1, float V1) ResolveUvRect(Texture2D? texture)
