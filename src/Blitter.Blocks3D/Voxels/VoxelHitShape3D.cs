@@ -37,6 +37,13 @@ internal sealed class VoxelHitShape3D : HitShape3D
     /// <summary>The shared per-chunk data this shape reads from.</summary>
     public VoxelChunkGrid Grid => _grid;
 
+    /// <summary>
+    /// Drops the cached solid-Y band so it is rescanned on the next query.
+    /// Used when the owning chunk is recycled onto a new coord (the grid's
+    /// data changed wholesale) and the band can no longer be trusted.
+    /// </summary>
+    internal void Invalidate() => _bandVersion = -1;
+
     public override BoundingSphere LocalBoundary => _localBoundary;
 
     // Conservative upper bound: total cells in the chunk. Counting

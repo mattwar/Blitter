@@ -56,7 +56,7 @@ public class VoxelChunkSource3D : ChunkSource3D
     public override Vector3 ChunkSize { get; }
 
     /// <inheritdoc/>
-    protected override Chunk3D? GenerateChunk(in ChunkCoord coord)
+    protected override Chunk3D? CreateChunk(in ChunkCoord coord)
     {
         // Materialize exactly the voxels this playfield chunk spans. The
         // world may generate more (its chunks can be larger/misaligned);
@@ -71,6 +71,29 @@ public class VoxelChunkSource3D : ChunkSource3D
         chunk.AddBarrier(barrier);
         // Registered after EnsureVoxels so the new grid isn't bumped by
         // its own generation event; it starts unbuilt and meshes anyway.
+        _grids[coord] = grid;
+        return chunk;
+    }
+
+    /// <inheritdoc/>
+    protected override bool PoolsChunks => true;
+
+    /// <inheritdoc/>
+    protected override Chunk3D? ReinitializeChunk(Chunk3D chunk, in ChunkCoord coord)
+    {
+        // The pooled chunk kept its single VoxelChunkBarrier3D (and the
+        // grid + visual + hit shape hanging off it). Retarget the grid to
+        // the new coord, reposition and reset the barrier, materialize the
+        // new region, and re-route change notifications to it. The mesh and
+        // collision buffers are reused in place; only the contents change.
+        var barrier = (VoxelChunkBarrier3D)chunk.Barriers[0];
+        var grid = barrier.Grid;
+        grid.Reinitialize(coord);
+        barrier.ResetForReuse();
+
+        int x0 = coord.X * _cellsX, y0 = coord.Y * _cellsY, z0 = coord.Z * _cellsZ;
+        World.EnsureVoxels(new VoxelBox(x0, y0, z0, x0 + _cellsX - 1, y0 + _cellsY - 1, z0 + _cellsZ - 1));
+
         _grids[coord] = grid;
         return chunk;
     }

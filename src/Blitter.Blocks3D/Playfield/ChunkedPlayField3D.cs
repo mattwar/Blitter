@@ -255,12 +255,29 @@ public interface IChunkSource3D : ISpriteHost3D
 /// Basic <see cref="IChunkSource3D"/> implementation: lazily generates each
 /// chunk on first access, caches it, and can evict chunks outside an active
 /// range. Also acts as the <see cref="ISpriteHost3D"/> for every sprite in any
-/// of its chunks. Subclasses supply <see cref="GenerateChunk"/>.
+/// of its chunks. Subclasses supply <see cref="CreateChunk"/>.
 /// </summary>
 public abstract class ChunkSource3D : IChunkSource3D
 {
     private readonly Dictionary<ChunkCoord, IChunk3D> _chunks = new();
     private readonly List<ChunkCoord> _trimScratch = new();
+    private readonly Stack<Chunk3D> _pool = new();
+
+    /// <summary>Number of chunks currently loaded (in the active window).</summary>
+    public int ActiveChunkCount => _chunks.Count;
+
+    /// <summary>Number of evicted chunks held in the reuse pool.</summary>
+    public int PooledChunkCount => _pool.Count;
+
+    /// <summary>
+    /// The total number of chunk allocations. 
+    /// </summary>
+    public int ChunksAllocated { get; private set; }
+
+    /// <summary>
+    /// The total number of times a pooled chunk reused.
+    /// </summary>
+    public int ChunksReused { get; private set; }
 
     /// <summary>
     /// The size of each chunk in world units.
@@ -292,17 +309,42 @@ public abstract class ChunkSource3D : IChunkSource3D
     /// <summary>
     /// Gets the chunk at the given chunk coordinates, generating and
     /// caching it on first access. Returns null when
-    /// <see cref="GenerateChunk"/> declines to populate the coord.
+    /// <see cref="CreateChunk"/> declines to populate the coord.
     /// </summary>
     public IChunk3D? GetChunk(in ChunkCoord coord)
     {
         if (!_chunks.TryGetValue(coord, out var chunk))
         {
-            chunk = GenerateChunk(coord);
+            chunk = CreateOrReuseChunk(coord);
             if (chunk != null)
                 _chunks[coord] = chunk;
         }
         return chunk;
+    }
+
+    // Reuses a pooled chunk when one is available and the source opts into
+    // pooling; otherwise generates a fresh chunk. A pooled chunk is reset
+    // (sprites cleared, coord retargeted) before the source repopulates it
+    // via ReinitializeChunk.
+    private Chunk3D? CreateOrReuseChunk(in ChunkCoord coord)
+    {
+        if (PoolsChunks && _pool.Count > 0)
+        {
+            var pooled = _pool.Pop();
+            pooled.ResetForReuse(coord);
+            var reused = ReinitializeChunk(pooled, coord);
+            if (reused != null)
+            {
+                ChunksReused++;
+                return reused;
+            }
+            // Source declined to reuse this instance for this coord; drop
+            // it and generate fresh.
+        }
+        var generated = CreateChunk(coord);
+        if (generated != null)
+            ChunksAllocated++;
+        return generated;
     }
 
     /// <summary>
@@ -316,10 +358,29 @@ public abstract class ChunkSource3D : IChunkSource3D
     }
 
     /// <summary>
-    /// Produces the chunk at <paramref name="coord"/> on first access.
+    /// Creates a chunk for the coordinates.
     /// Return <c>null</c> for coords this source doesn't populate.
     /// </summary>
-    protected abstract Chunk3D? GenerateChunk(in ChunkCoord coord);
+    protected abstract Chunk3D? CreateChunk(in ChunkCoord coord);
+
+    /// <summary>
+    /// When <c>true</c>, chunks evicted by <see cref="TrimChunksOutside"/>
+    /// are retained in a pool and offered back to
+    /// <see cref="ReinitializeChunk"/> on a later load instead of being
+    /// dropped. Defaults to <c>false</c>. Sources that implement
+    /// <see cref="ReinitializeChunk"/> override this to opt in.
+    /// </summary>
+    protected virtual bool PoolsChunks => false;
+
+    /// <summary>
+    /// Repopulates a pooled <paramref name="chunk"/> for <paramref name="coord"/>,
+    /// reusing its retained structures and buffers in place of a fresh
+    /// <see cref="CreateChunk"/>. The chunk has already been reset (sprites
+    /// cleared, coord retargeted) and keeps its barriers. Return the reused
+    /// chunk, or <c>null</c> to decline (the instance is then dropped and a
+    /// fresh chunk generated). Default returns <c>null</c>.
+    /// </summary>
+    protected virtual Chunk3D? ReinitializeChunk(Chunk3D chunk, in ChunkCoord coord) => null;
     /// <summary>
     /// Drops every loaded chunk whose coord falls outside the inclusive box
     /// <paramref name="min"/>..<paramref name="max"/>. Call this after updating
@@ -346,6 +407,8 @@ public abstract class ChunkSource3D : IChunkSource3D
             var chunk = _chunks[key];
             _chunks.Remove(key);
             OnChunkUnloaded(chunk);
+            if (PoolsChunks && chunk is Chunk3D pooled)
+                _pool.Push(pooled);
         }
     }
 
@@ -478,7 +541,7 @@ public class Chunk3D : IChunk3D
     public IChunkSource3D Source { get; }
 
     /// <summary>This chunk's integer coordinates in the source's grid.</summary>
-    public ChunkCoord Coord { get; }
+    public ChunkCoord Coord { get; private set; }
 
     /// <summary>Sprites currently bucketed in this chunk.</summary>
     public IReadOnlyList<Sprite3D> Sprites => _sprites;
@@ -573,6 +636,25 @@ public class Chunk3D : IChunk3D
     /// iterating the sprite/barrier lists.
     /// </summary>
     public void BeginFrame() => _updating = true;
+
+    /// <summary>
+    /// Resets this chunk so it can be recycled onto <paramref name="coord"/>
+    /// from a source's pool. Clears the sprite bucket and any deferred
+    /// mutations (keeping the lists' capacity), and retargets
+    /// <see cref="Coord"/>. Barriers are intentionally retained so the
+    /// source can reuse the per-chunk barrier (and the mesh/collision
+    /// buffers hanging off it) rather than rebuild it.
+    /// </summary>
+    internal void ResetForReuse(ChunkCoord coord)
+    {
+        Coord = coord;
+        _updating = false;
+        _sprites.Clear();
+        _pendingAddSprites.Clear();
+        _pendingRemoveSprites.Clear();
+        _pendingAddBarriers.Clear();
+        _pendingRemoveBarriers.Clear();
+    }
 
     /// <summary>
     /// Closes the frame and flushes pending adds/removes. Called by the

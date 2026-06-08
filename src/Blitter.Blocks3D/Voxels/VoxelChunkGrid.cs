@@ -41,7 +41,7 @@ internal sealed class VoxelChunkGrid
     public IVoxelWorld World { get; }
 
     /// <summary>Chunk coordinate within its source.</summary>
-    public ChunkCoord Coord { get; }
+    public ChunkCoord Coord { get; private set; }
 
     /// <summary>Cells along the X axis.</summary>
     public int CellsX { get; }
@@ -54,12 +54,12 @@ internal sealed class VoxelChunkGrid
     public Vector3 CellSize { get; }
 
     /// <summary>World-voxel coordinate of the chunk's local (0,0,0) cell.</summary>
-    public int OriginCellX { get; }
-    public int OriginCellY { get; }
-    public int OriginCellZ { get; }
+    public int OriginCellX { get; private set; }
+    public int OriginCellY { get; private set; }
+    public int OriginCellZ { get; private set; }
 
     /// <summary>World-space position of the chunk's local origin corner.</summary>
-    public Vector3 WorldOrigin { get; }
+    public Vector3 WorldOrigin { get; private set; }
 
     /// <summary>Palette of the underlying world.</summary>
     public VoxelPalette Palette => World.Palette;
@@ -77,6 +77,24 @@ internal sealed class VoxelChunkGrid
     /// <summary>Advances <see cref="Version"/> to mark this chunk's
     /// derived data (mesh, collision band) stale.</summary>
     internal void BumpVersion() => Version++;
+
+    /// <summary>
+    /// Retargets this grid to a new <paramref name="coord"/>, recomputing
+    /// its origin and resetting <see cref="Version"/>. Used when a pooled
+    /// chunk is recycled onto a different coordinate so the grid (and the
+    /// mesh/collision buffers hanging off it) can be reused in place. The
+    /// world, cell dimensions, and cell size are fixed for the source and
+    /// stay unchanged.
+    /// </summary>
+    internal void Reinitialize(ChunkCoord coord)
+    {
+        Coord = coord;
+        OriginCellX = coord.X * CellsX;
+        OriginCellY = coord.Y * CellsY;
+        OriginCellZ = coord.Z * CellsZ;
+        WorldOrigin = new Vector3(OriginCellX, OriginCellY, OriginCellZ) * CellSize;
+        Version = 0;
+    }
 
     /// <summary>
     /// Voxel id at chunk-local cell <paramref name="x"/>,

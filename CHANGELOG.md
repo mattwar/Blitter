@@ -19,6 +19,14 @@ All notable changes to this project will be documented in this file.
   chunkings stay independent and the world roots no chunk meshes.
 - `GeneratedChunkSource3D.TrimChunksOutside(min, max)` (virtual) +
   virtual `OnChunkUnloaded(Chunk3D)` for bounded-memory streaming.
+- `ChunkSource3D` chunk pooling: chunks evicted by `TrimChunksOutside`
+  are retained and recycled onto new coords on a later load instead of
+  being dropped, via opt-in `PoolsChunks` + a `ReinitializeChunk(chunk,
+  coord)` hook. `VoxelChunkSource3D` opts in and reuses each chunk's
+  `VoxelChunkBarrier3D` (and its grid, mesh, and collision buffers) in
+  place — `MeshBuilder` buffers grow to a high-water mark and then stop
+  reallocating — so a viewer oscillating across a chunk boundary no
+  longer re-allocates and re-meshes the same chunk repeatedly.
 - New sample: `samples/blocks/VoxelWalkInfinite3D.cs` — endless voxel
   world streamed around the player.
 - `Renderer3D.TextureSampling` (`ImageSampling.Linear` default,
@@ -34,7 +42,7 @@ All notable changes to this project will be documented in this file.
   mouse-look behavior with a coyote-window jump grace, configurable
   key bindings, and an optional `Camera3D` it slaves to the sprite's
   eye each frame. Replaces the local copies in
-  `samples/blocks/TerrainWalk3D.cs` and `samples/blocks/VoxelWalk3D.cs`.
+  `samples/blocks/TerrainWalk3D.cs`.
 - `Blitter.Blocks3D` barriers: `SphereBarrier3D`, `WallBarrier3D`
   (finite oriented rectangle with `OneSided` flag and
   `Floor`/`Ceiling`/`Vertical` helpers), `BoxBarrier3D` (axis-aligned

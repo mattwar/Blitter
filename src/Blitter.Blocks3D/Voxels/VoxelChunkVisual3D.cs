@@ -80,6 +80,24 @@ internal sealed class VoxelChunkVisual3D : Visual3D, IVoxelMeshSink
     /// <summary>Forces a re-mesh on next draw.</summary>
     public void Invalidate() => _built = false;
 
+    /// <summary>
+    /// Resets this visual so its owning chunk can be recycled onto a new
+    /// coord. Clears every texture group's buffered geometry but keeps the
+    /// <see cref="MeshBuilder{TVertex}"/> instances (and their grown GPU
+    /// buffers) alive for reuse, and marks the mesh unbuilt so it re-meshes
+    /// the recycled grid's data on the next draw.
+    /// </summary>
+    internal void ResetForReuse()
+    {
+        _untextured?.Builder.Clear();
+        foreach (var group in _groups.Values)
+            group.Builder.Clear();
+        _lastSource = null;
+        _lastBuilder = null;
+        _builtVersion = 0;
+        _built = false;
+    }
+
     // internal for tests: true when the mesh is stale relative to the
     // current grid version.
     internal bool NeedsRebuild() => !_built || _grid.Version != _builtVersion;
