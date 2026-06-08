@@ -63,9 +63,10 @@ var grass = palette.Add(new VoxelType
 {
     Id = 3,
     Name = "grass",
-    TopTexture    = grassTopTex,
-    SideTexture   = grassSideTex,
-    BottomTexture = dirtTex,
+    Texture = new TopSideBottomVoxelTexture(
+        top: grassTopTex,
+        side: grassSideTex,
+        bottom: dirtTex),
 });
 
 var generator = new TerrainGenerator(grassId: grass.Id, dirtId: dirt.Id, stoneId: stone.Id);

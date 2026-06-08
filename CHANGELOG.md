@@ -33,11 +33,15 @@ All notable changes to this project will be documented in this file.
   `Nearest` for crisp pixel-art / Minecraft-style atlases). Linear
   keeps the existing mipmapped + anisotropic sampler; nearest is
   point-sampled with no mip blending and no anisotropy.
-- `VoxelType` per-face textures: `TopTexture`, `BottomTexture`,
-  `SideTexture` (in addition to `Texture`). When only one is set every
-  face resolves to it; for variation set each side explicitly.
-  `VoxelMesher` now resolves the UV rect per face via
-  `VoxelType.GetFaceTexture(int face)`.
+- `VoxelType.Texture` is now a `VoxelTexture` abstraction (in
+  `Blitter.Blocks3D`) addressing faces by the local `VoxelFace` enum
+  (`NegativeX`..`PositiveZ`). Three variants: `UniformVoxelTexture`
+  (one picture on all six faces; a bare `Texture2D` implicitly
+  converts to this), `TopSideBottomVoxelTexture` (the grass-block
+  layout), and `SixFaceVoxelTexture` (every face declared separately).
+  Replaces the former `TopTexture` / `BottomTexture` / `SideTexture`
+  properties on `VoxelType`. `VoxelMesher` resolves the per-face UV
+  rect via `VoxelType.GetFaceTexture(int face)` as before.
 - `WalkController3D` (`Blitter.Blocks3D`): first-person walk + jump +
   mouse-look behavior with a coyote-window jump grace, configurable
   key bindings, and an optional `Camera3D` it slaves to the sprite's
