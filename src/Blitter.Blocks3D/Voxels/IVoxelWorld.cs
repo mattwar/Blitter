@@ -1,61 +1,74 @@
 namespace Blitter.Blocks3D;
 
 /// <summary>
-/// The source-of-truth voxel grid for a world. Implementations decide
-/// how cells are stored — flat array, chunked dictionary, sparse octree,
-/// streamed from disk, etc. Coordinates are world-voxel coordinates
-/// (each unit is one cell), not chunk-relative.
+/// The voxel grid for a world.
 /// </summary>
 public interface IVoxelWorld
 {
-    /// <summary>Palette resolving every id returned by <see cref="GetVoxel"/>.</summary>
+    /// <summary>
+    /// Palette resolving every id returned by <see cref="GetVoxel"/>.
+    /// </summary>
     VoxelPalette Palette { get; }
 
     /// <summary>
-    /// Voxel id at <paramref name="x"/>, <paramref name="y"/>,
-    /// <paramref name="z"/>. Out-of-bounds reads return
-    /// <c>0</c> (air) so meshers and collision can probe neighbor
-    /// cells without bounds checking.
+    /// Gets the voxel id at <paramref name="coord"/>.
+    /// Out-of-bounds reads return <c>0</c> (air).
     /// </summary>
-    int GetVoxel(int x, int y, int z);
+    int GetVoxel(VoxelCoord coord);
 
     /// <summary>
-    /// Sets the voxel at <paramref name="x"/>, <paramref name="y"/>,
-    /// <paramref name="z"/> to <paramref name="id"/>. 
-    /// Returns <c>true</c> if the cell actually changed. Out-of-bounds writes
-    /// return <c>false</c>.
+    /// Sets the voxel at <paramref name="coord"/>. 
+    /// Out-of-bounds writes return <c>false</c>.
     /// </summary>
-    bool SetVoxel(int x, int y, int z, int id);
+    bool SetVoxel(VoxelCoord coord, int id);
 
     /// <summary>
-    /// Raised when one or more cells change. 
-    /// Subscribers (typically <c>VoxelChunkSource3D</c>) mark affected chunks dirty.
-    /// The <see cref="VoxelChangeEventArgs"/> reports a bounding box of
-    /// changed cells so subscribers can compute which chunks to
-    /// invalidate without per-cell overhead during bulk edits.
+    /// Raised when one or more voxels change or when a region is first materialized.
     /// </summary>
-    event EventHandler<VoxelChangeEventArgs>? VoxelsChanged;
+    event VoxelsChangedHandler? VoxelsChanged;
+
+    /// <summary>
+    /// Ensures every voxel in the inclusive <paramref name="range"/> is ready to be accessed.
+    /// This is primarily an affordance for chunked or streamed implementations to pre-load/pre-generate the region.
+    /// </summary>
+    void EnsureVoxels(in VoxelBox range);
+
+    /// <summary>
+    /// Tells the world that the voxels outside <paramref name="range"/> are not in current use
+    /// and can be discarded/unloaded.
+    /// </summary>
+    void TrimVoxelsOutside(in VoxelBox range);
 }
 
 /// <summary>
-/// Inclusive integer bounding box of changed voxel cells.
+/// Handler for <see cref="IVoxelWorld.VoxelsChanged"/>.
 /// </summary>
-public sealed class VoxelChangeEventArgs : EventArgs
+public delegate void VoxelsChangedHandler(IVoxelWorld world, in VoxelBox change);
+
+/// <summary>
+/// A single voxel cell coordinate in world-voxel space (one unit per cell).
+/// </summary>
+public readonly record struct VoxelCoord(int X, int Y, int Z);
+
+/// <summary>
+/// An inclusive box of voxel cells
+/// </summary>
+public readonly record struct VoxelBox(VoxelCoord Min, VoxelCoord Max)
 {
-    public int MinX { get; }
-    public int MinY { get; }
-    public int MinZ { get; }
-    public int MaxX { get; }
-    public int MaxY { get; }
-    public int MaxZ { get; }
+    /// <summary>Builds a box from inclusive min/max cell components.</summary>
+    public VoxelBox(int minX, int minY, int minZ, int maxX, int maxY, int maxZ)
+        : this(new VoxelCoord(minX, minY, minZ), new VoxelCoord(maxX, maxY, maxZ)) { }
 
-    public VoxelChangeEventArgs(int minX, int minY, int minZ, int maxX, int maxY, int maxZ)
-    {
-        MinX = minX; MinY = minY; MinZ = minZ;
-        MaxX = maxX; MaxY = maxY; MaxZ = maxZ;
-    }
+    /// <summary>A degenerate box covering the single cell <paramref name="coord"/>.</summary>
+    public static VoxelBox Single(VoxelCoord coord) => new(coord, coord);
 
-    /// <summary>Convenience for the common single-cell case.</summary>
-    public static VoxelChangeEventArgs Single(int x, int y, int z) =>
-        new(x, y, z, x, y, z);
+    /// <summary>A degenerate box covering the single cell (x, y, z).</summary>
+    public static VoxelBox Single(int x, int y, int z) =>
+        new(new VoxelCoord(x, y, z), new VoxelCoord(x, y, z));
+
+    /// <summary>True when this box and <paramref name="other"/> share at least one cell.</summary>
+    public bool Intersects(in VoxelBox other) =>
+        Min.X <= other.Max.X && Max.X >= other.Min.X &&
+        Min.Y <= other.Max.Y && Max.Y >= other.Min.Y &&
+        Min.Z <= other.Max.Z && Max.Z >= other.Min.Z;
 }

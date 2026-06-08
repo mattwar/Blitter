@@ -38,26 +38,28 @@ public sealed class ArrayVoxelWorld : IVoxelWorld
     public VoxelPalette Palette { get; }
 
     /// <inheritdoc/>
-    public event EventHandler<VoxelChangeEventArgs>? VoxelsChanged;
+    public event VoxelsChangedHandler? VoxelsChanged;
 
     /// <inheritdoc/>
-    public int GetVoxel(int x, int y, int z)
+    public int GetVoxel(VoxelCoord coord)
     {
+        var (x, y, z) = coord;
         if ((uint)x >= (uint)Width || (uint)y >= (uint)Height || (uint)z >= (uint)Depth)
             return 0;
         return _cells[Index(x, y, z)];
     }
 
     /// <inheritdoc/>
-    public bool SetVoxel(int x, int y, int z, int id)
+    public bool SetVoxel(VoxelCoord coord, int id)
     {
+        var (x, y, z) = coord;
         if ((uint)x >= (uint)Width || (uint)y >= (uint)Height || (uint)z >= (uint)Depth)
             return false;
         var i = Index(x, y, z);
         if (_cells[i] == id)
             return false;
         _cells[i] = id;
-        VoxelsChanged?.Invoke(this, VoxelChangeEventArgs.Single(x, y, z));
+        VoxelsChanged?.Invoke(this, VoxelBox.Single(coord));
         return true;
     }
 
@@ -93,8 +95,20 @@ public sealed class ArrayVoxelWorld : IVoxelWorld
         }
 
         if (written > 0)
-            VoxelsChanged?.Invoke(this, new VoxelChangeEventArgs(x0, y0, z0, x1, y1, z1));
+        {
+            VoxelsChanged?.Invoke(this, new VoxelBox(x0, y0, z0, x1, y1, z1));
+        }
         return written;
+    }
+
+    /// <summary>The whole array is always materialized, so this is a no-op.</summary>
+    public void EnsureVoxels(in VoxelBox range)
+    {
+    }
+
+    /// <summary>Storage is fixed-size and never released, so this is a no-op.</summary>
+    public void TrimVoxelsOutside(in VoxelBox range)
+    {
     }
 
     // Row-major: x varies fastest (best cache locality for x-axis scans).

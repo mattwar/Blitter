@@ -11,7 +11,7 @@ namespace Blitter.Blocks3D;
 /// the chunk's world-origin corner; hit shape and draw come from the
 /// base class's <see cref="Barrier3D.Visual"/> path.
 /// </summary>
-public class VoxelChunkBarrier3D : Barrier3D
+internal sealed class VoxelChunkBarrier3D : Barrier3D
 {
     private readonly VoxelChunkGrid _grid;
     private readonly VoxelHitShape3D _hitShape;
@@ -35,4 +35,16 @@ public class VoxelChunkBarrier3D : Barrier3D
 
     /// <summary>Bucketed mesh visual built from the same grid as the hit shape.</summary>
     public VoxelChunkVisual3D VoxelVisual => _visual;
+
+    /// <summary>
+    /// Repositions this barrier onto its grid's (freshly retargeted) origin
+    /// and resets its visual and hit shape for reuse. Call after the shared
+    /// <see cref="VoxelChunkGrid"/> has been reinitialized to a new coord.
+    /// </summary>
+    internal void ResetForReuse()
+    {
+        Position = _grid.WorldOrigin;
+        _visual.ResetForReuse();
+        _hitShape.Invalidate();
+    }
 }

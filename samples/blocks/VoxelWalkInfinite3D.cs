@@ -70,7 +70,7 @@ var grass = palette.Add(new VoxelType
 
 var generator = new TerrainGenerator(grassId: grass.Id, dirtId: dirt.Id, stoneId: stone.Id);
 var voxelWorld = new SparseVoxelWorld(palette, generator, ChunkCellsX, ChunkCellsY, ChunkCellsZ);
-var chunkSource = new VoxelChunkSource3D(voxelWorld, Vector3.One);
+var chunkSource = new VoxelChunkSource3D(voxelWorld, Vector3.One, ChunkCellsX, ChunkCellsY, ChunkCellsZ);
 
 var window = new Window3D
 {
@@ -86,6 +86,10 @@ window.Renderer.DirectionalLight = new DirectionalLight(
     Vector3.Normalize(new Vector3(-0.4f, -0.8f, -0.5f)),
     new Color(140, 135, 125));
 window.Renderer.TextureSampling = ImageSampling.Nearest;
+
+// DebugDraw (the HUD text overlay below) is a no-op unless a renderer
+// opts in, so enable it here.
+window.Renderer.DebugDrawEnabled = true;
 
 const float spawnX = 0.5f;
 const float spawnZ = 0.5f;
@@ -160,12 +164,9 @@ var hud = new CustomLayer3D
     OnRender = rd =>
     {
         var pc = chunkSource.GetChunkCoords(player.Position);
-        DebugDraw.DrawText("WASD walk   SHIFT sprint   SPACE jump   Mouse look   ESC quit",
-            18f, 16f);
-        DebugDraw.DrawText(
-            $"pos ({player.Position.X,7:0.0}, {player.Position.Y,6:0.0}, {player.Position.Z,7:0.0})    " +
-            $"chunk ({pc.X,4}, {pc.Z,4})",
-            18f, 48f);
+        DebugDraw.DrawText("WASD walk   SHIFT sprint   SPACE jump   Mouse look   ESC quit", 18f, 16f);
+        DebugDraw.DrawText($"pos ({player.Position.X:0.0}, {player.Position.Y:0.0}, {player.Position.Z:0.0}) chunk ({pc.X}, {pc.Z})", 18f, 48f);
+        DebugDraw.DrawText($"chunks active: {chunkSource.ActiveChunkCount} pooled: {chunkSource.PooledChunkCount} allocated: {chunkSource.ChunksAllocated} reused: {chunkSource.ChunksReused}", 18f, 80f);
     },
 };
 

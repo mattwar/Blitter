@@ -9,7 +9,7 @@ public class ChunkedPlayField3D : Layer3D
     // alive sprite in the active range with its current chunk and the
     // sprite's index in iteration order (used to dedup sprite-vs-sprite
     // pairs across chunks).
-    private readonly List<(Sprite3D Sprite, Chunk3D Chunk)> _frameSprites = 
+    private readonly List<(Sprite3D Sprite, IChunk3D Chunk)> _frameSprites = 
         new();
 
     private readonly Dictionary<Sprite3D, int> _frameSpriteIndex =
@@ -18,7 +18,7 @@ public class ChunkedPlayField3D : Layer3D
     /// <summary>
     /// The source of chunked playfield data.
     /// </summary>
-    public ChunkSource3D ChunkSource { get; }
+    public IChunkSource3D ChunkSource { get; }
 
     /// <summary>
     /// The mininum chunk coordinate to update and draw
@@ -31,7 +31,7 @@ public class ChunkedPlayField3D : Layer3D
     public ChunkCoord MaxChunk { get; set; }
  
     public ChunkedPlayField3D(
-        ChunkSource3D chunkSource, 
+        IChunkSource3D chunkSource, 
         ChunkCoord minChunk, 
         ChunkCoord maxChunk)
     {
@@ -225,11 +225,60 @@ public class ChunkedPlayField3D : Layer3D
 public readonly record struct ChunkCoord(int X, int Y, int Z);
 
 /// <summary>
-/// A source of chunked playfield data. 
-/// Acts as the <see cref="ISpriteHost3D"/> for every sprite in any of its chunks.
+/// The read contract <see cref="ChunkedPlayField3D"/> depends on: query the
+/// chunk grid and fetch the chunk for a coord/position. A source is also the
+/// <see cref="ISpriteHost3D"/> for every sprite in any of its chunks. The
+/// basic stateful implementation lives in <see cref="ChunkSource3D"/>.
 /// </summary>
-public abstract class ChunkSource3D : ISpriteHost3D
+public interface IChunkSource3D : ISpriteHost3D
 {
+    /// <summary>The size of each chunk in world units.</summary>
+    Vector3 ChunkSize { get; }
+
+    /// <summary>Gets the chunk coordinates for the given world position.</summary>
+    ChunkCoord GetChunkCoords(Vector3 position);
+
+    /// <summary>Gets the world-space bounding box of the chunk at <paramref name="coord"/>.</summary>
+    BoundingBox GetChunkBounds(in ChunkCoord coord);
+
+    /// <summary>Gets the chunk at the given chunk coordinates, or null if absent.</summary>
+    IChunk3D? GetChunk(in ChunkCoord coord);
+
+    /// <summary>Gets the chunk at the given world position, or null if absent.</summary>
+    IChunk3D? GetChunk(Vector3 position);
+
+    /// <summary>Per-frame source tick (advances the host clock).</summary>
+    void Update(in UpdateContext3D context);
+}
+
+/// <summary>
+/// Basic <see cref="IChunkSource3D"/> implementation: lazily generates each
+/// chunk on first access, caches it, and can evict chunks outside an active
+/// range. Also acts as the <see cref="ISpriteHost3D"/> for every sprite in any
+/// of its chunks. Subclasses supply <see cref="CreateChunk"/>.
+/// </summary>
+public abstract class ChunkSource3D : IChunkSource3D
+{
+    private readonly Dictionary<ChunkCoord, IChunk3D> _chunks = new();
+    private readonly List<ChunkCoord> _trimScratch = new();
+    private readonly Stack<Chunk3D> _pool = new();
+
+    /// <summary>Number of chunks currently loaded (in the active window).</summary>
+    public int ActiveChunkCount => _chunks.Count;
+
+    /// <summary>Number of evicted chunks held in the reuse pool.</summary>
+    public int PooledChunkCount => _pool.Count;
+
+    /// <summary>
+    /// The total number of chunk allocations. 
+    /// </summary>
+    public int ChunksAllocated { get; private set; }
+
+    /// <summary>
+    /// The total number of times a pooled chunk reused.
+    /// </summary>
+    public int ChunksReused { get; private set; }
+
     /// <summary>
     /// The size of each chunk in world units.
     /// </summary>
@@ -258,20 +307,117 @@ public abstract class ChunkSource3D : ISpriteHost3D
     }
 
     /// <summary>
-    /// Gets the chunk at the given chunk coordinates.
-    /// If the chunk is out of bounds or not loaded, returns null.
+    /// Gets the chunk at the given chunk coordinates, generating and
+    /// caching it on first access. Returns null when
+    /// <see cref="CreateChunk"/> declines to populate the coord.
     /// </summary>
-    public abstract Chunk3D? GetChunk(in ChunkCoord coord);
+    public IChunk3D? GetChunk(in ChunkCoord coord)
+    {
+        if (!_chunks.TryGetValue(coord, out var chunk))
+        {
+            chunk = CreateOrReuseChunk(coord);
+            if (chunk != null)
+                _chunks[coord] = chunk;
+        }
+        return chunk;
+    }
+
+    // Reuses a pooled chunk when one is available and the source opts into
+    // pooling; otherwise generates a fresh chunk. A pooled chunk is reset
+    // (sprites cleared, coord retargeted) before the source repopulates it
+    // via ReinitializeChunk.
+    private Chunk3D? CreateOrReuseChunk(in ChunkCoord coord)
+    {
+        if (PoolsChunks && _pool.Count > 0)
+        {
+            var pooled = _pool.Pop();
+            pooled.ResetForReuse(coord);
+            var reused = ReinitializeChunk(pooled, coord);
+            if (reused != null)
+            {
+                ChunksReused++;
+                return reused;
+            }
+            // Source declined to reuse this instance for this coord; drop
+            // it and generate fresh.
+        }
+        var generated = CreateChunk(coord);
+        if (generated != null)
+            ChunksAllocated++;
+        return generated;
+    }
 
     /// <summary>
     /// Gets the chunk at the given world coordinates.
     /// If the chunk is out of bounds or not loaded, returns null.
     /// </summary>
-    public Chunk3D? GetChunk(Vector3 position)
+    public IChunk3D? GetChunk(Vector3 position)
     {
         var coord = GetChunkCoords(position);
         return GetChunk(in coord);
     }
+
+    /// <summary>
+    /// Creates a chunk for the coordinates.
+    /// Return <c>null</c> for coords this source doesn't populate.
+    /// </summary>
+    protected abstract Chunk3D? CreateChunk(in ChunkCoord coord);
+
+    /// <summary>
+    /// When <c>true</c>, chunks evicted by <see cref="TrimChunksOutside"/>
+    /// are retained in a pool and offered back to
+    /// <see cref="ReinitializeChunk"/> on a later load instead of being
+    /// dropped. Defaults to <c>false</c>. Sources that implement
+    /// <see cref="ReinitializeChunk"/> override this to opt in.
+    /// </summary>
+    protected virtual bool PoolsChunks => false;
+
+    /// <summary>
+    /// Repopulates a pooled <paramref name="chunk"/> for <paramref name="coord"/>,
+    /// reusing its retained structures and buffers in place of a fresh
+    /// <see cref="CreateChunk"/>. The chunk has already been reset (sprites
+    /// cleared, coord retargeted) and keeps its barriers. Return the reused
+    /// chunk, or <c>null</c> to decline (the instance is then dropped and a
+    /// fresh chunk generated). Default returns <c>null</c>.
+    /// </summary>
+    protected virtual Chunk3D? ReinitializeChunk(Chunk3D chunk, in ChunkCoord coord) => null;
+    /// <summary>
+    /// Drops every loaded chunk whose coord falls outside the inclusive box
+    /// <paramref name="min"/>..<paramref name="max"/>. Call this after updating
+    /// <see cref="ChunkedPlayField3D.MinChunk"/> / <see cref="ChunkedPlayField3D.MaxChunk"/>
+    /// each frame to bound memory while a viewer walks an unbounded world.
+    /// </summary>
+    public virtual void TrimChunksOutside(ChunkCoord min, ChunkCoord max)
+    {
+        if (_chunks.Count == 0)
+            return;
+        _trimScratch.Clear();
+        foreach (var key in _chunks.Keys)
+        {
+            if (key.X < min.X || key.X > max.X ||
+                key.Y < min.Y || key.Y > max.Y ||
+                key.Z < min.Z || key.Z > max.Z)
+            {
+                _trimScratch.Add(key);
+            }
+        }
+        for (int i = 0; i < _trimScratch.Count; i++)
+        {
+            var key = _trimScratch[i];
+            var chunk = _chunks[key];
+            _chunks.Remove(key);
+            OnChunkUnloaded(chunk);
+            if (PoolsChunks && chunk is Chunk3D pooled)
+                _pool.Push(pooled);
+        }
+    }
+
+    /// <summary>
+    /// Hook invoked once per chunk evicted by <see cref="TrimChunksOutside"/>.
+    /// Default does nothing; subclasses override to release any resources tied
+    /// to the chunk (voxel storage, GPU buffers, etc.).
+    /// </summary>
+    protected virtual void OnChunkUnloaded(IChunk3D chunk) { }
 
     public virtual void Update(in UpdateContext3D context)
     {
@@ -323,9 +469,57 @@ public abstract class ChunkSource3D : ISpriteHost3D
 }
 
 /// <summary>
-/// A spatial bucket of sprites and barriers owned by a <see cref="ChunkSource3D"/>. 
+/// A spatial bucket of sprites and barriers within a chunk grid. This is the
+/// view <see cref="ChunkedPlayField3D"/> drives each frame; the basic stateful
+/// implementation is <see cref="Chunk3D"/>.
 /// </summary>
-public class Chunk3D
+public interface IChunk3D
+{
+    /// <summary>The source that owns this chunk.</summary>
+    IChunkSource3D Source { get; }
+
+    /// <summary>This chunk's integer coordinates in the source's grid.</summary>
+    ChunkCoord Coord { get; }
+
+    /// <summary>Sprites currently bucketed in this chunk.</summary>
+    IReadOnlyList<Sprite3D> Sprites { get; }
+
+    /// <summary>Barriers currently bucketed in this chunk.</summary>
+    IReadOnlyList<Barrier3D> Barriers { get; }
+
+    /// <summary>Buckets <paramref name="sprite"/> into this chunk.</summary>
+    void AddSprite(Sprite3D sprite);
+
+    /// <summary>Removes <paramref name="sprite"/> from this chunk's bucket.</summary>
+    void RemoveSprite(Sprite3D sprite);
+
+    /// <summary>Buckets <paramref name="barrier"/> into this chunk.</summary>
+    void AddBarrier(Barrier3D barrier);
+
+    /// <summary>Removes <paramref name="barrier"/> from this chunk's bucket.</summary>
+    void RemoveBarrier(Barrier3D barrier);
+
+    /// <summary>Per-frame chunk update (barrier ticks plus any chunk-scoped work).</summary>
+    void Update(in UpdateContext3D context);
+
+    /// <summary>Draws the chunk's barriers and live sprites.</summary>
+    void Draw(Renderer3D renderer);
+
+    /// <summary>
+    /// Signals that a frame has started and any Add/Remove calls should be deferred until the end of the frame.
+    /// </summary>
+    void BeginFrame();
+
+    /// <summary>
+    /// Signals that he frame has ended and any deferred Add/Remove calls should be flushed.
+    /// </summary>
+    void EndFrame();
+}
+
+/// <summary>
+/// A spatial bucket of sprites and barriers owned by a <see cref="IChunkSource3D"/>. 
+/// </summary>
+public class Chunk3D : IChunk3D
 {
     private readonly List<Sprite3D> _sprites = new();
     private readonly List<Barrier3D> _barriers = new();
@@ -337,17 +531,17 @@ public class Chunk3D
     private readonly List<Barrier3D> _pendingRemoveBarriers = new();
     private bool _updating;
 
-    public Chunk3D(ChunkSource3D source, ChunkCoord coord)
+    public Chunk3D(IChunkSource3D source, ChunkCoord coord)
     {
         Source = source;
         Coord = coord;
     }
 
     /// <summary>The source that owns this chunk.</summary>
-    public ChunkSource3D Source { get; }
+    public IChunkSource3D Source { get; }
 
     /// <summary>This chunk's integer coordinates in the source's grid.</summary>
-    public ChunkCoord Coord { get; }
+    public ChunkCoord Coord { get; private set; }
 
     /// <summary>Sprites currently bucketed in this chunk.</summary>
     public IReadOnlyList<Sprite3D> Sprites => _sprites;
@@ -435,15 +629,38 @@ public class Chunk3D
             _barriers[i].Update(context);
     }
 
-    // Called by ChunkedPlayField3D at the start of its Update. While
-    // open, Add/Remove calls land in pending lists and are applied by
-    // EndFrame. Lets the playfield (and collision callbacks) mutate the
-    // chunk safely while it's also iterating the sprite/barrier lists.
-    internal void BeginFrame() => _updating = true;
+    /// <summary>
+    /// Opens the frame. While open, Add/Remove calls land in pending
+    /// lists and are applied by <see cref="EndFrame"/>. Lets the playfield
+    /// (and collision callbacks) mutate the chunk safely while it is also
+    /// iterating the sprite/barrier lists.
+    /// </summary>
+    public void BeginFrame() => _updating = true;
 
-    // Called by ChunkedPlayField3D after the collision pass. Flushes
-    // pending adds/removes and closes the frame.
-    internal void EndFrame()
+    /// <summary>
+    /// Resets this chunk so it can be recycled onto <paramref name="coord"/>
+    /// from a source's pool. Clears the sprite bucket and any deferred
+    /// mutations (keeping the lists' capacity), and retargets
+    /// <see cref="Coord"/>. Barriers are intentionally retained so the
+    /// source can reuse the per-chunk barrier (and the mesh/collision
+    /// buffers hanging off it) rather than rebuild it.
+    /// </summary>
+    internal void ResetForReuse(ChunkCoord coord)
+    {
+        Coord = coord;
+        _updating = false;
+        _sprites.Clear();
+        _pendingAddSprites.Clear();
+        _pendingRemoveSprites.Clear();
+        _pendingAddBarriers.Clear();
+        _pendingRemoveBarriers.Clear();
+    }
+
+    /// <summary>
+    /// Closes the frame and flushes pending adds/removes. Called by the
+    /// owning <see cref="ChunkedPlayField3D"/> after its collision pass.
+    /// </summary>
+    public void EndFrame()
     {
         _updating = false;
         ApplyPendingChanges();
@@ -487,65 +704,4 @@ public class Chunk3D
             _pendingAddBarriers.Clear();
         }
     }
-}
-
-
-public abstract class GeneratedChunkSource3D : ChunkSource3D
-{
-    private readonly Dictionary<ChunkCoord, Chunk3D> _chunks = new();
-    private readonly List<ChunkCoord> _trimScratch = new();
-
-    public override Chunk3D? GetChunk(in ChunkCoord coord)
-    {
-        if (!_chunks.TryGetValue(coord, out var chunk))
-        {
-            chunk = GenerateChunk(coord);
-            if (chunk != null)
-            {
-                _chunks[coord] = chunk;
-            }
-        }
-
-        return chunk;
-    }
-
-    protected abstract Chunk3D? GenerateChunk(in ChunkCoord coord);
-
-    /// <summary>
-    /// Drops every loaded chunk whose coord falls outside the inclusive
-    /// box <paramref name="min"/>..<paramref name="max"/>. Call this
-    /// after updating <see cref="ChunkedPlayField3D.MinChunk"/> /
-    /// <see cref="ChunkedPlayField3D.MaxChunk"/> each frame to bound
-    /// memory while a viewer walks an unbounded world.
-    /// </summary>
-    public void TrimChunksOutside(ChunkCoord min, ChunkCoord max)
-    {
-        if (_chunks.Count == 0)
-            return;
-        _trimScratch.Clear();
-        foreach (var key in _chunks.Keys)
-        {
-            if (key.X < min.X || key.X > max.X ||
-                key.Y < min.Y || key.Y > max.Y ||
-                key.Z < min.Z || key.Z > max.Z)
-            {
-                _trimScratch.Add(key);
-            }
-        }
-        for (int i = 0; i < _trimScratch.Count; i++)
-        {
-            var key = _trimScratch[i];
-            var chunk = _chunks[key];
-            _chunks.Remove(key);
-            OnChunkUnloaded(chunk);
-        }
-    }
-
-    /// <summary>
-    /// Hook invoked once per chunk evicted by
-    /// <see cref="TrimChunksOutside"/>. Default does nothing; subclasses
-    /// override to release any resources tied to the chunk (voxel
-    /// storage, GPU buffers, etc.).
-    /// </summary>
-    protected virtual void OnChunkUnloaded(Chunk3D chunk) { }
 }

@@ -9,7 +9,7 @@ namespace Blitter.Blocks3D;
 /// Reads are forwarded straight to the world; neighbor lookups across
 /// chunk edges work for free because the world is OOB-safe.
 /// </summary>
-public sealed class VoxelChunkGrid
+internal sealed class VoxelChunkGrid
 {
     public VoxelChunkGrid(
         IVoxelWorld world,
@@ -41,7 +41,7 @@ public sealed class VoxelChunkGrid
     public IVoxelWorld World { get; }
 
     /// <summary>Chunk coordinate within its source.</summary>
-    public ChunkCoord Coord { get; }
+    public ChunkCoord Coord { get; private set; }
 
     /// <summary>Cells along the X axis.</summary>
     public int CellsX { get; }
@@ -54,15 +54,47 @@ public sealed class VoxelChunkGrid
     public Vector3 CellSize { get; }
 
     /// <summary>World-voxel coordinate of the chunk's local (0,0,0) cell.</summary>
-    public int OriginCellX { get; }
-    public int OriginCellY { get; }
-    public int OriginCellZ { get; }
+    public int OriginCellX { get; private set; }
+    public int OriginCellY { get; private set; }
+    public int OriginCellZ { get; private set; }
 
     /// <summary>World-space position of the chunk's local origin corner.</summary>
-    public Vector3 WorldOrigin { get; }
+    public Vector3 WorldOrigin { get; private set; }
 
     /// <summary>Palette of the underlying world.</summary>
     public VoxelPalette Palette => World.Palette;
+
+    /// <summary>
+    /// Change stamp for this chunk's view of the world. Bumped (by the
+    /// owning <see cref="VoxelChunkSource3D"/>, in response to the world's
+    /// <see cref="IVoxelWorld.VoxelsChanged"/>) whenever a voxel this
+    /// chunk's mesh or collision reads — its own cells or the one-cell
+    /// skirt across each face — changes. Derived data snapshots the stamp
+    /// and rebuilds when it no longer matches. Only equality is defined.
+    /// </summary>
+    public int Version { get; private set; }
+
+    /// <summary>Advances <see cref="Version"/> to mark this chunk's
+    /// derived data (mesh, collision band) stale.</summary>
+    internal void BumpVersion() => Version++;
+
+    /// <summary>
+    /// Retargets this grid to a new <paramref name="coord"/>, recomputing
+    /// its origin and resetting <see cref="Version"/>. Used when a pooled
+    /// chunk is recycled onto a different coordinate so the grid (and the
+    /// mesh/collision buffers hanging off it) can be reused in place. The
+    /// world, cell dimensions, and cell size are fixed for the source and
+    /// stay unchanged.
+    /// </summary>
+    internal void Reinitialize(ChunkCoord coord)
+    {
+        Coord = coord;
+        OriginCellX = coord.X * CellsX;
+        OriginCellY = coord.Y * CellsY;
+        OriginCellZ = coord.Z * CellsZ;
+        WorldOrigin = new Vector3(OriginCellX, OriginCellY, OriginCellZ) * CellSize;
+        Version = 0;
+    }
 
     /// <summary>
     /// Voxel id at chunk-local cell <paramref name="x"/>,
@@ -71,5 +103,5 @@ public sealed class VoxelChunkGrid
     /// cells beyond the world's own bounds.
     /// </summary>
     public int GetVoxel(int x, int y, int z) =>
-        World.GetVoxel(OriginCellX + x, OriginCellY + y, OriginCellZ + z);
+        World.GetVoxel(new VoxelCoord(OriginCellX + x, OriginCellY + y, OriginCellZ + z));
 }

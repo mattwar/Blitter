@@ -6,23 +6,29 @@ namespace Blitter.Blocks3D;
 
 /// <summary>
 /// <see cref="Visual3D"/> for one voxel chunk. 
-/// Re-meshes lazily when the underlying <see cref="VoxelChunkGrid"/>'s world reports
-/// changes within (or adjacent to) the chunk. 
+/// Re-meshes lazily when its <see cref="VoxelChunkGrid.Version"/> changes,
+/// checked on <see cref="Draw"/>. The version is bumped by the owning
+/// <see cref="VoxelChunkSource3D"/> when the world reports a voxel change
+/// this chunk reads, so the long-lived world never holds a reference to
+/// the visual.
 /// Geometry is bucketed by source <see cref="Texture2D"/>: 
 /// every <see cref="TextureRegion2D"/> pointing at the same underlying texture collapses into a single mesh and
 /// material so chunks fully mapped to one source texture draw in one call.
 /// </summary>
-public sealed class VoxelChunkVisual3D : Visual3D, IVoxelMeshSink
+internal sealed class VoxelChunkVisual3D : Visual3D, IVoxelMeshSink
 {
     private readonly VoxelChunkGrid _grid;
     private readonly VoxelHitShape3D _hitShape;
     private readonly BoundingSphere _boundary;
+    // Grid version the current mesh was built against; compared on Draw
+    // to decide when to re-mesh.
+    private int _builtVersion;
+    private bool _built;
     // One builder + material per source texture. The untextured group
     // (cells whose VoxelType.Texture is null) is held separately so
     // the dictionary key stays non-nullable.
     private readonly Dictionary<Texture2D, TextureGroup> _groups = new(ReferenceEqualityComparer.Instance);
     private TextureGroup? _untextured;
-    private bool _dirty = true;
 
     // Sticky cache: the mesher walks all six faces of a cell in a row,
     // so most EmitQuad calls hit the same source texture. Skips the
@@ -47,7 +53,6 @@ public sealed class VoxelChunkVisual3D : Visual3D, IVoxelMeshSink
         _hitShape = hitShape;
         var size = new Vector3(grid.CellsX, grid.CellsY, grid.CellsZ) * grid.CellSize;
         _boundary = new BoundingSphere(size * 0.5f, size.Length() * 0.5f);
-        grid.World.VoxelsChanged += OnVoxelsChanged;
     }
 
     public VoxelChunkGrid Grid => _grid;
@@ -58,7 +63,7 @@ public sealed class VoxelChunkVisual3D : Visual3D, IVoxelMeshSink
 
     public override void Draw(Renderer3D renderer, in Pose3D pose, Color tint, TimeSpan elapsed)
     {
-        if (_dirty)
+        if (NeedsRebuild())
             Rebuild();
 
         var transform = pose.ToMatrix();
@@ -73,26 +78,31 @@ public sealed class VoxelChunkVisual3D : Visual3D, IVoxelMeshSink
     }
 
     /// <summary>Forces a re-mesh on next draw.</summary>
-    public void Invalidate() => _dirty = true;
+    public void Invalidate() => _built = false;
 
-    private void OnVoxelsChanged(object? sender, VoxelChangeEventArgs e)
+    /// <summary>
+    /// Resets this visual so its owning chunk can be recycled onto a new
+    /// coord. Clears every texture group's buffered geometry but keeps the
+    /// <see cref="MeshBuilder{TVertex}"/> instances (and their grown GPU
+    /// buffers) alive for reuse, and marks the mesh unbuilt so it re-meshes
+    /// the recycled grid's data on the next draw.
+    /// </summary>
+    internal void ResetForReuse()
     {
-        // Expand by one cell on each axis: a neighbor edit can flip a
-        // face inside this chunk from hidden to visible.
-        int lx0 = e.MinX - _grid.OriginCellX - 1;
-        int lx1 = e.MaxX - _grid.OriginCellX + 1;
-        int ly0 = e.MinY - _grid.OriginCellY - 1;
-        int ly1 = e.MaxY - _grid.OriginCellY + 1;
-        int lz0 = e.MinZ - _grid.OriginCellZ - 1;
-        int lz1 = e.MaxZ - _grid.OriginCellZ + 1;
-        if (lx1 < 0 || lx0 >= _grid.CellsX
-            || ly1 < 0 || ly0 >= _grid.CellsY
-            || lz1 < 0 || lz0 >= _grid.CellsZ)
-            return;
-        _dirty = true;
+        _untextured?.Builder.Clear();
+        foreach (var group in _groups.Values)
+            group.Builder.Clear();
+        _lastSource = null;
+        _lastBuilder = null;
+        _builtVersion = 0;
+        _built = false;
     }
 
-    private void Rebuild()
+    // internal for tests: true when the mesh is stale relative to the
+    // current grid version.
+    internal bool NeedsRebuild() => !_built || _grid.Version != _builtVersion;
+
+    internal void Rebuild()
     {
         _untextured?.Builder.Clear();
         foreach (var group in _groups.Values)
@@ -103,7 +113,9 @@ public sealed class VoxelChunkVisual3D : Visual3D, IVoxelMeshSink
         _lastSource = null;
         _lastBuilder = null;
         VoxelMesher.Build(_grid, this);
-        _dirty = false;
+        // Snapshot the version the mesh was built against.
+        _builtVersion = _grid.Version;
+        _built = true;
     }
 
     void IVoxelMeshSink.EmitQuad(
