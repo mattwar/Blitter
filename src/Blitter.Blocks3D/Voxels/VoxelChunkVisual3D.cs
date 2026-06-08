@@ -15,7 +15,7 @@ namespace Blitter.Blocks3D;
 /// every <see cref="TextureRegion2D"/> pointing at the same underlying texture collapses into a single mesh and
 /// material so chunks fully mapped to one source texture draw in one call.
 /// </summary>
-internal sealed class VoxelChunkVisual3D : Visual3D, IVoxelMeshSink
+internal sealed class VoxelChunkVisual3D : Visual3D, IChunkMeshBuilder
 {
     private readonly VoxelChunkGrid _grid;
     private readonly VoxelHitShape3D _hitShape;
@@ -31,7 +31,7 @@ internal sealed class VoxelChunkVisual3D : Visual3D, IVoxelMeshSink
     private TextureGroup? _untextured;
 
     // Sticky cache: the mesher walks all six faces of a cell in a row,
-    // so most EmitQuad calls hit the same source texture. Skips the
+    // so most AddQuad calls hit the same source texture. Skips the
     // dictionary lookup for the common run.
     private Texture2D? _lastSource;
     private MeshBuilder<LitTextureVertex3D>? _lastBuilder;
@@ -118,12 +118,26 @@ internal sealed class VoxelChunkVisual3D : Visual3D, IVoxelMeshSink
         _built = true;
     }
 
-    void IVoxelMeshSink.EmitQuad(
+    void IChunkMeshBuilder.AddQuad(
         Texture2D? sourceTexture,
         in LitTextureVertex3D v0,
         in LitTextureVertex3D v1,
         in LitTextureVertex3D v2,
         in LitTextureVertex3D v3)
+    {
+        ResolveBuilder(sourceTexture).AddQuad(in v0, in v1, in v2, in v3);
+    }
+
+    void IChunkMeshBuilder.AddTriangle(
+        Texture2D? sourceTexture,
+        in LitTextureVertex3D v0,
+        in LitTextureVertex3D v1,
+        in LitTextureVertex3D v2)
+    {
+        ResolveBuilder(sourceTexture).AddTriangle(in v0, in v1, in v2);
+    }
+
+    private MeshBuilder<LitTextureVertex3D> ResolveBuilder(Texture2D? sourceTexture)
     {
         var builder = _lastBuilder;
         if (builder is null || !ReferenceEquals(_lastSource, sourceTexture))
@@ -132,7 +146,7 @@ internal sealed class VoxelChunkVisual3D : Visual3D, IVoxelMeshSink
             _lastSource = sourceTexture;
             _lastBuilder = builder;
         }
-        builder.AddQuad(in v0, in v1, in v2, in v3);
+        return builder;
     }
 
     private TextureGroup GetOrCreateGroup(Texture2D? sourceTexture)

@@ -57,16 +57,16 @@ var dirtTex      = AtlasTile(atlas, col: 4, row: 3);
 var stoneTex     = AtlasTile(atlas, col: 1, row: 4);
 
 var palette = new VoxelPalette();
-var stone = palette.Add(new VoxelType { Id = 1, Name = "stone", Texture = stoneTex });
-var dirt  = palette.Add(new VoxelType { Id = 2, Name = "dirt",  Texture = dirtTex  });
+var stone = palette.Add(new VoxelType { Id = 1, Name = "stone", Shape = new CubeVoxelShape(stoneTex) });
+var dirt  = palette.Add(new VoxelType { Id = 2, Name = "dirt",  Shape = new CubeVoxelShape(dirtTex) });
 var grass = palette.Add(new VoxelType
 {
     Id = 3,
     Name = "grass",
-    Texture = new TopSideBottomVoxelTexture(
+    Shape = new CubeVoxelShape(new TopSideBottomVoxelTexture(
         top: grassTopTex,
         side: grassSideTex,
-        bottom: dirtTex),
+        bottom: dirtTex)),
 });
 
 var generator = new TerrainGenerator(grassId: grass.Id, dirtId: dirt.Id, stoneId: stone.Id);

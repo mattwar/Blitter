@@ -6,17 +6,24 @@ namespace Blitter.Tests;
 
 public class VoxelMesherTests
 {
-    /// <summary>Counts quads and remembers which textures were routed.</summary>
-    private sealed class CountingSink : IVoxelMeshSink
+    /// <summary>Counts quads and triangles routed through the builder.</summary>
+    private sealed class CountingMeshBuilder : IChunkMeshBuilder
     {
         public int QuadCount { get; private set; }
+        public int TriangleCount { get; private set; }
 
-        public void EmitQuad(
+        public void AddQuad(
             Texture2D? sourceTexture,
             in LitTextureVertex3D v0,
             in LitTextureVertex3D v1,
             in LitTextureVertex3D v2,
             in LitTextureVertex3D v3) => QuadCount++;
+
+        public void AddTriangle(
+            Texture2D? sourceTexture,
+            in LitTextureVertex3D v0,
+            in LitTextureVertex3D v1,
+            in LitTextureVertex3D v2) => TriangleCount++;
     }
 
     private static (ArrayVoxelWorld world, VoxelPalette palette) MakeWorld(int w, int h, int d)
@@ -30,9 +37,9 @@ public class VoxelMesherTests
     private static int CountQuads(ArrayVoxelWorld world)
     {
         var grid = new VoxelChunkGrid(world, default, world.Width, world.Height, world.Depth, Vector3.One);
-        var sink = new CountingSink();
-        VoxelMesher.Build(grid, sink);
-        return sink.QuadCount;
+        var builder = new CountingMeshBuilder();
+        VoxelMesher.Build(grid, builder);
+        return builder.QuadCount;
     }
 
     [Fact]

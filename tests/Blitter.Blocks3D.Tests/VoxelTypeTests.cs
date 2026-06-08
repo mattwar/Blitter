@@ -8,23 +8,25 @@ public class VoxelTypeTests
         Assert.Equal(0, VoxelType.Air.Id);
         Assert.True(VoxelType.Air.IsAir);
         Assert.False(VoxelType.Air.IsOpaque);
-        Assert.Equal(VoxelShape.None, VoxelType.Air.Shape);
+        Assert.Same(EmptyVoxelShape.Instance, VoxelType.Air.Shape);
+        Assert.False(VoxelType.Air.Shape.FillsCell);
     }
 
     [Fact]
-    public void Defaults_AreOpaqueFullBlock()
+    public void Defaults_AreOpaqueFullCube()
     {
         var type = new VoxelType { Id = 1, Name = "stone" };
         Assert.False(type.IsAir);
         Assert.True(type.IsOpaque);
-        Assert.Equal(VoxelShape.FullBlock, type.Shape);
+        Assert.IsType<CubeVoxelShape>(type.Shape);
+        Assert.True(type.Shape.FillsCell);
     }
 
     [Fact]
-    public void GetFaceTexture_AllNull_ReturnsNullForEveryFace()
+    public void DefaultCube_HasNoTexture()
     {
         var type = new VoxelType { Id = 1 };
-        for (int face = 0; face < 6; face++)
-            Assert.Null(type.GetFaceTexture(face));
+        var cube = Assert.IsType<CubeVoxelShape>(type.Shape);
+        Assert.Null(cube.Texture);
     }
 }

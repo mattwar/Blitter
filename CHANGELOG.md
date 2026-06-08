@@ -33,15 +33,23 @@ All notable changes to this project will be documented in this file.
   `Nearest` for crisp pixel-art / Minecraft-style atlases). Linear
   keeps the existing mipmapped + anisotropic sampler; nearest is
   point-sampled with no mip blending and no anisotropy.
-- `VoxelType.Texture` is now a `VoxelTexture` abstraction (in
-  `Blitter.Blocks3D`) addressing faces by the local `VoxelFace` enum
+- `VoxelShape`: a voxel's geometry is now an open class hierarchy
+  instead of an enum. `CubeVoxelShape` is the full unit cube (and the
+  default for `VoxelType.Shape`); `EmptyVoxelShape.Instance` is the
+  no-geometry cell used by air. The mesher walks the grid and defers
+  each cell's face emission to its shape, so new shapes can be added
+  without touching `VoxelMesher`. `VoxelType.Shape.FillsCell` replaces
+  the old `VoxelShape.FullBlock` check used by collision.
+- A voxel's face textures now live on `CubeVoxelShape` rather than
+  `VoxelType`. Assign `Shape = new CubeVoxelShape(texture)` where
+  `texture` is any `VoxelTexture`. The `VoxelTexture` abstraction (in
+  `Blitter.Blocks3D`) addresses faces by the local `VoxelFace` enum
   (`NegativeX`..`PositiveZ`). Three variants: `UniformVoxelTexture`
   (one picture on all six faces; a bare `Texture2D` implicitly
   converts to this), `TopSideBottomVoxelTexture` (the grass-block
   layout), and `SixFaceVoxelTexture` (every face declared separately).
-  Replaces the former `TopTexture` / `BottomTexture` / `SideTexture`
-  properties on `VoxelType`. `VoxelMesher` resolves the per-face UV
-  rect via `VoxelType.GetFaceTexture(int face)` as before.
+  Replaces the former `VoxelType.Texture` /
+  `TopTexture` / `BottomTexture` / `SideTexture` properties.
 - `WalkController3D` (`Blitter.Blocks3D`): first-person walk + jump +
   mouse-look behavior with a coyote-window jump grace, configurable
   key bindings, and an optional `Camera3D` it slaves to the sprite's
