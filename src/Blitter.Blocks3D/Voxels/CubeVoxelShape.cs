@@ -24,7 +24,7 @@ public sealed class CubeVoxelShape : VoxelShape
     public CubeVoxelShape(VoxelTexture? texture) => Texture = texture;
 
     /// <inheritdoc/>
-    public override bool FillsCell => true;
+    public override bool FillsVoxel => true;
 
     private static readonly Vector3[] _faceNormals =
     {

@@ -18,23 +18,23 @@ public class VoxelChunkSource3D : ChunkSource3D
 
     public VoxelChunkSource3D(
         IVoxelWorld world,
-        Vector3 cellSize,
-        int cellsPerChunkX,
-        int cellsPerChunkY,
-        int cellsPerChunkZ)
+        Vector3 voxelSize,
+        int voxelsPerChunkX,
+        int voxelsPerChunkY,
+        int voxelsPerChunkZ)
     {
         ArgumentNullException.ThrowIfNull(world);
-        if (cellSize.X <= 0f || cellSize.Y <= 0f || cellSize.Z <= 0f)
-            throw new ArgumentOutOfRangeException(nameof(cellSize), "Cell size components must be positive.");
-        if (cellsPerChunkX <= 0 || cellsPerChunkY <= 0 || cellsPerChunkZ <= 0)
-            throw new ArgumentOutOfRangeException(nameof(cellsPerChunkX), "Cells per chunk must be positive.");
+        if (voxelSize.X <= 0f || voxelSize.Y <= 0f || voxelSize.Z <= 0f)
+            throw new ArgumentOutOfRangeException(nameof(voxelSize), "Voxel size components must be positive.");
+        if (voxelsPerChunkX <= 0 || voxelsPerChunkY <= 0 || voxelsPerChunkZ <= 0)
+            throw new ArgumentOutOfRangeException(nameof(voxelsPerChunkX), "Voxels per chunk must be positive.");
 
         World = world;
-        _cellSize = cellSize;
-        _cellsX = cellsPerChunkX;
-        _cellsY = cellsPerChunkY;
-        _cellsZ = cellsPerChunkZ;
-        ChunkSize = new Vector3(cellsPerChunkX * cellSize.X, cellsPerChunkY * cellSize.Y, cellsPerChunkZ * cellSize.Z);
+        _cellSize = voxelSize;
+        _cellsX = voxelsPerChunkX;
+        _cellsY = voxelsPerChunkY;
+        _cellsZ = voxelsPerChunkZ;
+        ChunkSize = new Vector3(voxelsPerChunkX * voxelSize.X, voxelsPerChunkY * voxelSize.Y, voxelsPerChunkZ * voxelSize.Z);
 
         World.VoxelsChanged += OnVoxelsChanged;
     }
@@ -42,15 +42,15 @@ public class VoxelChunkSource3D : ChunkSource3D
     /// <summary>Voxel storage backing every chunk this source produces.</summary>
     public IVoxelWorld World { get; }
 
-    /// <summary>World units per voxel cell along each axis.</summary>
-    public Vector3 CellSize => _cellSize;
+    /// <summary>World units per voxel along each axis.</summary>
+    public Vector3 VoxelSize => _cellSize;
 
-    /// <summary>Voxel cells per playfield chunk along the X axis.</summary>
-    public int CellsPerChunkX => _cellsX;
-    /// <summary>Voxel cells per playfield chunk along the Y axis.</summary>
-    public int CellsPerChunkY => _cellsY;
-    /// <summary>Voxel cells per playfield chunk along the Z axis.</summary>
-    public int CellsPerChunkZ => _cellsZ;
+    /// <summary>Voxels per playfield chunk along the X axis.</summary>
+    public int VoxelsPerChunkX => _cellsX;
+    /// <summary>Voxels per playfield chunk along the Y axis.</summary>
+    public int VoxelsPerChunkY => _cellsY;
+    /// <summary>Voxels per playfield chunk along the Z axis.</summary>
+    public int VoxelsPerChunkZ => _cellsZ;
 
     /// <inheritdoc/>
     public override Vector3 ChunkSize { get; }

@@ -38,7 +38,7 @@ All notable changes to this project will be documented in this file.
   default for `VoxelType.Shape`); `EmptyVoxelShape.Instance` is the
   no-geometry cell used by air. The mesher walks the grid and defers
   each cell's face emission to its shape, so new shapes can be added
-  without touching `VoxelMesher`. `VoxelType.Shape.FillsCell` replaces
+  without touching `VoxelMesher`. `VoxelType.Shape.FillsVoxel` replaces
   the old `VoxelShape.FullBlock` check used by collision.
 - A voxel's face textures now live on `CubeVoxelShape` rather than
   `VoxelType`. Assign `Shape = new CubeVoxelShape(texture)` where

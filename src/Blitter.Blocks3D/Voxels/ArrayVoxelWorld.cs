@@ -25,13 +25,13 @@ public sealed class ArrayVoxelWorld : IVoxelWorld
         _cells = new int[width * height * depth];
     }
 
-    /// <summary>Number of cells along X.</summary>
+    /// <summary>Number of voxels along X.</summary>
     public int Width { get; }
 
-    /// <summary>Number of cells along Y.</summary>
+    /// <summary>Number of voxels along Y.</summary>
     public int Height { get; }
 
-    /// <summary>Number of cells along Z.</summary>
+    /// <summary>Number of voxels along Z.</summary>
     public int Depth { get; }
 
     /// <inheritdoc/>
@@ -64,10 +64,10 @@ public sealed class ArrayVoxelWorld : IVoxelWorld
     }
 
     /// <summary>
-    /// Bulk-fills the cell range <c>[minX..maxX] × [minY..maxY] × [minZ..maxZ]</c>
+    /// Bulk-fills the voxel range <c>[minX..maxX] × [minY..maxY] × [minZ..maxZ]</c>
     /// (inclusive) with <paramref name="id"/> and raises a single
     /// <see cref="VoxelsChanged"/> for the entire bounding box. The
-    /// range is clipped to the world. Returns the number of cells
+    /// range is clipped to the world. Returns the number of voxels
     /// actually written.
     /// </summary>
     public int Fill(int minX, int minY, int minZ, int maxX, int maxY, int maxZ, int id)

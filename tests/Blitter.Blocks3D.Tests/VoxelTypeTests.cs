@@ -9,7 +9,7 @@ public class VoxelTypeTests
         Assert.True(VoxelType.Air.IsAir);
         Assert.False(VoxelType.Air.IsOpaque);
         Assert.Same(EmptyVoxelShape.Instance, VoxelType.Air.Shape);
-        Assert.False(VoxelType.Air.Shape.FillsCell);
+        Assert.False(VoxelType.Air.Shape.FillsVoxel);
     }
 
     [Fact]
@@ -19,7 +19,7 @@ public class VoxelTypeTests
         Assert.False(type.IsAir);
         Assert.True(type.IsOpaque);
         Assert.IsType<CubeVoxelShape>(type.Shape);
-        Assert.True(type.Shape.FillsCell);
+        Assert.True(type.Shape.FillsVoxel);
     }
 
     [Fact]

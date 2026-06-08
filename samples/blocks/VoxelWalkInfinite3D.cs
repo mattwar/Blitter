@@ -34,9 +34,9 @@ using Blitter;
 using Blitter.Bits;
 using Blitter.Blocks3D;
 
-const int ChunkCellsX = 16;
-const int ChunkCellsY = 64;
-const int ChunkCellsZ = 16;
+const int ChunkVoxelsX = 16;
+const int ChunkVoxelsY = 64;
+const int ChunkVoxelsZ = 16;
 
 // 1 + 2 * LoadRadius chunks across each horizontal axis. 4 keeps the
 // active window at 9×9 chunks (≈144×144 cells) — plenty for a sample,
@@ -70,8 +70,8 @@ var grass = palette.Add(new VoxelType
 });
 
 var generator = new TerrainGenerator(grassId: grass.Id, dirtId: dirt.Id, stoneId: stone.Id);
-var voxelWorld = new SparseVoxelWorld(palette, generator, ChunkCellsX, ChunkCellsY, ChunkCellsZ);
-var chunkSource = new VoxelChunkSource3D(voxelWorld, Vector3.One, ChunkCellsX, ChunkCellsY, ChunkCellsZ);
+var voxelWorld = new SparseVoxelWorld(palette, generator, ChunkVoxelsX, ChunkVoxelsY, ChunkVoxelsZ);
+var chunkSource = new VoxelChunkSource3D(voxelWorld, Vector3.One, ChunkVoxelsX, ChunkVoxelsY, ChunkVoxelsZ);
 
 var window = new Window3D
 {
@@ -202,20 +202,20 @@ sealed class TerrainGenerator : IVoxelGenerator
         _stoneId = stoneId;
     }
 
-    public void Generate(ChunkCoord coord, int cellsX, int cellsY, int cellsZ, int[] cells)
+    public void Generate(ChunkCoord coord, int voxelsX, int voxelsY, int voxelsZ, int[] voxels)
     {
-        int originX = coord.X * cellsX;
-        int originY = coord.Y * cellsY;
-        int originZ = coord.Z * cellsZ;
-        for (int lz = 0; lz < cellsZ; lz++)
+        int originX = coord.X * voxelsX;
+        int originY = coord.Y * voxelsY;
+        int originZ = coord.Z * voxelsZ;
+        for (int lz = 0; lz < voxelsZ; lz++)
         {
             int wz = originZ + lz;
-            for (int lx = 0; lx < cellsX; lx++)
+            for (int lx = 0; lx < voxelsX; lx++)
             {
                 int wx = originX + lx;
                 int top = SurfaceHeight(wx, wz);
                 int surfaceId = SurfaceVoxel(wx, wz, _grassId, _dirtId, _stoneId);
-                for (int ly = 0; ly < cellsY; ly++)
+                for (int ly = 0; ly < voxelsY; ly++)
                 {
                     int wy = originY + ly;
                     int id;
@@ -227,7 +227,7 @@ sealed class TerrainGenerator : IVoxelGenerator
                         id = surfaceId;
                     else
                         id = 0;
-                    cells[(lz * cellsY + ly) * cellsX + lx] = id;
+                    voxels[(lz * voxelsY + ly) * voxelsX + lx] = id;
                 }
             }
         }
