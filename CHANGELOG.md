@@ -55,6 +55,15 @@ All notable changes to this project will be documented in this file.
   properties — read `slot.Visual` to draw. `Sprite2D.Image` is now a
   single non-null `ImageSource` slot (drawn via `Image.Visual`); the
   separate `Sprite2D.Visual` property was removed.
+- `ParallaxBackground2D` (Blitter.Blocks2D): a single `Layer2D` that draws a
+  back-to-front stack of parallax background plates declared as data, instead
+  of composing one `RepeatingImageLayer2D` per plate. Each `ParallaxPlate2D`
+  lists an image (an `ImageSource`, so a bare file path converts implicitly)
+  and its parallax factor; the `Plates` collection initializer supports the
+  terse `{ "image.png", parallaxX }` form alongside full plate objects for
+  per-plate `BottomY`/`OffsetX`/`RepeatX`/`Tint` overrides. Plates draw in
+  declaration order (first = farthest back); a non-repeating plate is centred
+  on the camera, the rest tile horizontally.
 - `Application.AssetFolder`: base folder that relative asset paths resolve
   against, defaulting to `AppContext.BaseDirectory` so shipped apps need no
   configuration. Honored by `Bitmap.Load`, `Sound.Load`, `Model.Load`,

@@ -11,15 +11,19 @@
 // Parallax side-scroller proof-of-concept: a stack of six tileable
 // background plates scrolls past at different speeds while the
 // space man walks across them. Exercises Scene2D + Layer2D
-// composition, the new RepeatingImageLayer2D block, and
-// CameraFollow2D for horizontal tracking with no world bounds (the
-// world scrolls forever).
+// composition, the ParallaxBackground2D block (one layer that lists
+// every plate and its parallax factor as data), and CameraFollow2D
+// for horizontal tracking with no world bounds (the world scrolls
+// forever).
 
 using System.Numerics;
 
 using Blitter;
 using Blitter.Bits;
 using Blitter.Blocks2D;
+
+// Resolve loose asset files next to this source file.
+Application.Current.SetCallerAssetFolder();
 
 // Logical surface matches the artwork (1920x1080). 
 // Window is half that size and letterboxes so it scales cleanly.
@@ -38,7 +42,6 @@ const float GroundY = 450f;
 const float WalkSpeed = 240f;          // world px / sec
 const float SpriteScale = 0.5f;
 
-
 var window = new Window2D(WindowW, WindowH)
 {
     Title = "Moon Scroller — ← → walk, Space jump, Esc quit",
@@ -47,20 +50,6 @@ var window = new Window2D(WindowW, WindowH)
 };
 
 window.Renderer.SetLogicalSize(LogicalW, LogicalH, LogicalPresentation.Letterbox);
-
-// Resolve loose asset files next to this source file.
-Application.Current.SetCallerAssetFolder();
-
-// --- Background plates --------------------------------------------
-// Loaded in back-to-front order. ParallaxFactor controls how fast
-// each layer scrolls relative to the camera: 0 = locked, 1 = matches
-// the playfield, anything in between drifts behind.
-var skyImage      = Bitmap.Load("01_sky_planet.png");
-var farMountains  = Bitmap.Load("02_mountains_far.png");
-var midMountains  = Bitmap.Load("03_mountains_mid.png");
-var nearMountains = Bitmap.Load("04_mountains_near.png");
-var crystals      = Bitmap.Load("05_crystals_big.png");
-var groundFg      = Bitmap.Load("06_ground_fg.png");
 
 // spaceman sprite sheet
 const double WalkFrameSeconds = 0.08;
@@ -145,33 +134,30 @@ var shadowLayer = new CustomLayer2D
     }
 };
 
-// compose scene with background layers with parallax so they scroll at different speeds
-
-var skyLayer = new RepeatingImageLayer2D(skyImage)
+// The whole parallax backdrop is one layer of data: each plate lists an
+// image and the factor it scrolls at (0 = locked, 1 = moves with the
+// foreground). Plates draw back-to-front in declaration order. The sky is
+// a single non-repeating plate (centred on the camera); the rest tile
+// horizontally to scroll forever.
+var background = new ParallaxBackground2D
 {
     BottomY = ImageBottomY,
-    OffsetX = -skyImage.Width / 2f,
-    RepeatX = false,
-    ParallaxFactor = Vector2.Zero,
-};
-
-RepeatingImageLayer2D TiledLayer(Texture2D img, float parallax) =>
-    new(img)
+    Plates =
     {
-        BottomY = ImageBottomY,
-        ParallaxFactor = new Vector2(parallax, 0f),
-    };
+        new() { Image = "01_sky_planet.png", Parallax = Vector2.Zero, RepeatX = false },
+        { "02_mountains_far.png",  0.15f },
+        { "03_mountains_mid.png",  0.30f },
+        { "04_mountains_near.png", 0.60f },
+        { "05_crystals_big.png",   1.00f },
+        { "06_ground_fg.png",      1.00f },
+    },
+};
 
 var scene = new Scene2D
 {
     Layers =
     {
-        skyLayer,
-        TiledLayer(farMountains,  0.15f),
-        TiledLayer(midMountains,  0.30f),
-        TiledLayer(nearMountains, 0.60f),
-        TiledLayer(crystals,      1.00f),
-        TiledLayer(groundFg,      1.00f),
+        background,
         shadowLayer,
         playfield,
     }
