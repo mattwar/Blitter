@@ -217,6 +217,30 @@ All notable changes to this project will be documented in this file.
   *into* the ground when gravity nudges it past the surface.
 
 ### Changed
+- **Breaking:** the voxel model no longer exposes integer ids.
+  `VoxelPalette` is renamed to `VoxelCatalog` — a name↔`VoxelType`
+  map that is also an ordered collection (`this[int]`, `this[string]`,
+  `IndexOf`, `TryGet`, `TryGetIndex`, `Contains`, `Names`, collection
+  initializers). `Add` stamps each type's storage slot itself, so
+  `VoxelType` no longer carries a public `Id`; author a type with just
+  its `Name` and appearance. `IVoxelWorld.GetVoxel` now returns a
+  `VoxelInfo` (an air-safe wrapper exposing `Type`, `IsAir`, `IsOpaque`)
+  and `SetVoxel` takes a `VoxelInfo` (a `VoxelType` converts implicitly).
+  `IVoxelWorld.Palette` becomes `Catalog`. `IVoxelGenerator.Generate`
+  takes a single `VoxelBuffer` (a
+  `ref struct` 3D view over a region of voxel storage) instead of an
+  `int[]`, so generators write voxel types and never see how the world
+  packs them. The buffer is constructed from a `VoxelBox` and exposes
+  that inclusive region as `Bounds`; its bounds-checked
+  `this[x, y, z]` indexer (and a `VoxelCoord` overload) addresses voxels
+  by their voxel coordinate — generators iterate `Bounds` and assign
+  `voxels[x, y, z] = type` in one coordinate space, with the buffer
+  mapping coordinates onto local storage. The buffer is no longer tied
+  to chunks and exposes no `Coord` or `Size`. Chunk dimensions are a
+  `ChunkSize` (with `VoxelCount` and a row-major `IndexOf`), which
+  `SparseVoxelWorld` also takes in its constructor in place of three ints.
+  `VoxelWorldExtensions.GetVoxelType` is dropped in favor of
+  `GetVoxel(...).Type`.
 - **Breaking:** the `Blitter.Blocks` project and namespace are renamed
   to `Blitter.Blocks2D` (assembly `Blitter.Blocks2D.dll`). Update any
   `using Blitter.Blocks;` to `using Blitter.Blocks2D;`. A future

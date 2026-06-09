@@ -2,41 +2,48 @@ namespace Blitter.Tests;
 
 public class SparseVoxelWorldTests
 {
-    /// <summary>Records the coords it is asked to generate and optionally seeds a constant id.</summary>
+    /// <summary>Records the min-corner of each region it is asked to generate and optionally seeds a constant type.</summary>
     private sealed class RecordingGenerator : IVoxelGenerator
     {
-        public List<ChunkCoord> Generated { get; } = new();
-        public int FillId { get; init; }
+        public List<VoxelCoord> Generated { get; } = new();
+        public VoxelType? Fill { get; init; }
 
-        public void Generate(ChunkCoord coord, int cellsX, int cellsY, int cellsZ, int[] cells)
+        public void Generate(in VoxelBuffer cells)
         {
-            Generated.Add(coord);
-            if (FillId != 0)
-                Array.Fill(cells, FillId);
+            var b = cells.Bounds;
+            Generated.Add(b.Min);
+            if (Fill is not null)
+            {
+                for (int z = b.Min.Z; z <= b.Max.Z; z++)
+                for (int y = b.Min.Y; y <= b.Max.Y; y++)
+                for (int x = b.Min.X; x <= b.Max.X; x++)
+                    cells[x, y, z] = new VoxelInfo(Fill);
+            }
         }
     }
 
-    private static VoxelPalette MakePalette()
+    private static VoxelCatalog MakeCatalog()
     {
-        var palette = new VoxelPalette();
-        palette.Add(new VoxelType { Id = 1, Name = "stone" });
-        return palette;
+        var catalog = new VoxelCatalog();
+        catalog.Add(new VoxelType { Name = "stone" });
+        return catalog;
     }
 
     [Fact]
     public void Constructor_RejectsNonPositiveChunkSize()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            new SparseVoxelWorld(MakePalette(), new RecordingGenerator(), 0, 16, 16));
+            new SparseVoxelWorld(MakeCatalog(), new RecordingGenerator(), new ChunkSize(0, 16, 16)));
     }
 
     [Fact]
     public void GetVoxel_OnUnloadedChunk_ReturnsAirWithoutGenerating()
     {
-        var gen = new RecordingGenerator { FillId = 1 };
-        var world = new SparseVoxelWorld(MakePalette(), gen);
+        var catalog = MakeCatalog();
+        var gen = new RecordingGenerator { Fill = catalog["stone"] };
+        var world = new SparseVoxelWorld(catalog, gen);
 
-        Assert.Equal(0, world.GetVoxel(5, 5, 5));
+        Assert.True(world.GetVoxel(5, 5, 5).IsAir);
         Assert.Empty(gen.Generated); // reads must not force generation
     }
 
@@ -44,17 +51,18 @@ public class SparseVoxelWorldTests
     public void SetVoxel_GeneratesChunkAndStores()
     {
         var gen = new RecordingGenerator();
-        var world = new SparseVoxelWorld(MakePalette(), gen, 16, 64, 16);
+        var world = new SparseVoxelWorld(MakeCatalog(), gen, new ChunkSize(16, 64, 16));
+        var stone = world.Catalog["stone"];
 
-        Assert.True(world.SetVoxel(3, 2, 1, 1));
-        Assert.Equal(1, world.GetVoxel(3, 2, 1));
+        Assert.True(world.SetVoxel(3, 2, 1, stone));
+        Assert.Same(stone, world.GetVoxel(3, 2, 1).Type);
         Assert.Single(gen.Generated);
     }
 
     [Fact]
     public void WorldToChunk_UsesFlooredDivisionForNegatives()
     {
-        var world = new SparseVoxelWorld(MakePalette(), new RecordingGenerator(), 16, 16, 16);
+        var world = new SparseVoxelWorld(MakeCatalog(), new RecordingGenerator(), new ChunkSize(16, 16, 16));
 
         Assert.Equal(new ChunkCoord(0, 0, 0), world.WorldToChunk(0, 0, 0));
         Assert.Equal(new ChunkCoord(0, 0, 0), world.WorldToChunk(15, 15, 15));
@@ -68,27 +76,29 @@ public class SparseVoxelWorldTests
     public void EnsureChunk_GeneratesOnceThenReportsAlreadyLoaded()
     {
         var gen = new RecordingGenerator();
-        var world = new SparseVoxelWorld(MakePalette(), gen);
+        var world = new SparseVoxelWorld(MakeCatalog(), gen);
         var coord = new ChunkCoord(2, 0, -1);
 
         Assert.True(world.EnsureChunk(coord));
         Assert.False(world.EnsureChunk(coord));
         Assert.Single(gen.Generated);
-        Assert.Equal(coord, gen.Generated[0]);
+        // Default chunk size is 16x64x16, so chunk (2, 0, -1) starts at world (32, 0, -16).
+        Assert.Equal(new VoxelCoord(32, 0, -16), gen.Generated[0]);
         Assert.True(world.IsChunkLoaded(coord));
     }
 
     [Fact]
     public void UnloadChunk_RemovesData()
     {
-        var gen = new RecordingGenerator { FillId = 1 };
-        var world = new SparseVoxelWorld(MakePalette(), gen);
+        var catalog = MakeCatalog();
+        var gen = new RecordingGenerator { Fill = catalog["stone"] };
+        var world = new SparseVoxelWorld(catalog, gen);
         var coord = new ChunkCoord(0, 0, 0);
 
         world.EnsureChunk(coord);
         Assert.True(world.UnloadChunk(coord));
         Assert.False(world.IsChunkLoaded(coord));
         Assert.False(world.UnloadChunk(coord)); // already gone
-        Assert.Equal(0, world.GetVoxel(0, 0, 0)); // reads air again
+        Assert.True(world.GetVoxel(0, 0, 0).IsAir); // reads air again
     }
 }

@@ -3,15 +3,25 @@ using Blitter.Bits;
 namespace Blitter.Blocks3D;
 
 /// <summary>
-/// Static properties of one voxel kind. Looked up by id through a
-/// <see cref="VoxelPalette"/>.
+/// Static properties of one voxel kind. Registered in a
+/// <see cref="VoxelCatalog"/> and resolved by <see cref="Name"/>.
 /// </summary>
 public sealed class VoxelType
 {
-    /// <summary>The id this type is registered under in its palette.</summary>
-    public int Id { get; init; }
+    /// <summary>
+    /// Dense storage index stamped by the <see cref="VoxelCatalog"/> this
+    /// type is added to. An implementation detail of how worlds pack their
+    /// voxels; not part of a type's identity.
+    /// </summary>
+    internal int Id { get; set; }
 
-    /// <summary>Human-readable name. Useful for debugging and content tooling.</summary>
+    /// <summary>The catalog this type belongs to, or <c>null</c> until it is added.</summary>
+    internal VoxelCatalog? Owner { get; set; }
+
+    /// <summary>
+    /// Intrinsic identity of the voxel kind. Required and unique within a
+    /// catalog; content and tooling refer to voxels by this name.
+    /// </summary>
     public string Name { get; init; } = "";
 
     /// <summary>True for cells that have no geometry and no collision (air, void).</summary>
@@ -32,7 +42,7 @@ public sealed class VoxelType
     /// <summary>Physics material the voxel reports when it acts as a collision surface.</summary>
     public PhysicsMaterial Physics { get; init; } = PhysicsMaterial.Ideal;
 
-    /// <summary>The canonical "air" type. Id 0 in any default palette.</summary>
+    /// <summary>The canonical "air" type. Index 0 in every catalog.</summary>
     public static readonly VoxelType Air = new()
     {
         Id = 0,

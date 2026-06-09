@@ -65,55 +65,46 @@ var plankTex     = tiles[0, 0];
 var stoneBrickTex = tiles[2, 4];
 var sandTex      = tiles[0, 4];
 
-var palette = new VoxelPalette();
-var stone = palette.Add(new VoxelType { Id = 1, Name = "stone", Shape = new CubeVoxelShape(stoneTex) });
-var dirt  = palette.Add(new VoxelType { Id = 2, Name = "dirt",  Shape = new CubeVoxelShape(dirtTex) });
-var grass = palette.Add(new VoxelType
+var catalog = new VoxelCatalog();
+var stone = catalog.Add(new VoxelType { Name = "stone", Shape = new CubeVoxelShape(stoneTex) });
+var dirt  = catalog.Add(new VoxelType { Name = "dirt",  Shape = new CubeVoxelShape(dirtTex) });
+var grass = catalog.Add(new VoxelType
 {
-    Id = 3,
     Name = "grass",
     Shape = new CubeVoxelShape(top: grassTopTex, sides: grassSideTex, bottom: dirtTex),
 });
 // Leaves: an alpha-cutout cube. IsOpaque = false so neighbors keep the
 // faces they share with it (you can see through the gaps to the blocks
 // behind), and the cutout shader discards the transparent texels.
-var leaves = palette.Add(new VoxelType
+var leaves = catalog.Add(new VoxelType
 {
-    Id = 4,
     Name = "leaves",
     IsOpaque = false,
     Shape = new CubeVoxelShape(leavesTex, TransparencyMode.Cutout),
 });
 // Tree trunk: log top/bottom and a separate bark side.
-var log = palette.Add(new VoxelType
+var log = catalog.Add(new VoxelType
 {
-    Id = 5,
     Name = "log",
     Shape = new CubeVoxelShape(topBottom: logTopTex, sides: logSideTex),
 });
 // Building blocks for the spawn hut.
-var planks = palette.Add(new VoxelType { Id = 6, Name = "planks", Shape = new CubeVoxelShape(plankTex) });
-var stoneBrick = palette.Add(new VoxelType { Id = 7, Name = "stonebrick", Shape = new CubeVoxelShape(stoneBrickTex) });
-var sand = palette.Add(new VoxelType { Id = 8, Name = "sand", Shape = new CubeVoxelShape(sandTex) });
-// Glass: a tinted, see-through pane. Its texture is built in code (see
-// MakeGlassTile) rather than loaded from the atlas. IsOpaque = false so
-// neighbors keep the faces they share with it, and Blend alpha-composites
-// the tinted body over the scene behind it.
+var planks = catalog.Add(new VoxelType { Name = "planks", Shape = new CubeVoxelShape(plankTex) });
+var stoneBrick = catalog.Add(new VoxelType { Name = "stonebrick", Shape = new CubeVoxelShape(stoneBrickTex) });
+var sand = catalog.Add(new VoxelType { Name = "sand", Shape = new CubeVoxelShape(sandTex) });
+
+// Glass: a tinted, see-through block
 var glassTex = MakeGlassTile();
-var glass = palette.Add(new VoxelType
+var glass = catalog.Add(new VoxelType
 {
-    Id = 9,
     Name = "glass",
     IsOpaque = false,
     Shape = new CubeVoxelShape(glassTex, TransparencyMode.Blend),
 });
 
-var generator = new TerrainGenerator(
-    grassId: grass.Id, dirtId: dirt.Id, stoneId: stone.Id,
-    leavesId: leaves.Id, logId: log.Id,
-    plankId: planks.Id, stoneBrickId: stoneBrick.Id, sandId: sand.Id,
-    glassId: glass.Id);
-var voxelWorld = new SparseVoxelWorld(palette, generator, ChunkVoxelsX, ChunkVoxelsY, ChunkVoxelsZ);
+var generator = new TerrainGenerator(catalog);
+
+var voxelWorld = new SparseVoxelWorld(catalog, generator, new ChunkSize(ChunkVoxelsX, ChunkVoxelsY, ChunkVoxelsZ));
 var chunkSource = new VoxelChunkSource3D(voxelWorld, Vector3.One, ChunkVoxelsX, ChunkVoxelsY, ChunkVoxelsZ);
 
 var window = new Window3D
@@ -254,51 +245,45 @@ static Bitmap MakeGlassTile()
 // after eviction.
 sealed class TerrainGenerator : IVoxelGenerator
 {
-    private readonly int _grassId;
-    private readonly int _dirtId;
-    private readonly int _stoneId;
-    private readonly int _leavesId;
-    private readonly int _logId;
-    private readonly int _plankId;
-    private readonly int _stoneBrickId;
-    private readonly int _sandId;
-    private readonly int _glassId;
+    private readonly VoxelType _grass;
+    private readonly VoxelType _dirt;
+    private readonly VoxelType _stone;
+    private readonly VoxelType _leaves;
+    private readonly VoxelType _log;
+    private readonly VoxelType _planks;
+    private readonly VoxelType _stoneBrick;
+    private readonly VoxelType _sand;
+    private readonly VoxelType _glass;
 
-    public TerrainGenerator(
-        int grassId, int dirtId, int stoneId,
-        int leavesId, int logId,
-        int plankId, int stoneBrickId, int sandId,
-        int glassId)
+    public TerrainGenerator(VoxelCatalog catalog)
     {
-        _grassId = grassId;
-        _dirtId = dirtId;
-        _stoneId = stoneId;
-        _leavesId = leavesId;
-        _logId = logId;
-        _plankId = plankId;
-        _stoneBrickId = stoneBrickId;
-        _sandId = sandId;
-        _glassId = glassId;
+        _grass = catalog["grass"];
+        _dirt = catalog["dirt"];
+        _stone = catalog["stone"];
+        _leaves = catalog["leaves"];
+        _log = catalog["log"];
+        _planks = catalog["planks"];
+        _stoneBrick = catalog["stonebrick"];
+        _sand = catalog["sand"];
+        _glass = catalog["glass"];
     }
 
-    public void Generate(ChunkCoord coord, int voxelsX, int voxelsY, int voxelsZ, int[] voxels)
+    public void Generate(in VoxelBuffer voxels)
     {
-        int originX = coord.X * voxelsX;
-        int originY = coord.Y * voxelsY;
-        int originZ = coord.Z * voxelsZ;
+        var bounds = voxels.Bounds;
+
         // Reused each column: the (up to 9) trees from the 3x3 grid
         // cells around the column that could reach it.
         Span<int> treeX = stackalloc int[9];
         Span<int> treeZ = stackalloc int[9];
         Span<int> treeBase = stackalloc int[9];
-        for (int lz = 0; lz < voxelsZ; lz++)
+
+        for (int wz = bounds.Min.Z; wz <= bounds.Max.Z; wz++)
         {
-            int wz = originZ + lz;
-            for (int lx = 0; lx < voxelsX; lx++)
+            for (int wx = bounds.Min.X; wx <= bounds.Max.X; wx++)
             {
-                int wx = originX + lx;
                 int top = SurfaceHeight(wx, wz);
-                int surfaceId = SurfaceVoxel(wx, wz, _grassId, _dirtId, _stoneId);
+                VoxelType surface = SurfaceVoxel(wx, wz);
 
                 // Gather trees whose trunk/leaves could reach this
                 // column. Trees are placed on a world grid (pure
@@ -315,7 +300,7 @@ sealed class TerrainGenerator : IVoxelGenerator
                             continue;
                         // Trees only grow on grass, and never inside the
                         // spawn hut footprint (so leaves don't poke in).
-                        if (SurfaceVoxel(tx, tz, _grassId, _dirtId, _stoneId) != _grassId)
+                        if (SurfaceVoxel(tx, tz) != _grass)
                             continue;
                         if (InHut(tx, tz))
                             continue;
@@ -325,39 +310,37 @@ sealed class TerrainGenerator : IVoxelGenerator
                         treeCount++;
                     }
 
-                for (int ly = 0; ly < voxelsY; ly++)
+                for (int wy = bounds.Min.Y; wy <= bounds.Max.Y; wy++)
                 {
-                    int wy = originY + ly;
-                    int id;
+                    VoxelType type;
                     if (wy == 0)
-                        id = _stoneId;
+                        type = _stone;
                     else if (wy < top)
-                        id = _dirtId;
+                        type = _dirt;
                     else if (wy == top)
-                        id = surfaceId;
+                        type = surface;
                     else
                     {
                         // Above the surface: see if any nearby tree
                         // puts a log or leaf at this voxel.
-                        id = 0;
+                        type = VoxelType.Air;
                         for (int t = 0; t < treeCount; t++)
                         {
-                            int tv = TreeVoxel(
-                                wx - treeX[t], wz - treeZ[t], wy - treeBase[t],
-                                _logId, _leavesId);
-                            if (tv != 0)
+                            var tv = TreeVoxel(
+                                wx - treeX[t], wz - treeZ[t], wy - treeBase[t]);
+                            if (!tv.IsAir)
                             {
-                                id = tv;
+                                type = tv;
                                 break;
                             }
                         }
                     }
 
                     // The spawn hut overrides terrain and trees.
-                    int sid = StructureVoxel(wx, wy, wz);
-                    if (sid >= 0)
-                        id = sid;
-                    voxels[(lz * voxelsY + ly) * voxelsX + lx] = id;
+                    var structure = StructureVoxel(wx, wy, wz);
+                    if (structure is not null)
+                        type = structure;
+                    voxels[wx, wy, wz] = type;
                 }
             }
         }
@@ -371,13 +354,13 @@ sealed class TerrainGenerator : IVoxelGenerator
         return baseTop + Math.Clamp((int)MathF.Round(h + 1f), 0, 2);
     }
 
-    public static int SurfaceVoxel(int x, int z, int grassId, int dirtId, int stoneId)
+    public VoxelType SurfaceVoxel(int x, int z)
     {
         float n = ValueNoise(x * 0.45f, z * 0.45f) * 0.65f
                 + ValueNoise(x * 0.15f, z * 0.15f) * 0.35f;
-        if (n > 0.78f) return stoneId;
-        if (n > 0.58f) return dirtId;
-        return grassId;
+        if (n > 0.78f) return _stone;
+        if (n > 0.58f) return _dirt;
+        return _grass;
     }
 
     // ---- Trees -------------------------------------------------------
@@ -410,36 +393,36 @@ sealed class TerrainGenerator : IVoxelGenerator
 
     // The blocky "small oak" shape, evaluated relative to the trunk
     // base. dx/dz are the column offset from the trunk; rel is the
-    // height above the surface the trunk sits on. Returns a log id, a
-    // leaf id, or 0 for empty.
-    static int TreeVoxel(int dx, int dz, int rel, int logId, int leafId)
+    // height above the surface the trunk sits on. Returns the log type,
+    // the leaf type, or air for empty.
+    VoxelType TreeVoxel(int dx, int dz, int rel)
     {
         const int trunkHeight = 4;
 
         // Trunk: a single column of logs.
         if (dx == 0 && dz == 0 && rel >= 1 && rel <= trunkHeight)
-            return logId;
+            return _log;
 
         int reach = Math.Max(Math.Abs(dx), Math.Abs(dz));
         // Two wide leaf layers around the top, corners trimmed.
         if (rel == trunkHeight - 1 || rel == trunkHeight)
         {
             if (reach <= 2 && !(Math.Abs(dx) == 2 && Math.Abs(dz) == 2))
-                return leafId;
+                return _leaves;
         }
         // A 3x3 layer above them.
         else if (rel == trunkHeight + 1)
         {
             if (reach <= 1)
-                return leafId;
+                return _leaves;
         }
         // A small plus-shaped cap.
         else if (rel == trunkHeight + 2)
         {
             if (Math.Abs(dx) + Math.Abs(dz) <= 1)
-                return leafId;
+                return _leaves;
         }
-        return 0;
+        return VoxelType.Air;
     }
 
     // Floor division (C# integer division truncates toward zero, which
@@ -460,35 +443,36 @@ sealed class TerrainGenerator : IVoxelGenerator
         => x >= HutMinX && x < HutMinX + HutSize
         && z >= HutMinZ && z < HutMinZ + HutSize;
 
-    // Returns the hut's voxel id at (wx, wy, wz): a block id, 0 to force
-    // air (interior, doorway, window slots), or -1 for "no opinion" so
-    // the terrain shows through.
-    int StructureVoxel(int wx, int wy, int wz)
+    // Returns the hut's voxel at (wx, wy, wz): a block type,
+    // <see cref="VoxelType.Air"/> to force air (interior, doorway,
+    // window slots), or <c>null</c> for "no opinion" so the terrain
+    // shows through.
+    VoxelType? StructureVoxel(int wx, int wy, int wz)
     {
         if (!InHut(wx, wz))
-            return -1;
+            return null;
 
         int lx = wx - HutMinX;
         int lz = wz - HutMinZ;
         int baseY = SurfaceHeight(HutMinX + 2, HutMinZ + 2);
         int rel = wy - baseY;
 
-        if (rel < -2) return -1;        // deep ground unchanged
-        if (rel < 0) return _sandId;    // foundation pad
-        if (rel == 0) return _plankId;  // floor
-        if (rel == 4) return _plankId;  // roof
-        if (rel > 4) return -1;         // open sky above
+        if (rel < -2) return null;          // deep ground unchanged
+        if (rel < 0) return _sand;          // foundation pad
+        if (rel == 0) return _planks;       // floor
+        if (rel == 4) return _planks;       // roof
+        if (rel > 4) return null;           // open sky above
 
         // Wall band (rel 1..3).
         bool perimeter = lx == 0 || lx == HutSize - 1 || lz == 0 || lz == HutSize - 1;
         if (!perimeter)
-            return 0;                   // hollow interior
+            return VoxelType.Air;           // hollow interior
 
         // Doorway: front wall (max Z, facing spawn), center column, two
         // voxels tall.
         bool frontWall = lz == HutSize - 1;
         if (frontWall && lx == 2 && (rel == 1 || rel == 2))
-            return 0;
+            return VoxelType.Air;
 
         // Window slots at eye height on the back wall and the two sides.
         bool backWall = lz == 0;
@@ -497,9 +481,9 @@ sealed class TerrainGenerator : IVoxelGenerator
             (backWall && lx == 2) ||
             (sideWall && lz == 2);
         if (rel == 2 && windowSlot)
-            return _glassId;            // tinted pane
+            return _glass;                  // tinted pane
 
-        return _stoneBrickId;
+        return _stoneBrick;
     }
 
     static float ValueNoise(float x, float z)

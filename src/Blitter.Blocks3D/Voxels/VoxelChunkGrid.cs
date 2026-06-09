@@ -61,8 +61,8 @@ internal sealed class VoxelChunkGrid
     /// <summary>World-space position of the chunk's local origin corner.</summary>
     public Vector3 WorldOrigin { get; private set; }
 
-    /// <summary>Palette of the underlying world.</summary>
-    public VoxelPalette Palette => World.Palette;
+    /// <summary>Catalog of the underlying world.</summary>
+    public VoxelCatalog Catalog => World.Catalog;
 
     /// <summary>
     /// Change stamp for this chunk's view of the world. Bumped (by the
@@ -97,11 +97,11 @@ internal sealed class VoxelChunkGrid
     }
 
     /// <summary>
-    /// Voxel id at chunk-local cell <paramref name="x"/>,
+    /// Voxel at chunk-local cell <paramref name="x"/>,
     /// <paramref name="y"/>, <paramref name="z"/>. Coordinates outside
     /// the chunk are forwarded to the world, which returns air for
     /// cells beyond the world's own bounds.
     /// </summary>
-    public int GetVoxel(int x, int y, int z) =>
+    public VoxelInfo GetVoxel(int x, int y, int z) =>
         World.GetVoxel(new VoxelCoord(OriginCellX + x, OriginCellY + y, OriginCellZ + z));
 }

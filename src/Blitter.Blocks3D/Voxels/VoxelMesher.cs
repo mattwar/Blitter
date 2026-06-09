@@ -80,25 +80,25 @@ internal readonly struct VoxelMeshContext
     public bool IsNeighborOpaque(VoxelFace face)
     {
         var off = _faceOffsets[(int)face];
-        return _grid.Palette.IsOpaque(_grid.GetVoxel(X + off.DX, Y + off.DY, Z + off.DZ));
+        return _grid.GetVoxel(X + off.DX, Y + off.DY, Z + off.DZ).IsOpaque;
     }
 
     /// <summary>
     /// True when the face toward <paramref name="face"/> can be skipped
-    /// for a cell holding <paramref name="ownVoxel"/>: either the
-    /// neighbor is opaque, or it's the same voxel as this one (so two
+    /// for a cell holding <paramref name="ownType"/>: either the
+    /// neighbor is opaque, or it's the same voxel type as this one (so two
     /// adjacent panes of the same translucent block don't draw the
     /// doubled interior face between them).
     /// </summary>
-    public bool IsNeighborOccluding(VoxelFace face, int ownVoxel)
+    public bool IsNeighborOccluding(VoxelFace face, VoxelType ownType)
     {
         var off = _faceOffsets[(int)face];
-        int neighbor = _grid.GetVoxel(X + off.DX, Y + off.DY, Z + off.DZ);
-        return neighbor == ownVoxel || _grid.Palette.IsOpaque(neighbor);
+        var neighbor = _grid.GetVoxel(X + off.DX, Y + off.DY, Z + off.DZ);
+        return ReferenceEquals(neighbor.Type, ownType) || neighbor.IsOpaque;
     }
 
-    /// <summary>The voxel id stored in this cell.</summary>
-    public int Voxel => _grid.GetVoxel(X, Y, Z);
+    /// <summary>The voxel type stored in this cell.</summary>
+    public VoxelType Voxel => _grid.GetVoxel(X, Y, Z).Type;
 }
 
 /// <summary>
@@ -116,13 +116,11 @@ internal static class VoxelMesher
         ArgumentNullException.ThrowIfNull(grid);
         ArgumentNullException.ThrowIfNull(builder);
 
-        var palette = grid.Palette;
-
         for (int z = 0; z < grid.CellsZ; z++)
         for (int y = 0; y < grid.CellsY; y++)
         for (int x = 0; x < grid.CellsX; x++)
         {
-            var type = palette[grid.GetVoxel(x, y, z)];
+            var type = grid.GetVoxel(x, y, z).Type;
             type.Shape.Build(new VoxelMeshContext(grid, x, y, z), builder);
         }
     }

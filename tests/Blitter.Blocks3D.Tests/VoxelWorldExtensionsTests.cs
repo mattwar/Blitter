@@ -4,42 +4,42 @@ public class VoxelWorldExtensionsTests
 {
     private static (ArrayVoxelWorld world, VoxelType stone) MakeWorld()
     {
-        var palette = new VoxelPalette();
-        var stone = palette.Add(new VoxelType { Id = 1, Name = "stone", IsOpaque = true });
-        return (new ArrayVoxelWorld(4, 4, 4, palette), stone);
+        var catalog = new VoxelCatalog();
+        var stone = catalog.Add(new VoxelType { Name = "stone", IsOpaque = true });
+        return (new ArrayVoxelWorld(4, 4, 4, catalog), stone);
     }
 
     [Fact]
-    public void GetVoxelType_ResolvesThroughPalette()
+    public void GetVoxel_ResolvesType()
     {
         var (world, stone) = MakeWorld();
-        world.SetVoxel(1, 1, 1, 1);
+        world.SetVoxel(1, 1, 1, stone);
 
-        Assert.Same(stone, world.GetVoxelType(1, 1, 1));
-        Assert.Same(VoxelType.Air, world.GetVoxelType(0, 0, 0));
+        Assert.Same(stone, world.GetVoxel(1, 1, 1).Type);
+        Assert.Same(VoxelType.Air, world.GetVoxel(0, 0, 0).Type);
     }
 
     [Fact]
-    public void SetVoxel_ByType_WritesTypeId()
+    public void SetVoxel_ByType_WritesType()
     {
         var (world, stone) = MakeWorld();
         Assert.True(world.SetVoxel(2, 2, 2, stone));
-        Assert.Equal(1, world.GetVoxel(2, 2, 2));
+        Assert.Same(stone, world.GetVoxel(2, 2, 2).Type);
     }
 
     [Fact]
-    public void SetVoxel_ByName_ResolvesId()
+    public void SetVoxel_ByName_ResolvesType()
     {
-        var (world, _) = MakeWorld();
+        var (world, stone) = MakeWorld();
         Assert.True(world.SetVoxel(0, 0, 0, "stone"));
-        Assert.Equal(1, world.GetVoxel(0, 0, 0));
+        Assert.Same(stone, world.GetVoxel(0, 0, 0).Type);
     }
 
     [Fact]
     public void IsAir_And_IsOpaque_Delegate()
     {
-        var (world, _) = MakeWorld();
-        world.SetVoxel(1, 1, 1, 1);
+        var (world, stone) = MakeWorld();
+        world.SetVoxel(1, 1, 1, stone);
 
         Assert.True(world.IsAir(0, 0, 0));
         Assert.False(world.IsAir(1, 1, 1));

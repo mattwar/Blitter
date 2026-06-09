@@ -2,20 +2,19 @@ namespace Blitter.Blocks3D;
 
 /// <summary>
 /// Ergonomic helpers around <see cref="IVoxelWorld"/> for content code
-/// that prefers <see cref="VoxelType"/> over raw ids. Hot-path code
-/// (meshers, collision) should keep calling
-/// <see cref="IVoxelWorld.GetVoxel"/> / <see cref="IVoxelWorld.SetVoxel"/>
-/// directly to avoid per-cell palette lookups.
+/// that prefers (x, y, z) coordinates. Hot-path code (meshers, collision)
+/// should keep calling <see cref="IVoxelWorld.GetVoxel"/> /
+/// <see cref="IVoxelWorld.SetVoxel"/> directly.
 /// </summary>
 public static class VoxelWorldExtensions
 {
-    /// <summary>Gets the voxel id at (x, y, z).</summary>
-    public static int GetVoxel(this IVoxelWorld world, int x, int y, int z) =>
+    /// <summary>Gets the voxel at (x, y, z).</summary>
+    public static VoxelInfo GetVoxel(this IVoxelWorld world, int x, int y, int z) =>
         world.GetVoxel(new VoxelCoord(x, y, z));
 
-    /// <summary>Sets the voxel at (x, y, z) to <paramref name="id"/>.</summary>
-    public static bool SetVoxel(this IVoxelWorld world, int x, int y, int z, int id) =>
-        world.SetVoxel(new VoxelCoord(x, y, z), id);
+    /// <summary>Sets the voxel at (x, y, z) to <paramref name="voxel"/>.</summary>
+    public static bool SetVoxel(this IVoxelWorld world, int x, int y, int z, VoxelInfo voxel) =>
+        world.SetVoxel(new VoxelCoord(x, y, z), voxel);
 
     /// <summary>Ensures the inclusive cell range is materialized.</summary>
     public static void EnsureVoxels(this IVoxelWorld world,
@@ -27,26 +26,15 @@ public static class VoxelWorldExtensions
         int minX, int minY, int minZ, int maxX, int maxY, int maxZ) =>
         world.TrimVoxelsOutside(new VoxelBox(minX, minY, minZ, maxX, maxY, maxZ));
 
-    /// <summary>Resolves the cell's id through <see cref="IVoxelWorld.Palette"/>.</summary>
-    public static VoxelType GetVoxelType(this IVoxelWorld world, int x, int y, int z) =>
-        world.Palette[world.GetVoxel(new VoxelCoord(x, y, z))];
-
-    /// <summary>Sets the cell to <paramref name="type"/>.<see cref="VoxelType.Id"/>.</summary>
-    public static bool SetVoxel(this IVoxelWorld world, int x, int y, int z, VoxelType type)
-    {
-        ArgumentNullException.ThrowIfNull(type);
-        return world.SetVoxel(new VoxelCoord(x, y, z), type.Id);
-    }
-
-    /// <summary>Sets the cell to the id of the type registered under <paramref name="typeName"/>.</summary>
+    /// <summary>Sets the cell to the type registered under <paramref name="typeName"/>.</summary>
     public static bool SetVoxel(this IVoxelWorld world, int x, int y, int z, string typeName) =>
-        world.SetVoxel(new VoxelCoord(x, y, z), world.Palette.IdOf(typeName));
+        world.SetVoxel(new VoxelCoord(x, y, z), world.Catalog[typeName]);
 
     /// <summary>True when the cell at the given coordinates is air.</summary>
     public static bool IsAir(this IVoxelWorld world, int x, int y, int z) =>
-        world.Palette.IsAir(world.GetVoxel(new VoxelCoord(x, y, z)));
+        world.GetVoxel(new VoxelCoord(x, y, z)).IsAir;
 
     /// <summary>True when the cell at the given coordinates is opaque.</summary>
     public static bool IsOpaque(this IVoxelWorld world, int x, int y, int z) =>
-        world.Palette.IsOpaque(world.GetVoxel(new VoxelCoord(x, y, z)));
+        world.GetVoxel(new VoxelCoord(x, y, z)).IsOpaque;
 }

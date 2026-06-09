@@ -6,21 +6,21 @@ namespace Blitter.Blocks3D;
 public interface IVoxelWorld
 {
     /// <summary>
-    /// Palette resolving every id returned by <see cref="GetVoxel"/>.
+    /// The catalog of voxel types this world can hold.
     /// </summary>
-    VoxelPalette Palette { get; }
+    VoxelCatalog Catalog { get; }
 
     /// <summary>
-    /// Gets the voxel id at <paramref name="coord"/>.
-    /// Out-of-bounds reads return <c>0</c> (air).
+    /// Gets the voxel at <paramref name="coord"/>.
+    /// Out-of-bounds reads return air.
     /// </summary>
-    int GetVoxel(VoxelCoord coord);
+    VoxelInfo GetVoxel(in VoxelCoord coord);
 
     /// <summary>
-    /// Sets the voxel at <paramref name="coord"/>. 
+    /// Sets the voxel at <paramref name="coord"/> to <paramref name="voxel"/>.
     /// Out-of-bounds writes return <c>false</c>.
     /// </summary>
-    bool SetVoxel(VoxelCoord coord, int id);
+    bool SetVoxel(in VoxelCoord coord, in VoxelInfo voxel);
 
     /// <summary>
     /// Raised when one or more voxels change or when a region is first materialized.
@@ -38,37 +38,4 @@ public interface IVoxelWorld
     /// and can be discarded/unloaded.
     /// </summary>
     void TrimVoxelsOutside(in VoxelBox range);
-}
-
-/// <summary>
-/// Handler for <see cref="IVoxelWorld.VoxelsChanged"/>.
-/// </summary>
-public delegate void VoxelsChangedHandler(IVoxelWorld world, in VoxelBox change);
-
-/// <summary>
-/// A single voxel cell coordinate in world-voxel space (one unit per cell).
-/// </summary>
-public readonly record struct VoxelCoord(int X, int Y, int Z);
-
-/// <summary>
-/// An inclusive box of voxel cells
-/// </summary>
-public readonly record struct VoxelBox(VoxelCoord Min, VoxelCoord Max)
-{
-    /// <summary>Builds a box from inclusive min/max cell components.</summary>
-    public VoxelBox(int minX, int minY, int minZ, int maxX, int maxY, int maxZ)
-        : this(new VoxelCoord(minX, minY, minZ), new VoxelCoord(maxX, maxY, maxZ)) { }
-
-    /// <summary>A degenerate box covering the single cell <paramref name="coord"/>.</summary>
-    public static VoxelBox Single(VoxelCoord coord) => new(coord, coord);
-
-    /// <summary>A degenerate box covering the single cell (x, y, z).</summary>
-    public static VoxelBox Single(int x, int y, int z) =>
-        new(new VoxelCoord(x, y, z), new VoxelCoord(x, y, z));
-
-    /// <summary>True when this box and <paramref name="other"/> share at least one cell.</summary>
-    public bool Intersects(in VoxelBox other) =>
-        Min.X <= other.Max.X && Max.X >= other.Min.X &&
-        Min.Y <= other.Max.Y && Max.Y >= other.Min.Y &&
-        Min.Z <= other.Max.Z && Max.Z >= other.Min.Z;
 }

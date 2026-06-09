@@ -225,6 +225,44 @@ public class ChunkedPlayField3D : Layer3D
 public readonly record struct ChunkCoord(int X, int Y, int Z);
 
 /// <summary>
+/// Dimensions of one chunk, in voxels along each axis. All three must be
+/// positive. Bundles the row-major <see cref="IndexOf"/> layout (X fastest,
+/// then Y, then Z) and the total <see cref="VoxelCount"/> so callers don't
+/// re-derive either from loose ints.
+/// </summary>
+public readonly record struct ChunkSize
+{
+    /// <summary>The default chunk size: 16 wide, 64 tall, 16 deep.</summary>
+    public static ChunkSize Default => new(16, 64, 16);
+
+    /// <summary>Creates a chunk size; throws if any dimension is not positive.</summary>
+    public ChunkSize(int x, int y, int z)
+    {
+        if (x <= 0 || y <= 0 || z <= 0)
+            throw new ArgumentOutOfRangeException(nameof(x), "Chunk dimensions must be positive.");
+        X = x;
+        Y = y;
+        Z = z;
+    }
+
+    /// <summary>Width in voxels (X axis).</summary>
+    public int X { get; }
+    /// <summary>Height in voxels (Y axis).</summary>
+    public int Y { get; }
+    /// <summary>Depth in voxels (Z axis).</summary>
+    public int Z { get; }
+
+    /// <summary>Total number of voxels in a chunk of this size.</summary>
+    public int VoxelCount => X * Y * Z;
+
+    /// <summary>
+    /// Row-major buffer index for local voxel (x, y, z), with X varying
+    /// fastest, then Y, then Z.
+    /// </summary>
+    public int IndexOf(int x, int y, int z) => (z * Y + y) * X + x;
+}
+
+/// <summary>
 /// The read contract <see cref="ChunkedPlayField3D"/> depends on: query the
 /// chunk grid and fetch the chunk for a coord/position. A source is also the
 /// <see cref="ISpriteHost3D"/> for every sprite in any of its chunks. The

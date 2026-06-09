@@ -149,7 +149,7 @@ internal sealed class VoxelHitShape3D : HitShape3D
     }
 
     private bool IsSolid(int x, int y, int z) =>
-        _grid.Palette[_grid.GetVoxel(x, y, z)].Shape.FillsVoxel;
+        _grid.GetVoxel(x, y, z).Type.Shape.FillsVoxel;
 
     private HitPrimitive3D MakeBoxPrimitive(in Pose3D mine, int x, int y, int z)
     {

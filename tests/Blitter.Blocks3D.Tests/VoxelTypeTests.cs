@@ -5,7 +5,6 @@ public class VoxelTypeTests
     [Fact]
     public void Air_IsTheCanonicalEmptyCell()
     {
-        Assert.Equal(0, VoxelType.Air.Id);
         Assert.True(VoxelType.Air.IsAir);
         Assert.False(VoxelType.Air.IsOpaque);
         Assert.Same(EmptyVoxelShape.Instance, VoxelType.Air.Shape);
@@ -15,7 +14,7 @@ public class VoxelTypeTests
     [Fact]
     public void Defaults_AreOpaqueFullCube()
     {
-        var type = new VoxelType { Id = 1, Name = "stone" };
+        var type = new VoxelType { Name = "stone" };
         Assert.False(type.IsAir);
         Assert.True(type.IsOpaque);
         Assert.IsType<CubeVoxelShape>(type.Shape);
@@ -25,7 +24,7 @@ public class VoxelTypeTests
     [Fact]
     public void DefaultCube_HasNoTexture()
     {
-        var type = new VoxelType { Id = 1 };
+        var type = new VoxelType { Name = "stone" };
         var cube = Assert.IsType<CubeVoxelShape>(type.Shape);
         Assert.Null(cube.Texture);
     }

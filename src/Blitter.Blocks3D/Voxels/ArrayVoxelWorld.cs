@@ -2,15 +2,16 @@ namespace Blitter.Blocks3D;
 
 /// <summary>
 /// A fixed-size dense <see cref="IVoxelWorld"/> backed by a flat <see cref="int"/> array. 
-/// Suited to tests and small/bounded worlds.
+/// Suited to tests and small/bounded worlds. The stored ints are catalog
+/// indices, an internal storage detail.
 /// </summary>
 public sealed class ArrayVoxelWorld : IVoxelWorld
 {
     private readonly int[] _cells;
 
-    public ArrayVoxelWorld(int width, int height, int depth, VoxelPalette palette)
+    public ArrayVoxelWorld(int width, int height, int depth, VoxelCatalog catalog)
     {
-        ArgumentNullException.ThrowIfNull(palette);
+        ArgumentNullException.ThrowIfNull(catalog);
         if (width <= 0)
             throw new ArgumentOutOfRangeException(nameof(width));
         if (height <= 0)
@@ -21,7 +22,7 @@ public sealed class ArrayVoxelWorld : IVoxelWorld
         Width = width;
         Height = height;
         Depth = depth;
-        Palette = palette;
+        Catalog = catalog;
         _cells = new int[width * height * depth];
     }
 
@@ -35,26 +36,27 @@ public sealed class ArrayVoxelWorld : IVoxelWorld
     public int Depth { get; }
 
     /// <inheritdoc/>
-    public VoxelPalette Palette { get; }
+    public VoxelCatalog Catalog { get; }
 
     /// <inheritdoc/>
     public event VoxelsChangedHandler? VoxelsChanged;
 
     /// <inheritdoc/>
-    public int GetVoxel(VoxelCoord coord)
+    public VoxelInfo GetVoxel(in VoxelCoord coord)
     {
         var (x, y, z) = coord;
         if ((uint)x >= (uint)Width || (uint)y >= (uint)Height || (uint)z >= (uint)Depth)
-            return 0;
-        return _cells[Index(x, y, z)];
+            return default;
+        return new VoxelInfo(Catalog[_cells[Index(x, y, z)]]);
     }
 
     /// <inheritdoc/>
-    public bool SetVoxel(VoxelCoord coord, int id)
+    public bool SetVoxel(in VoxelCoord coord, in VoxelInfo voxel)
     {
         var (x, y, z) = coord;
         if ((uint)x >= (uint)Width || (uint)y >= (uint)Height || (uint)z >= (uint)Depth)
             return false;
+        var id = Catalog.IndexOf(voxel.Type);
         var i = Index(x, y, z);
         if (_cells[i] == id)
             return false;
@@ -65,13 +67,15 @@ public sealed class ArrayVoxelWorld : IVoxelWorld
 
     /// <summary>
     /// Bulk-fills the voxel range <c>[minX..maxX] × [minY..maxY] × [minZ..maxZ]</c>
-    /// (inclusive) with <paramref name="id"/> and raises a single
+    /// (inclusive) with <paramref name="type"/> and raises a single
     /// <see cref="VoxelsChanged"/> for the entire bounding box. The
     /// range is clipped to the world. Returns the number of voxels
     /// actually written.
     /// </summary>
-    public int Fill(int minX, int minY, int minZ, int maxX, int maxY, int maxZ, int id)
+    public int Fill(int minX, int minY, int minZ, int maxX, int maxY, int maxZ, VoxelType type)
     {
+        ArgumentNullException.ThrowIfNull(type);
+        var id = Catalog.IndexOf(type);
         var x0 = Math.Max(minX, 0);
         var y0 = Math.Max(minY, 0);
         var z0 = Math.Max(minZ, 0);

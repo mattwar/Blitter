@@ -126,10 +126,10 @@ public sealed class CubeVoxelShape : VoxelShape
         // Same-type culling matters for the see-through modes: two
         // adjacent glass cubes shouldn't draw the doubled face between
         // them. For opaque cubes this is equivalent to IsNeighborOpaque.
-        int ownVoxel = context.Voxel;
+        VoxelType ownType = context.Voxel;
         for (int face = 0; face < 6; face++)
         {
-            if (context.IsNeighborOccluding((VoxelFace)face, ownVoxel))
+            if (context.IsNeighborOccluding((VoxelFace)face, ownType))
                 continue;
 
             var (source, u0, v0, u1, v1) = ResolveUvRect(Texture?.GetFace((VoxelFace)face));

@@ -11,62 +11,54 @@ public sealed class SparseVoxelWorld : IVoxelWorld
     private readonly Dictionary<ChunkCoord, int[]> _chunks = new();
     private readonly List<ChunkCoord> _trimScratch = new();
     private readonly IVoxelGenerator _generator;
+    private VoxelInfo[]? _genScratch;
 
     public SparseVoxelWorld(
-        VoxelPalette palette,
+        VoxelCatalog catalog,
         IVoxelGenerator generator,
-        int chunkVoxelsX = 16,
-        int chunkVoxelsY = 64,
-        int chunkVoxelsZ = 16)
+        ChunkSize? size = null)
     {
-        ArgumentNullException.ThrowIfNull(palette);
+        ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(generator);
-        if (chunkVoxelsX <= 0 || chunkVoxelsY <= 0 || chunkVoxelsZ <= 0)
-            throw new ArgumentOutOfRangeException(nameof(chunkVoxelsX), "Chunk voxel dimensions must be positive.");
 
-        Palette = palette;
+        Catalog = catalog;
         _generator = generator;
-        ChunkVoxelsX = chunkVoxelsX;
-        ChunkVoxelsY = chunkVoxelsY;
-        ChunkVoxelsZ = chunkVoxelsZ;
+        Size = size ?? ChunkSize.Default;
     }
 
     /// <inheritdoc/>
-    public VoxelPalette Palette { get; }
+    public VoxelCatalog Catalog { get; }
 
-    /// <summary>Chunk dimension along X, in voxels.</summary>
-    public int ChunkVoxelsX { get; }
-    /// <summary>Chunk dimension along Y, in voxels.</summary>
-    public int ChunkVoxelsY { get; }
-    /// <summary>Chunk dimension along Z, in voxels.</summary>
-    public int ChunkVoxelsZ { get; }
+    /// <summary>Chunk dimensions, in voxels.</summary>
+    public ChunkSize Size { get; }
 
     /// <inheritdoc/>
     public event VoxelsChangedHandler? VoxelsChanged;
 
     /// <inheritdoc/>
-    public int GetVoxel(VoxelCoord coord)
+    public VoxelInfo GetVoxel(in VoxelCoord coord)
     {
         var (x, y, z) = coord;
         var chunk = WorldToChunk(x, y, z);
         if (!_chunks.TryGetValue(chunk, out var voxels))
-            return 0;
-        var lx = x - chunk.X * ChunkVoxelsX;
-        var ly = y - chunk.Y * ChunkVoxelsY;
-        var lz = z - chunk.Z * ChunkVoxelsZ;
-        return voxels[Index(lx, ly, lz)];
+            return default;
+        var lx = x - chunk.X * Size.X;
+        var ly = y - chunk.Y * Size.Y;
+        var lz = z - chunk.Z * Size.Z;
+        return new VoxelInfo(Catalog[voxels[Size.IndexOf(lx, ly, lz)]]);
     }
 
     /// <inheritdoc/>
-    public bool SetVoxel(VoxelCoord coord, int id)
+    public bool SetVoxel(in VoxelCoord coord, in VoxelInfo voxel)
     {
+        var id = Catalog.IndexOf(voxel.Type);
         var (x, y, z) = coord;
         var chunk = WorldToChunk(x, y, z);
         var voxels = EnsureChunkInternal(in chunk);
-        var lx = x - chunk.X * ChunkVoxelsX;
-        var ly = y - chunk.Y * ChunkVoxelsY;
-        var lz = z - chunk.Z * ChunkVoxelsZ;
-        var i = Index(lx, ly, lz);
+        var lx = x - chunk.X * Size.X;
+        var ly = y - chunk.Y * Size.Y;
+        var lz = z - chunk.Z * Size.Z;
+        var i = Size.IndexOf(lx, ly, lz);
         if (voxels[i] == id)
             return false;
         voxels[i] = id;
@@ -131,9 +123,9 @@ public sealed class SparseVoxelWorld : IVoxelWorld
         foreach (var coord in _chunks.Keys)
         {
             // Voxel extent of this chunk, inclusive.
-            int x0 = coord.X * ChunkVoxelsX, x1 = x0 + ChunkVoxelsX - 1;
-            int y0 = coord.Y * ChunkVoxelsY, y1 = y0 + ChunkVoxelsY - 1;
-            int z0 = coord.Z * ChunkVoxelsZ, z1 = z0 + ChunkVoxelsZ - 1;
+            int x0 = coord.X * Size.X, x1 = x0 + Size.X - 1;
+            int y0 = coord.Y * Size.Y, y1 = y0 + Size.Y - 1;
+            int z0 = coord.Z * Size.Z, z1 = z0 + Size.Z - 1;
             bool intersects =
                 x1 >= min.X && x0 <= max.X &&
                 y1 >= min.Y && y0 <= max.Y &&
@@ -150,7 +142,7 @@ public sealed class SparseVoxelWorld : IVoxelWorld
     /// division so negative world coords map correctly.
     /// </summary>
     public ChunkCoord WorldToChunk(int x, int y, int z) =>
-        new(FloorDiv(x, ChunkVoxelsX), FloorDiv(y, ChunkVoxelsY), FloorDiv(z, ChunkVoxelsZ));
+        new(FloorDiv(x, Size.X), FloorDiv(y, Size.Y), FloorDiv(z, Size.Z));
 
     private int[] EnsureChunkInternal(in ChunkCoord coord)
     {
@@ -165,17 +157,27 @@ public sealed class SparseVoxelWorld : IVoxelWorld
     // against air).
     private int[] Generate(in ChunkCoord coord)
     {
-        var voxels = new int[ChunkVoxelsX * ChunkVoxelsY * ChunkVoxelsZ];
-        _generator.Generate(coord, ChunkVoxelsX, ChunkVoxelsY, ChunkVoxelsZ, voxels);
-        _chunks[coord] = voxels;
-        int x0 = coord.X * ChunkVoxelsX, y0 = coord.Y * ChunkVoxelsY, z0 = coord.Z * ChunkVoxelsZ;
-        VoxelsChanged?.Invoke(this, new VoxelBox(
+        int count = Size.VoxelCount;
+
+        // Reused scratch the generator fills with VoxelInfo, so generators
+        // never see how the world packs voxels. Cleared to air each pass.
+        var scratch = _genScratch ??= new VoxelInfo[count];
+        Array.Clear(scratch);
+        int x0 = coord.X * Size.X, y0 = coord.Y * Size.Y, z0 = coord.Z * Size.Z;
+        var bounds = new VoxelBox(
             x0, y0, z0,
-            x0 + ChunkVoxelsX - 1, y0 + ChunkVoxelsY - 1, z0 + ChunkVoxelsZ - 1));
+            x0 + Size.X - 1, y0 + Size.Y - 1, z0 + Size.Z - 1);
+        _generator.Generate(new VoxelBuffer(scratch, bounds));
+
+        // Pack the generated types into the world's compact index storage.
+        var voxels = new int[count];
+        for (int i = 0; i < count; i++)
+            voxels[i] = Catalog.IndexOf(scratch[i].Type);
+
+        _chunks[coord] = voxels;
+        VoxelsChanged?.Invoke(this, bounds);
         return voxels;
     }
-
-    private int Index(int lx, int ly, int lz) => (lz * ChunkVoxelsY + ly) * ChunkVoxelsX + lx;
 
     // C# / always rounds toward zero; we need toward -inf so that
     // a negative world coord lands in the correct (negative) chunk.
