@@ -116,11 +116,24 @@ var window = new Window3D
     CloseKey = Key.Escape,
 };
 
+// The sun's world direction, shared by the directional light and the
+// sky's sun disc so the bright spot painted in the sky sits exactly
+// where the surfaces are lit from. Direction points from a surface
+// toward the light, which is also "toward the sun".
+var sunDirection = Vector3.Normalize(new Vector3(0.4f, 0.8f, 0.5f));
+
 window.Renderer.AmbientLight = new Color(140, 150, 165);
 window.Renderer.DirectionalLight = new DirectionalLight(
-    Vector3.Normalize(new Vector3(-0.4f, -0.8f, -0.5f)),
+    sunDirection,
     new Color(140, 135, 125));
 window.Renderer.TextureSampling = ImageSampling.Nearest;
+
+// Procedural sky cubemap with a sun disc aimed along the light
+// direction. The Skybox shader samples the cubemap with Z negated, so
+// bake the sun at -Z to make the visible disc line up with where the
+// directional light actually comes from.
+var sky = Cubemaps.CreateSky(
+    sunDirection: new Vector3(sunDirection.X, sunDirection.Y, -sunDirection.Z));
 
 // DebugDraw (the HUD text overlay below) is a no-op unless a renderer
 // opts in, so enable it here.
@@ -205,9 +218,17 @@ var hud = new CustomLayer3D
     },
 };
 
+// Draws the sky behind everything else each frame. The skybox shader
+// strips camera translation (so the sky never moves) and writes the
+// far depth, so it sits behind the opaque terrain regardless of order.
+var skyLayer = new CustomLayer3D
+{
+    OnRender = rd => rd.DrawSkybox(sky),
+};
+
 var scene = new Scene3D
 {
-    Layers = { streamer, playField, hud },
+    Layers = { skyLayer, streamer, playField, hud },
 };
 
 await scene.RunAsync(window);

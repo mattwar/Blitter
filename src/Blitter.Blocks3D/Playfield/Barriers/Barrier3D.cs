@@ -59,6 +59,19 @@ public abstract class Barrier3D
     public virtual void Draw(Renderer3D renderer) =>
         Visual?.Draw(renderer, new Pose3D(Position, Orientation, Scale), Tint, TimeSpan.Zero);
 
+    /// <summary>
+    /// Render the part of this barrier belonging to <paramref name="pass"/>.
+    /// The default barrier is treated as opaque: it draws its whole
+    /// <see cref="Visual"/> in the <see cref="DrawPass3D.Opaque"/> pass and
+    /// nothing in the <see cref="DrawPass3D.Transparent"/> pass. Barriers
+    /// with alpha-blended surfaces override to split their geometry.
+    /// </summary>
+    public virtual void Draw(Renderer3D renderer, DrawPass3D pass)
+    {
+        if (pass == DrawPass3D.Opaque)
+            Draw(renderer);
+    }
+
     /// <summary>Called when a sprite collides with this barrier.</summary>
     public virtual void OnHitSprite(Sprite3D hitter, in UpdateContext3D context) { }
 

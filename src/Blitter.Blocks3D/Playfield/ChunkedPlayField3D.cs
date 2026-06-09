@@ -207,6 +207,13 @@ public class ChunkedPlayField3D : Layer3D
     
     public override void Draw(Renderer3D renderer)
     {
+        // Draw opaque geometry seperately from transparent
+        Draw(renderer, DrawPass3D.Opaque);
+        Draw(renderer, DrawPass3D.Transparent);
+    }
+
+    private void Draw(Renderer3D renderer, DrawPass3D pass)
+    {
         for (int y = this.MinChunk.Y; y <= this.MaxChunk.Y; y++)
         {
             for (int z = this.MinChunk.Z; z <= this.MaxChunk.Z; z++)
@@ -215,10 +222,10 @@ public class ChunkedPlayField3D : Layer3D
                 {
                     var coord = new ChunkCoord(x, y, z);
                     var chunk = ChunkSource.GetChunk(in coord);
-                    chunk?.Draw(renderer);
+                    chunk?.Draw(renderer, pass);
                 }
             }
-        }       
+        }
     }
 }
 
@@ -540,8 +547,15 @@ public interface IChunk3D
     /// <summary>Per-frame chunk update (barrier ticks plus any chunk-scoped work).</summary>
     void Update(in UpdateContext3D context);
 
-    /// <summary>Draws the chunk's barriers and live sprites.</summary>
+    /// <summary>Draws the chunk's barriers and live sprites (both passes).</summary>
     void Draw(Renderer3D renderer);
+
+    /// <summary>
+    /// Draws only the geometry belonging to <paramref name="pass"/>, so a
+    /// caller can render every chunk's opaque pass before any chunk's
+    /// transparent pass. See <see cref="DrawPass3D"/>.
+    /// </summary>
+    void Draw(Renderer3D renderer, DrawPass3D pass);
 
     /// <summary>
     /// Signals that a frame has started and any Add/Remove calls should be deferred until the end of the frame.
@@ -706,8 +720,18 @@ public class Chunk3D : IChunk3D
 
     public virtual void Draw(Renderer3D renderer)
     {
+        Draw(renderer, DrawPass3D.Opaque);
+        Draw(renderer, DrawPass3D.Transparent);
+    }
+
+    public virtual void Draw(Renderer3D renderer, DrawPass3D pass)
+    {
         for (int i = 0; i < _barriers.Count; i++)
-            _barriers[i].Draw(renderer);
+            _barriers[i].Draw(renderer, pass);
+
+        // Sprites are treated as opaque and drawn once, in the opaque pass.
+        if (pass != DrawPass3D.Opaque)
+            return;
 
         for (int i = 0; i < _sprites.Count; i++)
         {

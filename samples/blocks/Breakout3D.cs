@@ -79,7 +79,7 @@ var window = new Window3D
 window.Renderer.DebugDrawEnabled = true;
 window.Renderer.AmbientLight = new Color(70, 75, 110);
 window.Renderer.DirectionalLight = new DirectionalLight(
-    Vector3.Normalize(new Vector3(-0.35f, -0.9f, -0.4f)),
+    Vector3.Normalize(new Vector3(0.35f, 0.9f, 0.4f)),
     new Color(255, 246, 220));
 
 var camera = new PerspectiveCamera

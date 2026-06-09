@@ -72,17 +72,37 @@ internal sealed class VoxelChunkVisual3D : Visual3D, IChunkMeshBuilder
 
     public override void Draw(Renderer3D renderer, in Pose3D pose, Color tint, TimeSpan elapsed)
     {
+        DrawPass(renderer, pose, DrawPass3D.Opaque);
+        DrawPass(renderer, pose, DrawPass3D.Transparent);
+    }
+
+    /// <summary>
+    /// Draws only the geometry belonging to <paramref name="pass"/>: the
+    /// untextured, opaque, and cutout groups in
+    /// <see cref="DrawPass3D.Opaque"/>, and the alpha-blended groups in
+    /// <see cref="DrawPass3D.Transparent"/>. The owning chunk source drives
+    /// the two passes globally so every chunk's solid terrain fills the
+    /// depth buffer before any chunk's blended glass composites over it.
+    /// </summary>
+    internal void DrawPass(Renderer3D renderer, in Pose3D pose, DrawPass3D pass)
+    {
         if (NeedsRebuild())
             Rebuild();
 
         var transform = pose.ToMatrix();
-        // Pass order: opaque (incl. untextured) first so they fill depth,
-        // then cutout, then alpha-blended last over everything behind.
-        if (_untextured is { } u && !u.Builder.IsEmpty)
-            renderer.DrawMesh(u.Builder.Flush(), u.Material, transform);
-        DrawGroups(renderer, _opaque, transform);
-        DrawGroups(renderer, _cutout, transform);
-        DrawGroups(renderer, _blend, transform);
+        if (pass == DrawPass3D.Opaque)
+        {
+            // Opaque (incl. untextured) first so they fill depth, then cutout.
+            if (_untextured is { } u && !u.Builder.IsEmpty)
+                renderer.DrawMesh(u.Builder.Flush(), u.Material, transform);
+            DrawGroups(renderer, _opaque, transform);
+            DrawGroups(renderer, _cutout, transform);
+        }
+        else
+        {
+            // Alpha-blended last, over everything behind, with depth writes off.
+            DrawGroups(renderer, _blend, transform);
+        }
     }
 
     private static void DrawGroups(

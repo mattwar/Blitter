@@ -37,6 +37,14 @@ internal sealed class VoxelChunkBarrier3D : Barrier3D
     public VoxelChunkVisual3D VoxelVisual => _visual;
 
     /// <summary>
+    /// Draws only the chunk geometry belonging to <paramref name="pass"/>,
+    /// so the owning playfield can render every chunk's opaque terrain
+    /// before any chunk's transparent (glass) surfaces.
+    /// </summary>
+    public override void Draw(Renderer3D renderer, DrawPass3D pass) =>
+        _visual.DrawPass(renderer, new Pose3D(Position, Orientation, Scale), pass);
+
+    /// <summary>
     /// Repositions this barrier onto its grid's (freshly retargeted) origin
     /// and resets its visual and hit shape for reuse. Call after the shared
     /// <see cref="VoxelChunkGrid"/> has been reinitialized to a new coord.
