@@ -29,13 +29,12 @@ var sheet = Bitmap.Load(Asset.GetPathRelativeToCaller("space-man-sprites.png"));
 //sheet.SetAlpha(0, sheet.GetPixel(0, 0), tolerance: 30);
 //sheet.Save(Asset.GetPathRelativeToCaller("space-man-sprites.png"));
 
-using var atlas = TextureCatalog.Sense(
+var atlas = TextureCatalog.Sense(
     sheet,
     minRegionWidth: 8,
     minRegionHeight: 8,
     minRowGutter: 4,
-    minColumnGutter: 4,
-    ownsImage: false
+    minColumnGutter: 4
     );
 
 var window = new Window2D(DesignW, DesignH)

@@ -51,17 +51,19 @@ const float JumpSpeed = 6.0f;
 const float EyeOffsetY = 1.3f;
 
 // ---- Atlas
+// Slice the 16x16-tile sheet once into a grid; index tiles by [col, row].
 var atlas = Bitmap.Load(Asset.GetPathRelativeToCaller("Blocks.png"));
-var grassTopTex  = AtlasTile(atlas, col: 4, row: 4);
-var grassSideTex = AtlasTile(atlas, col: 1, row: 3);
-var dirtTex      = AtlasTile(atlas, col: 4, row: 3);
-var stoneTex     = AtlasTile(atlas, col: 1, row: 4);
-var leavesTex    = AtlasTile(atlas, col: 0, row: 1);
-var logTopTex    = AtlasTile(atlas, col: 0, row: 2);
-var logSideTex   = AtlasTile(atlas, col: 0, row: 3);
-var plankTex     = AtlasTile(atlas, col: 0, row: 0);
-var stoneBrickTex = AtlasTile(atlas, col: 2, row: 4);
-var sandTex      = AtlasTile(atlas, col: 0, row: 4);
+var tiles = TextureCatalog.Tiles(atlas, 16, 16);
+var grassTopTex  = tiles[4, 4];
+var grassSideTex = tiles[1, 3];
+var dirtTex      = tiles[4, 3];
+var stoneTex     = tiles[1, 4];
+var leavesTex    = tiles[0, 1];
+var logTopTex    = tiles[0, 2];
+var logSideTex   = tiles[0, 3];
+var plankTex     = tiles[0, 0];
+var stoneBrickTex = tiles[2, 4];
+var sandTex      = tiles[0, 4];
 
 var palette = new VoxelPalette();
 var stone = palette.Add(new VoxelType { Id = 1, Name = "stone", Shape = new CubeVoxelShape(stoneTex) });
@@ -220,9 +222,6 @@ var scene = new Scene3D
 await scene.RunAsync(window);
 
 // ---- helpers ----------------------------------------------------------
-
-static TextureRegion2D AtlasTile(Bitmap atlas, int col, int row)
-    => new(atlas, new Rect(col * 16, row * 16, 16, 16));
 
 // Builds a 16x16 colored-glass tile
 static Bitmap MakeGlassTile()

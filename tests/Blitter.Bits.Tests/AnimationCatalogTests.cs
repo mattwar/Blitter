@@ -7,7 +7,7 @@ public class AnimationCatalogTests
     [Fact]
     public void Names_In_Declaration_Order()
     {
-        using var atlas = MakeAtlas(8);
+        var atlas = MakeAtlas(8);
         var a = atlas.ToAnimationCatalog([
             new("idle", [0, 1], TimeSpan.FromSeconds(1)),
             new("walk", [2, 3, 4], TimeSpan.FromSeconds(1)),
@@ -20,7 +20,7 @@ public class AnimationCatalogTests
     [Fact]
     public void Out_Of_Range_Frame_Throws()
     {
-        using var atlas = MakeAtlas(2);
+        var atlas = MakeAtlas(2);
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             atlas.ToAnimationCatalog([
                 new("a", [0, 5], TimeSpan.FromSeconds(1)),
@@ -30,7 +30,7 @@ public class AnimationCatalogTests
     [Fact]
     public void Duplicate_Names_Throw()
     {
-        using var atlas = MakeAtlas(4);
+        var atlas = MakeAtlas(4);
         Assert.Throws<ArgumentException>(() =>
             atlas.ToAnimationCatalog([
                 new("a", [0], TimeSpan.FromSeconds(1)),
@@ -41,7 +41,7 @@ public class AnimationCatalogTests
     [Fact]
     public void Lookup_By_Name_And_Index()
     {
-        using var atlas = MakeAtlas(4);
+        var atlas = MakeAtlas(4);
         var a = atlas.ToAnimationCatalog([
             new("idle", [0], TimeSpan.FromSeconds(1)),
             new("walk", [1, 2], TimeSpan.FromSeconds(1)),
@@ -60,7 +60,7 @@ public class AnimationCatalogTests
     [Fact]
     public void Single_Factory_Builds_One_Sequence_Catalog()
     {
-        using var atlas = MakeAtlas(3);
+        var atlas = MakeAtlas(3);
         var a = atlas.ToSingleSequenceCatalog(TimeSpan.FromSeconds(1));
 
         Assert.Equal(1, a.Count);

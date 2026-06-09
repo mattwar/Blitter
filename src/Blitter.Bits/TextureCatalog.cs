@@ -2,19 +2,37 @@ namespace Blitter.Bits;
 
 /// <summary>
 /// An ordered collection of <see cref="Texture2D"/>s with optional names.
+/// A catalog is a non-owning view: its entries (often slices of a shared
+/// source image) stay owned by whoever created them, so the catalog never
+/// disposes anything.
 /// </summary>
-public sealed class TextureCatalog : IDisposable
+public sealed class TextureCatalog
 {
     private readonly Texture2D[] _textures;
     private readonly Dictionary<string, int>? _names;
     private readonly string[] _nameList;
-    private readonly IDisposable[]? _owned;
-    private bool _disposed;
+    private readonly int _columns;
+    private readonly int _rows;
 
     /// <summary>
     /// Number of entries in the atlas.
     /// </summary>
     public int Count => _textures.Length;
+
+    /// <summary>
+    /// Number of columns in the catalog's 2D grid shape. A catalog built
+    /// from a flat span or list of regions is laid out as a single row, so
+    /// this equals <see cref="Count"/>; <see cref="Grid(Texture2D, int, int)"/>
+    /// sets a real multi-row shape. Zero only for an empty catalog.
+    /// </summary>
+    public int Columns => _columns;
+
+    /// <summary>
+    /// Number of rows in the catalog's 2D grid shape. <c>1</c> for a flat
+    /// span/region catalog; <see cref="Grid(Texture2D, int, int)"/> sets
+    /// the real row count. See <see cref="Columns"/>.
+    /// </summary>
+    public int Rows => _rows;
 
     /// <summary>
     /// Names registered in this atlas, in the order they were supplied.
@@ -26,6 +44,27 @@ public sealed class TextureCatalog : IDisposable
     /// Gets the <see cref="Texture2D"/> at the specified zero-based index.
     /// </summary>
     public Texture2D this[int index] => _textures[index];
+
+    /// <summary>
+    /// Gets the <see cref="Texture2D"/> at the given grid position. The
+    /// entries are stored linearly in row-major order, so this maps to
+    /// index <c>row * Columns + column</c>. Catalogs built from a flat
+    /// span or region list are a single row; use
+    /// <see cref="Grid(Texture2D, int, int)"/> for a multi-row shape.
+    /// </summary>
+    public Texture2D this[int column, int row]
+    {
+        get
+        {
+            if (_columns == 0)
+                throw new InvalidOperationException("TextureCatalog is empty.");
+            if ((uint)column >= (uint)_columns)
+                throw new ArgumentOutOfRangeException(nameof(column));
+            if ((uint)row >= (uint)_rows)
+                throw new ArgumentOutOfRangeException(nameof(row));
+            return _textures[row * _columns + column];
+        }
+    }
 
     /// <summary>
     /// Gets the <see cref="Texture2D"/> registered with the specified name,
@@ -42,20 +81,47 @@ public sealed class TextureCatalog : IDisposable
     }
 
     /// <summary>
-    /// Constructs an <see cref="TextureCatalog"/> from a set of textures and an optional name-to-index map.
-    /// Caller retains ownership of <paramref name="textures"/>; the atlas disposes nothing.
+    /// Constructs an <see cref="TextureCatalog"/> from a set of textures and an optional list of names.
+    /// The <paramref name="names"/> list assigns names positionally
+    /// (<c>names[i]</c> names the texture at index <c>i</c>) and must be no
+    /// longer than <paramref name="textures"/>; names left off the end are
+    /// simply unnamed. Names must be unique.
+    /// Caller retains ownership of <paramref name="textures"/>.
+    /// The entries are laid out as a single row (<see cref="Rows"/> = 1);
+    /// use <see cref="Grid(Texture2D, int, int)"/> when you need a
+    /// multi-row shape.
     /// </summary>
     public TextureCatalog(
         ReadOnlySpan<Texture2D> textures,
-        IReadOnlyDictionary<string, int>? names = null)
-        : this(textures, names, owned: null)
+        IReadOnlyList<string>? names = null)
+        : this(textures, names, textures.Length, textures.Length == 0 ? 0 : 1)
     {
+    }
+
+    /// <summary>
+    /// Builds a catalog from <c>(texture, name)</c> pairs, so every entry is
+    /// named and there is no separate list whose length has to line up with
+    /// the textures. Names must be unique. Caller retains ownership of the
+    /// textures. The entries are laid out as a single row (<see cref="Rows"/>
+    /// = 1); use <see cref="Grid(Texture2D, int, int)"/> for a multi-row shape.
+    /// </summary>
+    public static TextureCatalog Named(ReadOnlySpan<(Texture2D Texture, string Name)> entries)
+    {
+        var textures = new Texture2D[entries.Length];
+        var names = new string[entries.Length];
+        for (int i = 0; i < entries.Length; i++)
+        {
+            textures[i] = entries[i].Texture;
+            names[i] = entries[i].Name;
+        }
+        return new TextureCatalog(textures, names);
     }
 
     private TextureCatalog(
         ReadOnlySpan<Texture2D> textures,
-        IReadOnlyDictionary<string, int>? names,
-        IDisposable[]? owned)
+        IReadOnlyList<string>? names,
+        int columns,
+        int rows)
     {
         _textures = new Texture2D[textures.Length];
         for (int i = 0; i < textures.Length; i++)
@@ -63,21 +129,35 @@ public sealed class TextureCatalog : IDisposable
             ArgumentNullException.ThrowIfNull(textures[i]);
             _textures[i] = textures[i];
         }
-        _owned = owned;
+
+        if (columns < 0) throw new ArgumentOutOfRangeException(nameof(columns));
+        if (rows < 0) throw new ArgumentOutOfRangeException(nameof(rows));
+        if ((columns == 0) != (rows == 0))
+            throw new ArgumentException("Provide both columns and rows, or neither.");
+        if (columns != 0 && columns * rows != _textures.Length)
+            throw new ArgumentException(
+                $"Grid shape {columns}x{rows} does not match the {_textures.Length} catalog entries.");
+        _columns = columns;
+        _rows = rows;
 
         if (names is not null)
         {
-            _names = new Dictionary<string, int>(names.Count, StringComparer.Ordinal);
+            if (names.Count > _textures.Length)
+                throw new ArgumentException(
+                    $"Got {names.Count} names for {_textures.Length} textures; there cannot be more names than textures.",
+                    nameof(names));
+            var map = new Dictionary<string, int>(names.Count, StringComparer.Ordinal);
             var list = new string[names.Count];
-            int n = 0;
-            foreach (var kv in names)
+            for (int i = 0; i < names.Count; i++)
             {
-                if ((uint)kv.Value >= (uint)_textures.Length)
-                    throw new ArgumentOutOfRangeException(nameof(names),
-                        $"Name '{kv.Key}' maps to index {kv.Value} which is outside [0, {_textures.Length}).");
-                _names.Add(kv.Key, kv.Value);
-                list[n++] = kv.Key;
+                var name = names[i];
+                ArgumentNullException.ThrowIfNull(name);
+                if (!map.TryAdd(name, i))
+                    throw new ArgumentException(
+                        $"Duplicate name '{name}' at index {i}.", nameof(names));
+                list[i] = name;
             }
+            _names = map;
             _nameList = list;
         }
         else
@@ -88,50 +168,73 @@ public sealed class TextureCatalog : IDisposable
 
     /// <summary>
     /// Builds an atlas from a single image and a list of sub-rects.
-    /// Each rect becomes a slice of <paramref name="image"/>.
+    /// Each rect becomes a slice of <paramref name="image"/>. The slices
+    /// are laid out as a single row; use
+    /// <see cref="Grid(Texture2D, int, int)"/> for a multi-row shape.
+    /// The caller keeps ownership of <paramref name="image"/>.
     /// </summary>
     public static TextureCatalog FromRegions(
         Texture2D image,
         ReadOnlySpan<Rect> regions,
-        IReadOnlyDictionary<string, int>? names = null,
-        bool ownsImage = true)
+        IReadOnlyList<string>? names = null)
+        => FromRegions(image, regions, names,
+            regions.Length, regions.Length == 0 ? 0 : 1);
+
+    private static TextureCatalog FromRegions(
+        Texture2D image,
+        ReadOnlySpan<Rect> regions,
+        IReadOnlyList<string>? names,
+        int columns,
+        int rows)
     {
         ArgumentNullException.ThrowIfNull(image);
         var segs = new Texture2D[regions.Length];
         for (int i = 0; i < regions.Length; i++)
             segs[i] = image.Slice(regions[i]);
-        return new TextureCatalog(segs, names, ownsImage ? [image] : null);
+        return new TextureCatalog(segs, names, columns, rows);
     }
 
     /// <summary>
-    /// Creates an atlas by splitting an image into a uniform grid of regions.
+    /// Creates an atlas by splitting an image into a uniform grid of
+    /// <paramref name="columns"/> × <paramref name="rows"/> regions. The
+    /// cell size is the image size divided by the counts. To slice by a
+    /// fixed tile size instead, use <see cref="Tiles"/>.
     /// </summary>
-    public static TextureCatalog Grid(Texture2D image, int columns, int rows, bool ownsImage = true)
+    public static TextureCatalog Grid(Texture2D image, int columns, int rows)
     {
         ArgumentNullException.ThrowIfNull(image);
         if (columns <= 0) throw new ArgumentOutOfRangeException(nameof(columns));
         if (rows <= 0) throw new ArgumentOutOfRangeException(nameof(rows));
         var (w, h) = image.Size;
-        return Grid(image, columns, rows, w / columns, h / rows, ownsImage);
+        return GridCore(image, columns, rows, w / columns, h / rows);
     }
 
     /// <summary>
-    /// Creates an atlas by splitting an image into a uniform grid of regions
-    /// with explicit cell dimensions.
+    /// Creates an atlas by splitting an image into uniform tiles of
+    /// <paramref name="tileWidth"/> × <paramref name="tileHeight"/> pixels.
+    /// The column and row counts are the image size divided by the tile
+    /// size, so any trailing pixels that do not fill a whole tile are
+    /// ignored. To slice into a fixed number of columns/rows instead, use
+    /// <see cref="Grid(Texture2D, int, int)"/>.
     /// </summary>
-    public static TextureCatalog Grid(
+    public static TextureCatalog Tiles(Texture2D image, int tileWidth, int tileHeight)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        if (tileWidth <= 0) throw new ArgumentOutOfRangeException(nameof(tileWidth));
+        if (tileHeight <= 0) throw new ArgumentOutOfRangeException(nameof(tileHeight));
+        var (w, h) = image.Size;
+        return GridCore(image, w / tileWidth, h / tileHeight, tileWidth, tileHeight);
+    }
+
+    private static TextureCatalog GridCore(
         Texture2D image,
         int columns,
         int rows,
         int cellWidth,
-        int cellHeight,
-        bool ownsImage = true)
+        int cellHeight)
     {
-        ArgumentNullException.ThrowIfNull(image);
         if (columns <= 0) throw new ArgumentOutOfRangeException(nameof(columns));
         if (rows <= 0) throw new ArgumentOutOfRangeException(nameof(rows));
-        if (cellWidth <= 0) throw new ArgumentOutOfRangeException(nameof(cellWidth));
-        if (cellHeight <= 0) throw new ArgumentOutOfRangeException(nameof(cellHeight));
 
         var rects = new Rect[columns * rows];
         for (int row = 0; row < rows; row++)
@@ -145,7 +248,7 @@ public sealed class TextureCatalog : IDisposable
                     cellHeight);
             }
         }
-        return FromRegions(image, rects, names: null, ownsImage);
+        return FromRegions(image, rects, names: null, columns, rows);
     }
 
     /// <summary>
@@ -175,8 +278,7 @@ public sealed class TextureCatalog : IDisposable
         int minRegionWidth = 1,
         int minRegionHeight = 1,
         int minRowGutter = 1,
-        int minColumnGutter = 1,
-        bool ownsImage = true)
+        int minColumnGutter = 1)
     {
         ArgumentNullException.ThrowIfNull(image);
         ArgumentOutOfRangeException.ThrowIfLessThan(minRegionWidth, 1);
@@ -185,7 +287,7 @@ public sealed class TextureCatalog : IDisposable
         ArgumentOutOfRangeException.ThrowIfLessThan(minColumnGutter, 1);
         var (w, h) = image.Size;
         if (w <= 0 || h <= 0)
-            return FromRegions(image, ReadOnlySpan<Rect>.Empty, names: null, ownsImage);
+            return FromRegions(image, ReadOnlySpan<Rect>.Empty, names: null);
 
         // First pass: per-row "has any opaque pixel" flag, used to
         // partition the image into horizontal bands.
@@ -236,7 +338,7 @@ public sealed class TextureCatalog : IDisposable
                 rects.Add(new Rect(x0, y0, x1 - x0, y1 - y0));
             }
         }
-        return FromRegions(image, rects.ToArray(), names: null, ownsImage);
+        return FromRegions(image, rects.ToArray(), names: null);
     }
 
     // Finds runs of 'true' in <paramref name="flags"/> and writes their
@@ -288,18 +390,5 @@ public sealed class TextureCatalog : IDisposable
             return true;
         index = -1;
         return false;
-    }
-
-    /// <summary>
-    /// Disposes any source images this atlas's factories took ownership of.
-    /// Textures supplied directly to the general constructor are left alone.
-    /// </summary>
-    public void Dispose()
-    {
-        if (_disposed) return;
-        _disposed = true;
-        if (_owned is null) return;
-        foreach (var d in _owned)
-            d.Dispose();
     }
 }

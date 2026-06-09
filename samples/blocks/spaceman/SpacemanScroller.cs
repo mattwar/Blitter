@@ -61,13 +61,12 @@ var groundFg      = Bitmap.Load(Asset.GetPathRelativeToCaller("06_ground_fg.png"
 
 // spaceman sprite sheet
 var sheet = Bitmap.Load(Asset.GetPathRelativeToCaller("space-man-sprites.png"));
-using var atlas = TextureCatalog.Sense(
+var atlas = TextureCatalog.Sense(
     sheet,
     minRegionWidth: 8,
     minRegionHeight: 8,
     minRowGutter: 4,
-    minColumnGutter: 4,
-    ownsImage: true
+    minColumnGutter: 4
     );
 
 const double WalkFrameSeconds = 0.08;
