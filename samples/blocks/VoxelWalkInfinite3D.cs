@@ -50,9 +50,12 @@ const float JumpSpeed = 6.0f;
 // The eye view above the player position.
 const float EyeOffsetY = 1.3f;
 
+// Resolve loose asset files next to this source file.
+Application.Current.SetCallerAssetFolder();
+
 // ---- Atlas
 // Slice the 16x16-tile sheet once into a grid; index tiles by [col, row].
-var atlas = Bitmap.Load(Asset.GetPathRelativeToCaller("Blocks.png"));
+var atlas = Bitmap.Load("Blocks.png");
 var tiles = TextureCatalog.Tiles(atlas, 16, 16);
 var grassTopTex  = tiles[4, 4];
 var grassSideTex = tiles[1, 3];

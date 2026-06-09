@@ -48,55 +48,57 @@ var window = new Window2D(WindowW, WindowH)
 
 window.Renderer.SetLogicalSize(LogicalW, LogicalH, LogicalPresentation.Letterbox);
 
+// Resolve loose asset files next to this source file.
+Application.Current.SetCallerAssetFolder();
+
 // --- Background plates --------------------------------------------
 // Loaded in back-to-front order. ParallaxFactor controls how fast
 // each layer scrolls relative to the camera: 0 = locked, 1 = matches
 // the playfield, anything in between drifts behind.
-var skyImage      = Bitmap.Load(Asset.GetPathRelativeToCaller("01_sky_planet.png"));
-var farMountains  = Bitmap.Load(Asset.GetPathRelativeToCaller("02_mountains_far.png"));
-var midMountains  = Bitmap.Load(Asset.GetPathRelativeToCaller("03_mountains_mid.png"));
-var nearMountains = Bitmap.Load(Asset.GetPathRelativeToCaller("04_mountains_near.png"));
-var crystals      = Bitmap.Load(Asset.GetPathRelativeToCaller("05_crystals_big.png"));
-var groundFg      = Bitmap.Load(Asset.GetPathRelativeToCaller("06_ground_fg.png"));
+var skyImage      = Bitmap.Load("01_sky_planet.png");
+var farMountains  = Bitmap.Load("02_mountains_far.png");
+var midMountains  = Bitmap.Load("03_mountains_mid.png");
+var nearMountains = Bitmap.Load("04_mountains_near.png");
+var crystals      = Bitmap.Load("05_crystals_big.png");
+var groundFg      = Bitmap.Load("06_ground_fg.png");
 
 // spaceman sprite sheet
-var sheet = Bitmap.Load(Asset.GetPathRelativeToCaller("space-man-sprites.png"));
-var atlas = TextureCatalog.Sense(
-    sheet,
-    minRegionWidth: 8,
-    minRegionHeight: 8,
-    minRowGutter: 4,
-    minColumnGutter: 4
-    );
-
 const double WalkFrameSeconds = 0.08;
 const double IdleFrameSeconds = 0.25;
 // Pace the 5-frame [7,4,5,6,7] jump (squat → up → mid → down →
 // squat) to span the full airtime so the landing pose lands with the
 // feet, not above the peak.
 var jumpFrameDuration = TimeSpan.FromSeconds(SpacemanController.JumpAirtime / 5.0);
-var anims = atlas.ToAnimationCatalog([
-    new("idle-right", [0, 1, 2, 3], TimeSpan.FromSeconds(IdleFrameSeconds)),
-    new("idle-left",  [0, 1, 2, 3], TimeSpan.FromSeconds(IdleFrameSeconds), Flip: FlipMode.Horizontal),
-    new("walk-right", [9, 10, 11, 12, 13, 14, 15, 16], TimeSpan.FromSeconds(WalkFrameSeconds)),
-    new("walk-left",  [9, 10, 11, 12, 13, 14, 15, 16], TimeSpan.FromSeconds(WalkFrameSeconds), Flip: FlipMode.Horizontal),
-    new("jump-right", [7, 4, 5, 6, 7], jumpFrameDuration, AnimationLoop.Once),
-    new("jump-left",  [7, 4, 5, 6, 7], jumpFrameDuration, AnimationLoop.Once, FlipMode.Horizontal),
-]);
 
-var visual = new AnimatedVisual2D(anims, initialState: "idle-right");
-var standSize = ((ITextureRegion)atlas[0]).Region;
-float feetOffset = standSize.Height * 0.5f * SpriteScale;
-
+// The sheet's sprites are not on a uniform grid, so we leave TileSize
+// unset and let ImageSource auto-sense the cells: with no TileSize an
+// integer frame is the Nth detected region. Frames are listed by index
+// — the same numbers the old hand-built catalog used — and each state
+// inherits the shared sheet, so the whole animation table is declared
+// in one place. The first declared state ("idle-right") is the initial one.
 var spaceman = new Spaceman
 {
-    Visual = visual,
-    Center = new Vector2(0f, GroundY - feetOffset),
+    Image =
+    {
+        FilePath = "space-man-sprites.png",
+        ["idle-right"] = { Frames = { 0, 1, 2, 3 }, FrameDuration = TimeSpan.FromSeconds(IdleFrameSeconds) },
+        ["idle-left"]  = { Frames = { 0, 1, 2, 3 }, FrameDuration = TimeSpan.FromSeconds(IdleFrameSeconds), Flip = FlipMode.Horizontal },
+        ["walk-right"] = { Frames = { 9, 10, 11, 12, 13, 14, 15, 16 }, FrameDuration = TimeSpan.FromSeconds(WalkFrameSeconds) },
+        ["walk-left"]  = { Frames = { 9, 10, 11, 12, 13, 14, 15, 16 }, FrameDuration = TimeSpan.FromSeconds(WalkFrameSeconds), Flip = FlipMode.Horizontal },
+        ["jump-right"] = { Frames = { 7, 4, 5, 6, 7 }, FrameDuration = jumpFrameDuration, Loop = AnimationLoop.Once },
+        ["jump-left"]  = { Frames = { 7, 4, 5, 6, 7 }, FrameDuration = jumpFrameDuration, Loop = AnimationLoop.Once, Flip = FlipMode.Horizontal },
+    },
     Scale = SpriteScale,
     WalkSpeed = WalkSpeed,
-    FeetOffsetY = feetOffset,
     GroundY = GroundY,
 };
+
+// Measure the standing pose (idle frame 0) to anchor the feet and shadow.
+var visual = (AnimatedVisual2D)spaceman.Image.Visual!;
+var standSize = ((ITextureRegion)visual.Catalog["idle-right"].Frames[0].Texture).Region;
+float feetOffset = standSize.Height * 0.5f * SpriteScale;
+spaceman.FeetOffsetY = feetOffset;
+spaceman.Center = new Vector2(0f, GroundY - feetOffset);
 
 spaceman.Behaviors.Add(
     new SpacemanController(window.Input)
@@ -262,6 +264,6 @@ public class SpacemanController : SpriteBehavior2D
             ? "jump"
             : (move != 0f ? "walk" : "idle");
 
-        self.Visual!.State = motion + "-" + spaceman.Facing;
+        self.Image.Visual!.State = motion + "-" + spaceman.Facing;
     }
 }

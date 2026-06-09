@@ -25,9 +25,10 @@ const int DesignH = 720;
 // gutter detection work. JPEG halos around sprite edges still leave
 // stray almost-background pixels; the minRegion thresholds on Sense
 // then drop tiny noise runs.
-var sheet = Bitmap.Load(Asset.GetPathRelativeToCaller("space-man-sprites.png"));
+Application.Current.SetCallerAssetFolder();
+var sheet = Bitmap.Load("space-man-sprites.png");
 //sheet.SetAlpha(0, sheet.GetPixel(0, 0), tolerance: 30);
-//sheet.Save(Asset.GetPathRelativeToCaller("space-man-sprites.png"));
+//sheet.Save("space-man-sprites.png");
 
 var atlas = TextureCatalog.Sense(
     sheet,

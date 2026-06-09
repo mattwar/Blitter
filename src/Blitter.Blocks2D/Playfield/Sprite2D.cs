@@ -10,8 +10,20 @@ namespace Blitter.Blocks2D;
 /// </summary>
 public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
 {
-    /// <summary>The visual to render.</summary>
-    public Visual2D? Visual { get; set; }
+    private ImageSource _image = new();
+
+    /// <summary>
+    /// The sprite's image. Always non-null; assign a path, an
+    /// <see cref="ImageSource"/>, or a configured source via object
+    /// initializer, then read <see cref="ImageSource.Visual"/> for the
+    /// materialised <see cref="Visual2D"/>. Setting this to <c>null</c>
+    /// installs a fresh empty source (which draws nothing).
+    /// </summary>
+    public ImageSource Image
+    {
+        get => _image;
+        set => _image = value ?? new();
+    }
 
     /// <summary>The position of the center of the sprite.</summary>
     public Vector2 Center { get; set; }
@@ -82,14 +94,14 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
 
     /// <summary>
     /// The sprite's world-space collision shape: the current
-    /// <see cref="Visual"/>'s <see cref="Visual2D.HitShape"/>
-    /// (mirrored by <see cref="Flipped"/>) combined with this
-    /// sprite's <see cref="Center"/>, <see cref="Rotation"/>, and
-    /// <see cref="Scale"/>. Override to substitute a different
-    /// shape (still posed by the sprite).
+    /// <see cref="Image"/>'s <see cref="ImageSource.Visual"/>
+    /// <see cref="Visual2D.HitShape"/> (mirrored by <see cref="Flipped"/>)
+    /// combined with this sprite's <see cref="Center"/>,
+    /// <see cref="Rotation"/>, and <see cref="Scale"/>. Override to substitute
+    /// a different shape (still posed by the sprite).
     /// </summary>
     public virtual PosedHitShape2D HitShape =>
-        new((Visual?.HitShape ?? HitShape2D.None).Flipped(Flipped), new Pose2D(Center, Rotation, Scale));
+        new((Image.Visual?.HitShape ?? HitShape2D.None).Flipped(Flipped), new Pose2D(Center, Rotation, Scale));
 
     /// <summary>
     /// Bounding circle of the sprite for collision
@@ -143,7 +155,7 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer2D renderer)
     {
-        this.Visual?.Draw(renderer, new Pose2D(Center, Rotation, Scale), this.Tint, this.Age, this.Flipped);
+        this.Image.Visual?.Draw(renderer, new Pose2D(Center, Rotation, Scale), this.Tint, this.Age, this.Flipped);
     }
 
     /// <summary>

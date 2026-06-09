@@ -14,6 +14,9 @@ using Blitter.Bits;
 using Blitter.Blocks2D;
 using SkiaSharp;
 
+// Resolve loose asset files next to this source file.
+Application.Current.SetCallerAssetFolder();
+
 // Fixed design surface. The renderer letterboxes this into whatever
 // the actual window size is, so the playfield stays a constant
 // 1920x1080 regardless of monitor resolution or fullscreen toggles. 
@@ -68,15 +71,9 @@ var scoreboard = new ScoreLayer2D
 DateTime? gameOverAt = null;
 var gameOverDuration = TimeSpan.FromSeconds(3);
 
-// create rocket sprite
-var rocketImage = Bitmap.Load(Asset.GetPathRelativeToCaller("rocket.png"));
- // make rocket's background transparent
-rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0));
-var flameImage = Bitmap.Load(Asset.GetPathRelativeToCaller("flame.png"));
-flameImage.SetAlpha(0, flameImage.GetPixel(0, 0));
 
 // create meteor field - small static obstacles for the rocket to hit
-var asteroidImage = Bitmap.Load(Asset.GetPathRelativeToCaller("asteroid.png"));
+var asteroidImage = Bitmap.Load("asteroid.png");
 var asteroids = CreateAsteroidField(20, asteroidImage);
 
 // Debris bursts when the smallest asteroids are destroyed. Tinted
@@ -90,8 +87,8 @@ Asteroid.Particles = debrisParticles;
 
 var rocket = new Rocket
 {
-    Visual = rocketImage,
-    FlameVisual = flameImage,
+    Image = "rocket.png",
+    Flame = "flame.png",
     Center = new Vector2(WorldW / 2f, WorldH / 2f),
     Scale = 0.1f,
     Speed = 600f,
@@ -334,7 +331,7 @@ static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
 
         var asteriod = new Asteroid
         {
-            Visual = image,
+            Image = "asteroid.png",
             Center = new Vector2(x, y),
             Scale = scale,
             Rotation = rotation,
@@ -350,7 +347,12 @@ static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
 
 sealed class Rocket : Sprite2D
 {
-    public Visual2D? FlameVisual { get; set; }
+    /// <summary>
+    /// The flame drawn behind the rocket while thrusting. A separate slot
+    /// from <see cref="Sprite2D.Image"/> so it can be composited with its own
+    /// blend mode. Assign a path; read <see cref="ImageSource.Visual"/> to draw.
+    /// </summary>
+    public ImageSource Flame { get; set; } = new();
 
     public TimeSpan FlameUntil { get; private set; }
     public bool IsFlameVisible => Age < FlameUntil;
@@ -431,9 +433,9 @@ sealed class Rocket : Sprite2D
         var pose = new Pose2D(Center, Rotation, Scale);
 
         if (IsFlameVisible)
-            FlameVisual?.Draw(renderer, pose, Color.White, Age, Flipped);
+            Flame.Visual?.Draw(renderer, pose, Color.White, Age, Flipped);
 
-        Visual?.Draw(renderer, pose, Tint, Age, Flipped);
+        Image.Visual?.Draw(renderer, pose, Tint, Age, Flipped);
 
         // Shield image drawn at the bounding circle size, rotated with the heading.
         if (IsShieldVisible)
@@ -817,7 +819,7 @@ sealed class Asteroid : Sprite2D
 
                 var shard = new Asteroid(childKind)
                 {
-                    Visual = this.Visual,
+                    Image = this.Image,
                     Center = this.Center,
                     Scale = newScale,
                     Rotation = Random.Shared.Next(0, 360),

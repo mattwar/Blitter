@@ -11,6 +11,7 @@ public sealed class TextureVisual2D : Visual2D
 {
     private readonly Texture2D _texture;
     private readonly HitShapeCache _hitShapeCache;
+    private readonly HitShape2D? _hitShape;
     private BoundingCircle? _boundary;
 
     public TextureVisual2D(Texture2D texture, HitShapeCache? hitShapeCache = null)
@@ -20,6 +21,20 @@ public sealed class TextureVisual2D : Visual2D
         _hitShapeCache = hitShapeCache ?? HitShapeCache.Default;
     }
 
+    /// <summary>
+    /// Creates a visual with an explicit <paramref name="hitShape"/> instead
+    /// of one derived from the texture's opaque pixels. The boundary is taken
+    /// from the shape's own bounding circle.
+    /// </summary>
+    public TextureVisual2D(Texture2D texture, HitShape2D hitShape)
+    {
+        ArgumentNullException.ThrowIfNull(texture);
+        ArgumentNullException.ThrowIfNull(hitShape);
+        _texture = texture;
+        _hitShapeCache = HitShapeCache.Default;
+        _hitShape = hitShape;
+    }
+
     public Texture2D Texture => _texture;
 
     public override BoundingCircle Boundary =>
@@ -27,6 +42,10 @@ public sealed class TextureVisual2D : Visual2D
 
     private BoundingCircle ComputeBoundary()
     {
+        // An explicit hit shape carries its own boundary.
+        if (_hitShape is not null)
+            return _hitShape.LocalBoundary;
+
         // Pixel-accurate boundary requires CPU pixel access (ReadableTexture2D).
         // For other Texture2D backings, fall back to the circle that
         // circumscribes the full image rect.
@@ -70,5 +89,5 @@ public sealed class TextureVisual2D : Visual2D
 
     /// <inheritdoc/>
     public override HitShape2D HitShape =>
-        _hitShapeCache.GetOrCreateHitShape(_texture);
+        _hitShape ?? _hitShapeCache.GetOrCreateHitShape(_texture);
 }

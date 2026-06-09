@@ -30,7 +30,8 @@ public sealed class VertexShader : StageShader
 
     /// <summary>
     /// Loads a vertex shader from a file containing precompiled shader code
-    /// in <paramref name="format"/>.
+    /// in <paramref name="format"/>. Relative paths are resolved against
+    /// <see cref="Application.AssetFolder"/>.
     /// </summary>
     public static VertexShader Load(
         string path,
@@ -39,7 +40,7 @@ public sealed class VertexShader : StageShader
         ShaderResourceCounts? resources = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
-        var bytes = File.ReadAllBytes(path);
+        var bytes = File.ReadAllBytes(Application.Current.ResolveAssetPath(path));
         return new VertexShader(
             format,
             ImmutableCollectionsMarshal.AsImmutableArray(bytes),

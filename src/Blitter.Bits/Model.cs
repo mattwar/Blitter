@@ -28,11 +28,13 @@ public sealed class Model
     }
 
     /// <summary>
-    /// Loads a 3D model from disk.
+    /// Loads a 3D model from disk. Relative paths are resolved against
+    /// <see cref="Application.AssetFolder"/>.
     /// </summary>
     public static Model Load(string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
+        path = Application.Current.ResolveAssetPath(path);
         var ext = Path.GetExtension(path);
         if (ext.Equals(".obj", StringComparison.OrdinalIgnoreCase))
             return OBJ.Load(path);

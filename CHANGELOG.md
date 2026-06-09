@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Declarative `ImageSource` (Blitter.Bits): describe a sprite's image as
+  `new ImageSource { FilePath = "blocks.png", Tile = (4, 4), TileSize = (16, 16) }`
+  and read its `Visual` property for the materialised `Visual2D` — the
+  source bitmap loads once (shared through an internal per-path cache) and
+  the named tile is sliced from it. Setting `Tile` declares a grid of
+  fixed-size cells, so `TileSize` is required alongside it; omit both for
+  the whole image. An optional `Hit` hint (`Auto` opaque-pixel default,
+  `Circle`, `Box`, or `None`) picks the collision `HitShape2D`. A bare
+  path string converts implicitly (`ImageSource src = "hero.png"`). The
+  cache pins bitmaps for the application lifetime and never disposes them;
+  `ImageSource.Evict(path)` / `ImageSource.Clear()` drop cached mappings so
+  the next load re-reads the file. `TextureVisual2D` gained a constructor
+  taking an explicit `HitShape2D`.
+- Named states on `ImageSource`: a string indexer declares several named
+  looks in one descriptor, e.g.
+  `new ImageSource { FilePath = "hero.png", TileSize = (16, 16), ["idle"] = { Tile = (0, 0) }, ["walk"] = { Frames = { (1, 0), (2, 0), (3, 0) } } }`.
+  The descriptor has three declarative levels — `ImageSource` (the whole
+  visual), `ImageSourceState` (one named look), and `ImageSourceFrame` (one
+  picture). A state is either a single `Tile` or an ordered list of
+  animation `Frames` (with `FrameDuration`, `Loop`, and a state-level `Flip`
+  composed onto every frame); `(Column, Row)` tuples and path strings
+  convert implicitly so `Frames = { (1, 0), (2, 0) }` is enough. Each level
+  inherits `FilePath`/`TileSize` from the level above, so a shared sheet is
+  declared once at the top and each state/frame just picks its cell; brace
+  initializers work without `new` because the indexer auto-creates states. A
+  source with states materialises into an `AnimatedVisual2D` whose `State`
+  selects the named look.
+- Frame selection by `Index` on `ImageSource`/`ImageSourceState`/`ImageSourceFrame`:
+  a 1D alternative to the `(Column, Row)` `Tile`. With a fixed `TileSize` set,
+  `Index` is the Nth grid cell in row-major order (wrapping across rows);
+  with no `TileSize`, the sheet is auto-sensed (`TextureCatalog.Sense` with
+  default settings) and `Index` is the Nth detected region — so irregular
+  sheets need no grid and no configuration. Bare integers convert implicitly,
+  so `Frames = { 0, 1, 2 }` lists frames by index; sensed catalogs are cached
+  per file.
+- Direct assignment of already-built visuals on the `ImageSource` tree, for
+  when you have the exact item in hand (e.g. slices from a `TextureCatalog`
+  you sensed yourself): `ImageSource.Texture` / `ImageSourceFrame.Texture`
+  take a `Texture2D`, `ImageSourceState.Texture` a single static frame,
+  `ImageSourceState.Sequence` a whole `AnimationSequence`. `Texture2D`,
+  `AnimationFrame`, and `AnimationSequence` convert implicitly at the
+  appropriate level (so `Frames = { texA, texB }` and `["walk"] = sequence`
+  work), composing the level's `Flip` where applicable.
+- `ImageSource.Visual`: the materialised `Visual2D`, lazily built from the
+  descriptor on first read and locked in, or assigned explicitly to
+  override. An empty source yields `null`. This lets a single
+  `ImageSource`-typed slot replace the previous paired image/visual
+  properties — read `slot.Visual` to draw. `Sprite2D.Image` is now a
+  single non-null `ImageSource` slot (drawn via `Image.Visual`); the
+  separate `Sprite2D.Visual` property was removed.
+- `Application.AssetFolder`: base folder that relative asset paths resolve
+  against, defaulting to `AppContext.BaseDirectory` so shipped apps need no
+  configuration. Honored by `Bitmap.Load`, `Sound.Load`, `Model.Load`,
+  `Font.Load`, `FragmentShader.Load`, and `VertexShader.Load`.
+  `Application.Current.SetCallerAssetFolder()`
+  sets it to the calling source file's folder via `[CallerFilePath]`, so a
+  sample or single-file app can call it once at startup and then load assets
+  by bare relative name. Absolute paths bypass resolution.
 - See-through voxels via a `TransparencyMode` on `CubeVoxelShape`
   (`Opaque`, `Cutout`, `Blend`):
   - `Cutout` discards texels below 0.5 alpha for crisp holes (foliage,

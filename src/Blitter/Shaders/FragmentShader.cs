@@ -30,7 +30,8 @@ public sealed class FragmentShader : StageShader
 
     /// <summary>
     /// Loads a fragment shader from a file containing precompiled shader
-    /// code in <paramref name="format"/>.
+    /// code in <paramref name="format"/>. Relative paths are resolved against
+    /// <see cref="Application.AssetFolder"/>.
     /// </summary>
     public static FragmentShader Load(
         string path,
@@ -39,7 +40,7 @@ public sealed class FragmentShader : StageShader
         ShaderResourceCounts? resources = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
-        var bytes = File.ReadAllBytes(path);
+        var bytes = File.ReadAllBytes(Application.Current.ResolveAssetPath(path));
         return new FragmentShader(
             format,
             ImmutableCollectionsMarshal.AsImmutableArray(bytes),

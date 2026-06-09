@@ -71,10 +71,12 @@ public sealed class Font : IDisposable
 
     /// <summary>
     /// Loads a typeface from a <c>.ttf</c> / <c>.otf</c> file on disk.
+    /// Relative paths are resolved against <see cref="Application.AssetFolder"/>.
     /// </summary>
     public static Font Load(string filePath, float pixelSize, string? charset = null)
     {
         ArgumentNullException.ThrowIfNull(filePath);
+        filePath = Application.Current.ResolveAssetPath(filePath);
         var typeface = SKTypeface.FromFile(filePath)
             ?? throw new InvalidOperationException($"Failed to load typeface from '{filePath}'.");
         return new Font(typeface, pixelSize, charset, ownsTypeface: true);

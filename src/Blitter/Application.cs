@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 using Blitter.Devices;
 using Blitter.Events;
@@ -76,6 +77,39 @@ public class Application : IDisposable
                 else WindowsAccessibility.Restore();
             }
         }
+    }
+
+    private string _assetFolder = AppContext.BaseDirectory;
+
+    /// <summary>
+    /// The folder that assets are found in, or asset file paths are relative to..
+    /// Defaults the the application's base directory.
+    /// </summary>
+    public string AssetFolder
+    {
+        get => _assetFolder;
+        set => _assetFolder = string.IsNullOrEmpty(value) ? AppContext.BaseDirectory : value;
+    }
+
+    /// <summary>
+    /// Sets <see cref="AssetFolder"/> to the folder of the source file that calls this method.
+    /// This is useful for single source applications run using "dotnet run app.cs"
+    /// since they don't run in the same directory of the source file and don't copy the assets into the run folder.
+    /// </summary>
+    public void SetCallerAssetFolder([CallerFilePath] string sourcePath = "")
+    {
+        AssetFolder = Path.GetDirectoryName(sourcePath)
+            ?? throw new InvalidOperationException(
+                "Caller source path is unavailable.");
+    }
+
+    /// <summary>
+    /// Resolves <paramref name="path"/> against <see cref="AssetFolder"/>.
+    /// </summary>
+    public string ResolveAssetPath(string path)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        return Path.IsPathRooted(path) ? path : Path.Combine(_assetFolder, path);
     }
 
     private readonly TaskCompletionSource _shutdownTcs =

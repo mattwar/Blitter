@@ -94,9 +94,12 @@ playField.AddBarriers(
     new Wall(new Vector2(W - WallInset, 820f), new Vector2(W / 2f + CenterGapOffset, 860f)), // bottom right
 ]);
 
-var bumperSound = Sound.Load(Asset.GetPathRelativeToCaller("bumper.wav"));
-var flipperSound = Sound.Load(Asset.GetPathRelativeToCaller("flipper.wav"));
-var slingshotSound = Sound.Load(Asset.GetPathRelativeToCaller("slingshot.wav"));
+// Resolve loose asset files next to this source file.
+Application.Current.SetCallerAssetFolder();
+
+var bumperSound = Sound.Load("bumper.wav");
+var flipperSound = Sound.Load("flipper.wav");
+var slingshotSound = Sound.Load("slingshot.wav");
 
 // circular bumpers
 playField.AddBarriers(

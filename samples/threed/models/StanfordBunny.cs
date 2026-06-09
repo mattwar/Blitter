@@ -32,7 +32,10 @@ using Blitter.Bits;
 //const string ModelFile = "teapot.obj";
 const string ModelFile = "bunny.obj";
 
-var model = Model.Load(Asset.GetPathRelativeToCaller(ModelFile));
+// Resolve loose asset files next to this source file.
+Application.Current.SetCallerAssetFolder();
+
+var model = Model.Load(ModelFile);
 
 // Center + scale the model into a unit-ish bounding sphere so it
 // frames the same way regardless of which classic asset is loaded

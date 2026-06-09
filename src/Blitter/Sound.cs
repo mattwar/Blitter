@@ -42,11 +42,13 @@ public sealed class Sound
 
     /// <summary>
     /// Loads a sound from disk. Format is determined by the file extension:
-    /// <c>.wav</c>, <c>.ogg</c>, <c>.mp3</c>.
+    /// <c>.wav</c>, <c>.ogg</c>, <c>.mp3</c>. Relative paths are resolved
+    /// against <see cref="Application.AssetFolder"/>.
     /// </summary>
     public static Sound Load(string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
+        path = Application.Current.ResolveAssetPath(path);
         var ext = Path.GetExtension(path).ToLowerInvariant();
         return ext switch
         {
