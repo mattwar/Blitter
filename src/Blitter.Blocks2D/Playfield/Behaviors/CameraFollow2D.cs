@@ -17,7 +17,20 @@ public class CameraFollow2D : SpriteBehavior2D
     /// nothing — set this to the same <see cref="Camera2D"/> assigned
     /// to <see cref="Renderer2D.Camera"/>.
     /// </summary>
+    /// <remarks>
+    /// May be left unset and resolved automatically at attach time from a
+    /// <see cref="CameraLayer2D"/> in the scene — see <see cref="CameraName"/>.
+    /// </remarks>
     public Camera2D? Camera { get; set; }
+
+    /// <summary>
+    /// Optional name of the <see cref="CameraLayer2D"/> to drive. When
+    /// <see cref="Camera"/> is left unset, the behavior resolves its camera
+    /// at attach time: by this name if given, otherwise the scene's single
+    /// <see cref="CameraLayer2D"/>. An explicitly assigned
+    /// <see cref="Camera"/> always wins.
+    /// </summary>
+    public string? CameraName { get; set; }
 
     /// <summary>
     /// Viewport size in viewport pixels (typically the renderer's
@@ -51,6 +64,27 @@ public class CameraFollow2D : SpriteBehavior2D
     /// for side-scrollers where a moving target shouldn't drag the
     /// camera vertically.</summary>
     public bool FollowY { get; set; } = true;
+
+    /// <summary>
+    /// Resolves <see cref="Camera"/> from a <see cref="CameraLayer2D"/> when
+    /// it was not assigned explicitly: by <see cref="CameraName"/> if set,
+    /// otherwise the scene's single camera layer.
+    /// </summary>
+    protected internal override void OnAttach(Sprite2D self)
+    {
+        if (Camera is not null)
+            return;
+
+        var scene = self.Scene;
+        CameraLayer2D? cameraLayer;
+        if (CameraName is null)
+            scene.TryGetLayer(out cameraLayer);
+        else
+            scene.TryGetLayer(CameraName, out cameraLayer);
+
+        if (cameraLayer is not null)
+            Camera = cameraLayer.Camera;
+    }
 
     public override void Apply(Sprite2D target, in UpdateContext2D context)
     {

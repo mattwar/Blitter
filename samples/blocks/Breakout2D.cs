@@ -62,11 +62,10 @@ var window = new Window2D(W, H)
     FullScreen = true,
     RelativeMouseMode = true,  // hide mouse
     CloseKey = Key.Escape,
+    // Render at a fixed 960x720 logical surface; SDL letterboxes it onto
+    // whatever the physical fullscreen resolution turns out to be.
+    LogicalSize = (W, H),
 };
-
-// Render at a fixed 960x720 logical surface; SDL letterboxes it onto
-// whatever the physical fullscreen resolution turns out to be.
-window.Renderer.SetLogicalSize(W, H, LogicalPresentation.Letterbox);
 
 Application.Current.SuppressAccessibilityShortcuts = true;
 

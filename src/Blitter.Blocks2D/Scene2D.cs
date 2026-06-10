@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Blitter.Blocks2D;
 
@@ -100,6 +101,8 @@ public class Scene2D
         _exitConditions.Clear();
         RunState = RunState.Running;
 
+        Attach();
+
         try
         {
             await window.RunAsync(
@@ -117,6 +120,101 @@ public class Scene2D
             _window = null;
         }
     }
+
+    /// <summary>
+    /// Walks the fully-built scene tree once, before the first frame: wires
+    /// each layer's <see cref="Layer2D.Scene"/> back-reference, then calls
+    /// each node's <c>OnAttach</c> hook. Two passes so the back-references
+    /// (and thus cross-node lookups) are in place before any hook runs. Each
+    /// layer attaches its own contents (a <see cref="PlayField2D"/> recurses
+    /// into its sprites and their behaviors).
+    /// </summary>
+    private void Attach()
+    {
+        // Pass 1: wire back-references so Scene/PlayField navigation works.
+        foreach (var layer in Layers)
+            layer._scene = this;
+
+        // Pass 2: run the attach hooks now that the graph is navigable.
+        foreach (var behavior in Behaviors)
+            behavior.OnAttach(this);
+
+        foreach (var layer in Layers)
+            layer.OnAttach();
+    }
+
+    /// <summary>
+    /// The renderer this scene draws through. Available only while the
+    /// scene is running (including during <c>OnAttach</c>).
+    /// </summary>
+    public Renderer2D Renderer =>
+        _window?.Renderer ?? throw new InvalidOperationException("The scene's renderer is available only while the scene is running.");
+
+    /// <summary>
+    /// Tries to resolve the single layer assignable to <typeparamref name="T"/>.
+    /// Returns <c>false</c> if none. Throws if more than one matches (name it
+    /// and use <see cref="TryGetLayer{T}(string, out T)"/> to disambiguate).
+    /// </summary>
+    public bool TryGetLayer<T>([NotNullWhen(true)] out T? layer) where T : class
+    {
+        T? match = null;
+        foreach (var candidate in Layers)
+        {
+            if (candidate is not T typed)
+                continue;
+            if (match is not null)
+                throw new InvalidOperationException($"More than one layer is a {typeof(T).Name}; resolve it by name instead.");
+            match = typed;
+        }
+        layer = match;
+        return match is not null;
+    }
+
+    /// <summary>
+    /// Resolves the single layer assignable to <typeparamref name="T"/>.
+    /// Throws if none exists or more than one matches.
+    /// </summary>
+    public T GetLayer<T>() where T : class =>
+        TryGetLayer<T>(out var layer) ? layer : throw new InvalidOperationException($"No layer of type {typeof(T).Name}.");
+
+    /// <summary>
+    /// Tries to resolve the layer named <paramref name="name"/> as a
+    /// <typeparamref name="T"/>. Returns <c>false</c> if no layer has that
+    /// name. Throws if the name is duplicated or the named layer is a
+    /// different type.
+    /// </summary>
+    public bool TryGetLayer<T>(string name, [NotNullWhen(true)] out T? layer) where T : class
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        Layer2D? named = null;
+        foreach (var candidate in Layers)
+        {
+            if (candidate.Name != name)
+                continue;
+            if (named is not null)
+                throw new InvalidOperationException($"More than one layer is named '{name}'.");
+            named = candidate;
+        }
+        if (named is null)
+        {
+            layer = null;
+            return false;
+        }
+        if (named is T typed)
+        {
+            layer = typed;
+            return true;
+        }
+        throw new InvalidOperationException($"Layer '{name}' is a {named.GetType().Name}, not a {typeof(T).Name}.");
+    }
+
+    /// <summary>
+    /// Resolves the layer named <paramref name="name"/> as a
+    /// <typeparamref name="T"/>. Throws if no such layer exists or it is a
+    /// different type.
+    /// </summary>
+    public T GetLayer<T>(string name) where T : class =>
+        TryGetLayer<T>(name, out var layer) ? layer : throw new InvalidOperationException($"No layer named '{name}'.");
 
     /// <summary>
     /// Current run-loop state. Becomes <see cref="RunState.Exiting"/> after

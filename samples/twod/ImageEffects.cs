@@ -23,8 +23,8 @@ var window = new Window2D
     BackgroundColor = new Color(18, 20, 28),
     FullScreen = true,
     CloseKey = Key.Escape,
+    LogicalSize = (DesignW, DesignH),
 };
-window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
 // Resolve loose asset files next to this source file.
 Application.Current.SetCallerAssetFolder();

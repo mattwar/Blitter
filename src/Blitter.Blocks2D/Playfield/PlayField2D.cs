@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 using Blitter.Bits;
 
 namespace Blitter.Blocks2D;
@@ -54,15 +56,123 @@ public class PlayField2D : Layer2D
     }
 
     /// <summary>
-    /// The sprites currently in this playfield.
+    /// The sprites currently in this playfield. The <c>init</c> accessor adopts
+    /// an initial set at construction (object-initializer or constructor), taking
+    /// ownership of each sprite just like <see cref="AddSprite"/>.
     /// </summary>
-    public IReadOnlyList<Sprite2D> Sprites => _sprites;
+    public IReadOnlyList<Sprite2D> Sprites
+    {
+        get => _sprites;
+        init => AdoptSprites(value);
+    }
+
+    /// <summary>
+    /// Attaches this playfield's sprites (and their behaviors) after the
+    /// base layer attaches: the scene walks layers, but only a playfield
+    /// owns sprites, so the recursion into them lives here.
+    /// </summary>
+    protected internal override void OnAttach()
+    {
+        base.OnAttach();
+        foreach (var sprite in _sprites)
+        {
+            sprite.OnAttach();
+            foreach (var behavior in sprite.Behaviors)
+                behavior.OnAttach(sprite);
+        }
+    }
+
+    /// <summary>
+    /// Tries to resolve the single sprite assignable to <typeparamref name="T"/>
+    /// in this playfield. Returns <c>false</c> if none. Throws if more than one
+    /// matches (name it and use <see cref="TryGetSprite{T}(string, out T)"/> to
+    /// disambiguate).
+    /// </summary>
+    public bool TryGetSprite<T>([NotNullWhen(true)] out T? sprite) where T : Sprite2D
+    {
+        T? match = null;
+        foreach (var candidate in _sprites)
+        {
+            if (candidate is not T typed)
+                continue;
+            if (match is not null)
+                throw new InvalidOperationException($"More than one sprite is a {typeof(T).Name}; resolve it by name instead.");
+            match = typed;
+        }
+        sprite = match;
+        return match is not null;
+    }
+
+    /// <summary>
+    /// Resolves the single sprite assignable to <typeparamref name="T"/> in
+    /// this playfield. Throws if none exists or more than one matches.
+    /// </summary>
+    public T GetSprite<T>() where T : Sprite2D =>
+        TryGetSprite<T>(out var sprite) ? sprite : throw new InvalidOperationException($"No sprite of type {typeof(T).Name}.");
+
+    /// <summary>
+    /// Tries to resolve the sprite named <paramref name="name"/> in this
+    /// playfield as a <typeparamref name="T"/>. Returns <c>false</c> if none
+    /// has that name. Throws if the name is duplicated or the named sprite is
+    /// a different type.
+    /// </summary>
+    public bool TryGetSprite<T>(string name, [NotNullWhen(true)] out T? sprite) where T : Sprite2D
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        Sprite2D? named = null;
+        foreach (var candidate in _sprites)
+        {
+            if (candidate.Name != name)
+                continue;
+            if (named is not null)
+                throw new InvalidOperationException($"More than one sprite is named '{name}'.");
+            named = candidate;
+        }
+        if (named is null)
+        {
+            sprite = null;
+            return false;
+        }
+        if (named is T typed)
+        {
+            sprite = typed;
+            return true;
+        }
+        throw new InvalidOperationException($"Sprite '{name}' is a {named.GetType().Name}, not a {typeof(T).Name}.");
+    }
+
+    /// <summary>
+    /// Resolves the sprite named <paramref name="name"/> in this playfield
+    /// as a <typeparamref name="T"/>. Throws if no such sprite exists or it
+    /// is a different type.
+    /// </summary>
+    public T GetSprite<T>(string name) where T : Sprite2D =>
+        TryGetSprite<T>(name, out var sprite) ? sprite : throw new InvalidOperationException($"No sprite named '{name}'.");
+
+    /// <summary>Tries to resolve the sprite named <paramref name="name"/> in
+    /// this playfield. Returns <c>false</c> if none has that name.</summary>
+    public bool TryGetSprite(string name, [NotNullWhen(true)] out Sprite2D? sprite) =>
+        TryGetSprite<Sprite2D>(name, out sprite);
+
+    /// <summary>Resolves the sprite named <paramref name="name"/> in this
+    /// playfield. Throws if none has that name.</summary>
+    public Sprite2D GetSprite(string name) => GetSprite<Sprite2D>(name);
 
     /// <summary>
     /// Static, non-sprite obstacles in this playfield. 
     /// Tested against every sprite's <see cref="Sprite2D.HitCircle"/> each tick.
+    /// The <c>init</c> accessor adds an initial set at construction
+    /// (object-initializer or constructor).
     /// </summary>
-    public IReadOnlyList<Barrier2D> Barriers => _barriers;
+    public IReadOnlyList<Barrier2D> Barriers
+    {
+        get => _barriers;
+        init
+        {
+            foreach (var b in value)
+                _barriers.Add(b);
+        }
+    }
 
     /// <summary>
     /// Total time accumulated from <see cref="UpdateContext2D"/> deltas passed through this playfield's <see cref="Update"/>.

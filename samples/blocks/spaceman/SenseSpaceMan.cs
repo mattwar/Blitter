@@ -43,9 +43,8 @@ var window = new Window2D(DesignW, DesignH)
     Title = $"Sense: {atlas.Count} regions detected",
     BackgroundColor = new Color(100, 100, 120),
     CloseKey = Key.Escape,
+    LogicalSize = (DesignW, DesignH),
 };
-
-window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
 // Fit the sheet to the design surface preserving aspect.
 var (sw, sh) = sheet.Size;

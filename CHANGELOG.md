@@ -64,6 +64,29 @@ All notable changes to this project will be documented in this file.
   per-plate `BottomY`/`OffsetX`/`RepeatX`/`Tint` overrides. Plates draw in
   declaration order (first = farthest back); a non-repeating plate is centred
   on the camera, the rest tile horizontally.
+- `CameraLayer2D` (Blitter.Blocks2D): a non-visual layer whose sole job is to
+  install its `Camera2D` onto the renderer when it draws. Placing it first in
+  `Scene2D.Layers` makes the camera a declarative scene node instead of an
+  imperative `renderer.Camera = …` call, so it can be positioned, named, and
+  resolved like any other node.
+- Scene-node naming and an attach lifecycle (Blitter.Blocks2D): `Layer2D` and
+  `Sprite2D` gained an optional `Name`, a `Scene` back-reference (and
+  `Sprite2D.PlayField`/`Scene`), and an `OnAttach` hook called once after the
+  scene tree is built but before the first frame. Nodes resolve a dependency
+  by navigating from themselves: a layer or sprite reads `Scene`, a
+  `SpriteBehavior2D.OnAttach(Sprite2D self)` reads `self.Scene`, a
+  `SceneBehavior2D.OnAttach(Scene2D scene)` is handed the scene. Lookups live
+  on their natural owners — `Scene2D.GetLayer<T>()`/`GetLayer<T>(name)` for
+  layers and `PlayField2D.GetSprite<T>(name)` for sprites (a sprite's owner
+  is its playfield, not the scene), each with a `TryGet…(out …)` companion —
+  so cross-references can be wired by lookup at attach time instead of
+  hoisting shared local variables through every constructor. Duplicate names
+  and wrong-type or ambiguous lookups throw a descriptive error.
+- `CameraFollow2D` can now resolve the camera it drives from a
+  `CameraLayer2D` at attach time instead of requiring a shared `Camera2D`
+  reference: leave `Camera` unset and it binds to the scene's single
+  `CameraLayer2D`, or to the one named by `CameraName`. An explicitly
+  assigned `Camera` still wins.
 - `Application.AssetFolder`: base folder that relative asset paths resolve
   against, defaulting to `AppContext.BaseDirectory` so shipped apps need no
   configuration. Honored by `Bitmap.Load`, `Sound.Load`, `Model.Load`,

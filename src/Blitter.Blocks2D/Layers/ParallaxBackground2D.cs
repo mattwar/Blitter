@@ -6,41 +6,20 @@ using Blitter.Bits;
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// A single <see cref="Layer2D"/> that draws a back-to-front stack of
-/// parallax background plates. Instead of composing one
-/// <see cref="RepeatingImageLayer2D"/> per plate, declare the whole stack in
-/// one place: each <see cref="ParallaxPlate2D"/> lists an image and the
-/// parallax factor to scroll it at, so a layered backdrop reads as data.
-/// <code>
-/// var background = new ParallaxBackground2D
-/// {
-///     BottomY = 540f,
-///     Plates =
-///     {
-///         { "sky.png",            0.00f },
-///         { "mountains_far.png",  0.15f },
-///         { "mountains_near.png", 0.60f },
-///         { "ground.png",         1.00f },
-///     },
-/// };
-/// </code>
-/// Plates draw in declaration order (first = farthest back). Each plate's
-/// <see cref="ParallaxPlate2D.Parallax"/> is applied independently, so the
-/// layer's own <see cref="Layer2D.ParallaxFactor"/> is left at its default.
+/// A single <see cref="Layer2D"/> that contains a colleciton of stacked plates
+/// each with a different parallax factor, so they scroll at different rates to create
+/// a sense of depth.
 /// </summary>
 public sealed class ParallaxBackground2D : Layer2D
 {
     /// <summary>
-    /// The plates, back-to-front. Supports a terse collection initializer:
-    /// <c>{ "image.png", parallaxX }</c> adds a horizontally-scrolling plate,
-    /// and full <see cref="ParallaxPlate2D"/> objects can be mixed in for
-    /// per-plate overrides.
+    /// The individual plates including images and parallax factors.
     /// </summary>
     public PlateCollection Plates { get; } = new();
 
     /// <summary>
-    /// Default world-space Y for the bottom edge of every plate, used by any
-    /// plate that does not set its own <see cref="ParallaxPlate2D.BottomY"/>.
+    /// Default world-space Y for the bottom edge of every plate, 
+    /// used by any plate that does not set its own <see cref="ParallaxPlate2D.BottomY"/>.
     /// </summary>
     public float BottomY { get; set; }
 
@@ -114,9 +93,7 @@ public sealed class ParallaxBackground2D : Layer2D
     }
 
     /// <summary>
-    /// The plate list for <see cref="ParallaxBackground2D.Plates"/>, with
-    /// collection-initializer <c>Add</c> overloads for the terse
-    /// <c>{ "image.png", parallaxX }</c> form alongside full plate objects.
+    /// The plate list for <see cref="ParallaxBackground2D.Plates"/>.
     /// </summary>
     public sealed class PlateCollection : IEnumerable<ParallaxPlate2D>
     {
@@ -136,9 +113,7 @@ public sealed class ParallaxBackground2D : Layer2D
         }
 
         /// <summary>
-        /// Adds a horizontally-scrolling plate from an image and a horizontal
-        /// parallax factor (the vertical factor is <c>0</c>, the usual choice
-        /// for a side-scrolling backdrop).
+        /// Adds a plate.
         /// </summary>
         public void Add(ImageSource image, float parallaxX)
         {

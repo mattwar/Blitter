@@ -67,7 +67,24 @@ public sealed class ImageSourceState
     public FlipMode Flip { get; set; }
 
     /// <summary>How long each frame is held. Irrelevant for a single frame.</summary>
-    public TimeSpan FrameDuration { get; set; } = TimeSpan.FromSeconds(0.1);
+    public TimeSpan FrameDuration
+    {
+        get => _frameDuration ?? DefaultFrameDuration;
+        set => _frameDuration = value;
+    }
+
+    private TimeSpan? _frameDuration;
+    private static readonly TimeSpan DefaultFrameDuration = TimeSpan.FromSeconds(0.1);
+
+    /// <summary>
+    /// Total play time for the whole state, divided evenly across its
+    /// <see cref="Frames"/> to set the per-frame cadence — so you can declare
+    /// "this five-frame jump lasts the airtime" without hand-computing each
+    /// frame's slice. Mutually exclusive with <see cref="FrameDuration"/>; leave
+    /// unset to use <see cref="FrameDuration"/> instead. Ignored for a single
+    /// frame.
+    /// </summary>
+    public TimeSpan? Duration { get; set; }
 
     /// <summary>Behaviour when the sequence reaches its end.</summary>
     public AnimationLoop Loop { get; set; } = AnimationLoop.Loop;
@@ -118,6 +135,10 @@ public sealed class ImageSourceState
 
         var ctx = context.Inherit(FilePath, TileSize, Flip);
 
+        if (Duration is not null && _frameDuration is not null)
+            throw new InvalidOperationException(
+                $"An {nameof(ImageSourceState)} sets either {nameof(Duration)} (total) or {nameof(FrameDuration)} (per frame), not both.");
+
         ImmutableArray<AnimationFrame> frames;
         if (Frames.Count > 0)
         {
@@ -146,6 +167,12 @@ public sealed class ImageSourceState
             frames = ImmutableArray.Create(new AnimationFrame(texture, ctx.Flip));
         }
 
-        return new AnimationSequence(frames, FrameDuration, Loop);
+        // Total Duration is split evenly across the frames; otherwise each
+        // frame is held for the explicit (or default) FrameDuration.
+        var frameDuration = Duration is { } total
+            ? TimeSpan.FromTicks(total.Ticks / frames.Length)
+            : FrameDuration;
+
+        return new AnimationSequence(frames, frameDuration, Loop);
     }
 }

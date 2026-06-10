@@ -36,9 +36,8 @@ var window = new Window2D(DesignW, DesignH)
     FullScreen = true,
     RelativeMouseMode = true, // hides mouse
     CloseKey = Key.Escape,
+    LogicalSize = (DesignW, DesignH),
 };
-
-window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
 // Font for floating score popups and HUD score readout.
 var scoreFont = new Font(["Consolas", "Menlo"], 48, bold: true);

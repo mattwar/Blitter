@@ -224,6 +224,43 @@ public class ImageSourceTests : IDisposable
     }
 
     [Fact]
+    public void States_Duration_DividesEvenlyAcrossFrames()
+    {
+        var sheet = SaveImage("jump.png", 64, 16);
+
+        var source = new ImageSource
+        {
+            FilePath = sheet,
+            TileSize = (16, 16),
+            ["jump"] = { Frames = { (0, 0), (1, 0), (2, 0), (3, 0) }, Duration = TimeSpan.FromSeconds(1.0) },
+        };
+
+        var visual = Assert.IsType<AnimatedVisual2D>(source.ToVisual2D());
+        var jump = visual.Catalog["jump"];
+        Assert.Equal(TimeSpan.FromSeconds(0.25), jump.FrameDuration);
+    }
+
+    [Fact]
+    public void States_DurationAndFrameDuration_Throws()
+    {
+        var sheet = SaveImage("both.png", 64, 16);
+
+        var source = new ImageSource
+        {
+            FilePath = sheet,
+            TileSize = (16, 16),
+            ["x"] =
+            {
+                Frames = { (0, 0), (1, 0) },
+                Duration = TimeSpan.FromSeconds(1.0),
+                FrameDuration = TimeSpan.FromSeconds(0.2),
+            },
+        };
+
+        Assert.Throws<InvalidOperationException>(() => source.ToVisual2D());
+    }
+
+    [Fact]
     public void States_StateFlip_ComposesOntoEveryFrame()
     {
         var sheet = SaveImage("flipwalk.png", 64, 16);

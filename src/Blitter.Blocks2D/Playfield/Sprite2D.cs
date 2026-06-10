@@ -13,6 +13,11 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     private ImageSource _image = new();
 
     /// <summary>
+    /// Optional scene-unique name.
+    /// </summary>
+    public string? Name { get; set; }
+
+    /// <summary>
     /// The sprite's image. Always non-null; assign a path, an
     /// <see cref="ImageSource"/>, or a configured source via object
     /// initializer, then read <see cref="ImageSource.Visual"/> for the
@@ -78,6 +83,13 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     public PlayField2D PlayField =>  
         _playField ?? throw new InvalidOperationException("Sprite is not attached to a PlayField. Access PlayField only while the sprite is a member of one.");
 
+    /// <summary>
+    /// The <see cref="Scene2D"/> this sprite's <see cref="PlayField"/>
+    /// belongs to. Throws if the sprite is not in a playfield that is part
+    /// of a running scene.
+    /// </summary>
+    public Scene2D Scene => PlayField.Scene;
+
     // PlayField backing field.
     internal PlayField2D? _playField;
 
@@ -93,24 +105,28 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
             : TimeSpan.Zero;
 
     /// <summary>
-    /// The sprite's world-space collision shape: the current
-    /// <see cref="Image"/>'s <see cref="ImageSource.Visual"/>
-    /// <see cref="Visual2D.HitShape"/> (mirrored by <see cref="Flipped"/>)
-    /// combined with this sprite's <see cref="Center"/>,
-    /// <see cref="Rotation"/>, and <see cref="Scale"/>. Override to substitute
-    /// a different shape (still posed by the sprite).
+    /// The sprite's world-space collision shape
     /// </summary>
     public virtual PosedHitShape2D HitShape =>
         new((Image.Visual?.HitShape ?? HitShape2D.None).Flipped(Flipped), new Pose2D(Center, Rotation, Scale));
 
     /// <summary>
-    /// Bounding circle of the sprite for collision
-    /// purposes; equivalent to <see cref="HitShape"/>'s
-    /// <see cref="PosedHitShape2D.BoundingCircle"/>.
+    /// Bounding circle of the sprite
     /// </summary>
     public BoundingCircle HitCircle => HitShape.BoundingCircle;
 
     public Sprite2D()
+    {
+    }
+
+    /// <summary>
+    /// Called once after the scene tree is built but before the first
+    /// frame, with <see cref="PlayField"/> and <see cref="Scene"/> already
+    /// set. Resolve dependencies on other nodes via <c>Scene.Find…</c> here
+    /// and cache them, and run any one-time self-measurement. The default
+    /// does nothing.
+    /// </summary>
+    protected internal virtual void OnAttach()
     {
     }
 

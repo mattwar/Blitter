@@ -11,6 +11,24 @@ namespace Blitter.Blocks2D;
 /// </summary>
 public abstract class Layer2D : IUpdatable<UpdateContext2D>, IDrawable2D
 {
+    /// <summary>
+    /// Optional scene-unique name. When set, other nodes can resolve this
+    /// layer through <see cref="Scene2D.GetLayer{T}(string)"/> in their
+    /// <c>OnAttach</c> hook instead of capturing it in a local variable.
+    /// </summary>
+    public string? Name { get; set; }
+
+    /// <summary>
+    /// The <see cref="Scene2D"/> this layer belongs to. Set by the scene
+    /// before <see cref="OnAttach"/> runs; throws if read before the layer
+    /// is attached to a running scene.
+    /// </summary>
+    public Scene2D Scene =>
+        _scene ?? throw new InvalidOperationException("Layer is not attached to a Scene. Access Scene only while the layer is part of a running scene.");
+
+    // Scene back-reference, set during the scene's attach walk.
+    internal Scene2D? _scene;
+
     /// <summary>When false the scene skips this layer's update.</summary>
     public bool Enabled { get; set; } = true;
 
@@ -55,5 +73,15 @@ public abstract class Layer2D : IUpdatable<UpdateContext2D>, IDrawable2D
 
     /// <summary>Render the layer's current state.</summary>
     protected abstract void DrawContent(Renderer2D renderer);
+
+    /// <summary>
+    /// Called once after the scene tree is built but before the first
+    /// frame, with <see cref="Scene"/> already set. Resolve dependencies on
+    /// other nodes via <c>Scene.GetLayer</c> here and cache them, and run
+    /// any one-time setup. The default does nothing.
+    /// </summary>
+    protected internal virtual void OnAttach()
+    {
+    }
 }
 

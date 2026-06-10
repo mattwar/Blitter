@@ -39,9 +39,8 @@ var window = new Window2D(W, H)
     FullScreen = true,
     RelativeMouseMode = true, // hides the mouse
     CloseKey = Key.Escape,
+    LogicalSize = (W, H),
 };
-
-window.Renderer.SetLogicalSize(W, H, LogicalPresentation.Letterbox);
 
 // Stop Shift×5 / right-Shift-hold from triggering the Windows
 // Sticky/Filter Keys prompt while we're playing.
@@ -158,7 +157,7 @@ playField.AddBarriers([flipperLeft, flipperRight]);
 // The "ball"
 var ball = new Pinball
 {
-    Visual = ballImage,
+    Image = ballImage,
     Center = plungerSpawn,
     Scale = (BallRadius * 2f) / ballImage.Width,
     Behaviors = 
