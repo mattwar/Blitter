@@ -7,10 +7,10 @@ namespace Blitter.Blocks2D;
 /// </summary>
 public sealed class CustomLayer2D : Layer2D
 {
-    public Action<UpdateContext2D>? OnUpdate { get; set; }
+    public Action<UpdateContext>? OnUpdate { get; set; }
     public Action<Renderer2D>? OnRender { get; set; }
 
-    public override void Update(in UpdateContext2D context)
+    public override void Update(in UpdateContext context)
     {
         OnUpdate?.Invoke(context);
     }

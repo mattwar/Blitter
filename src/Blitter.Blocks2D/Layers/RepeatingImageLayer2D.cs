@@ -42,9 +42,6 @@ public sealed class RepeatingImageLayer2D : Layer2D
     public Color Tint { get; set; } = Color.White;
 
     /// <inheritdoc/>
-    public override void Update(in UpdateContext2D context) { }
-
-    /// <inheritdoc/>
     protected override void DrawContent(Renderer2D renderer)
     {
         float tileW = _image.Width;

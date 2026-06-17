@@ -24,7 +24,12 @@ public sealed class BarrierBounce2D : SpriteBehavior2D
     /// <summary>Called after a successful bounce. Args: sprite, barrier, contact normal.</summary>
     public Action<Sprite2D, Barrier2D, Vector2>? OnBounce { get; set; }
 
-    public override void OnHitBarrier(Sprite2D self, Barrier2D barrier, in UpdateContext2D context)
+    public override void Apply(in UpdateContext context)
+    {
+        // No per-tick logic; bounce happens in OnHitBarrier.
+    }
+    
+    public override void OnHitBarrier(Sprite2D self, Barrier2D barrier, in UpdateContext context)
     {
         // Normal convention: TryGetContact returns normal from b → a;
         // here a = self.HitShape, b = barrier.HitShape, so `contact.Normal`

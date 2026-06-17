@@ -9,8 +9,7 @@ public class SceneLookupTests
         var scene = new Scene2D();
         foreach (var layer in layers)
         {
-            scene.Layers.Add(layer);
-            layer._scene = scene;
+            scene.AddLayer(layer);
         }
         return scene;
     }
@@ -85,11 +84,11 @@ public class SceneLookupTests
         var follow = new CameraFollow2D();
         var sprite = new Sprite2D();
         var playfield = new PlayField2D();
-        sprite.Behaviors.Add(follow);
+        sprite.AddBehavior(follow);
         playfield.AddSprite(sprite);
         SceneWith(cameraLayer, playfield);
 
-        follow.OnAttach(sprite);
+        sprite.Update(new UpdateContext());
 
         Assert.Same(cameraLayer.Camera, follow.Camera);
     }
@@ -102,11 +101,11 @@ public class SceneLookupTests
         var follow = new CameraFollow2D { CameraName = "world" };
         var sprite = new Sprite2D();
         var playfield = new PlayField2D();
-        sprite.Behaviors.Add(follow);
+        sprite.AddBehavior(follow);
         playfield.AddSprite(sprite);
         SceneWith(world, hud, playfield);
 
-        follow.OnAttach(sprite);
+        sprite.Update(new UpdateContext());
 
         Assert.Same(world.Camera, follow.Camera);
     }
@@ -119,11 +118,11 @@ public class SceneLookupTests
         var follow = new CameraFollow2D { Camera = explicitCamera };
         var sprite = new Sprite2D();
         var playfield = new PlayField2D();
-        sprite.Behaviors.Add(follow);
+        sprite.AddBehavior(follow);
         playfield.AddSprite(sprite);
         SceneWith(cameraLayer, playfield);
 
-        follow.OnAttach(sprite);
+        sprite.Update(new UpdateContext());
 
         Assert.Same(explicitCamera, follow.Camera);
     }

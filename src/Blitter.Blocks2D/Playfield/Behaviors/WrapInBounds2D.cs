@@ -1,3 +1,5 @@
+using Blitter.Bits;
+
 namespace Blitter.Blocks2D;
 
 /// <summary>
@@ -10,13 +12,30 @@ public class WrapInBounds2D : SpriteBehavior2D
     /// <summary>Invoked after the sprite has wrapped this tick.</summary>
     public Action<Sprite2D>? OnWrap { get; set; }
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+    private IEntity _entity = null!;
+    private Bounds2D? _bounds;
+    private Transform2D _transform = null!;
+
+    protected override void OnAttach(IEntity entity)
     {
-        var b = context.Bounds;
+        _entity = entity;
+        _transform = entity.GetOrAddTrait<Transform2D>();
+    }
+
+    public override void Apply(in UpdateContext context)
+    {
+        // Bounds live on an ancestor (the playfield), which isn't reachable
+        // when this behavior is attached (the sprite may not be parented yet). 
+        // Resolve it opportunistically once the entity is parented.
+        _bounds ??= _entity.TryFindTrait<Bounds2D>(out var bounds) ? bounds : null;
+        if (_bounds is null)
+            return;
+
+        var b = _bounds.Rect;
         if (b.Width <= 0f || b.Height <= 0f)
             return;
 
-        var c = target.Center;
+        var c = _transform.Position;
         var wrapped = false;
 
         if (c.X < b.X)                  
@@ -43,8 +62,9 @@ public class WrapInBounds2D : SpriteBehavior2D
 
         if (wrapped)
         {
-            target.Center = c;
-            OnWrap?.Invoke(target);
+            _transform.Position = c;
+            if (_entity is Sprite2D target)
+                OnWrap?.Invoke(target);
         }
     }
 }

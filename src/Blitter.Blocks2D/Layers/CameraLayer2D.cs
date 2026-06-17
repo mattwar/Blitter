@@ -20,7 +20,7 @@ public sealed class CameraLayer2D : Layer2D
     public Camera2D Camera { get; set; } = new();
 
     /// <inheritdoc/>
-    public override void Update(in UpdateContext2D context)
+    public override void Update(in UpdateContext context)
     {
         // Pure configuration layer: nothing to advance.
     }

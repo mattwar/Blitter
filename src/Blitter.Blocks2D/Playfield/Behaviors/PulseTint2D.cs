@@ -1,4 +1,5 @@
 namespace Blitter.Blocks2D;
+using Bits;
 
 /// <summary>
 /// Smoothly cycles the host sprite's <see cref="Sprite2D.Tint"/>
@@ -23,7 +24,16 @@ public sealed class PulseTint2D : SpriteBehavior2D
     /// </summary>
     public TimeSpan Period { get; init; } = TimeSpan.FromSeconds(1);
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+    private Sprite2D _target = null!;
+
+    protected override void OnAttach(IEntity entity)
+    {
+        if (entity is not Sprite2D sprite)
+            throw new InvalidOperationException($"PulseTint2D can only be attached to Sprite2D entities, but was attached to {entity}.");
+        _target = sprite;
+    }
+
+    public override void Apply(in UpdateContext context)
     {
         var seconds = Period.TotalSeconds;
         if (seconds <= 0)
@@ -31,9 +41,9 @@ public sealed class PulseTint2D : SpriteBehavior2D
 
         // 0..1 triangle-shaped weight from a sine, driven by sprite age
         // so each sprite pulses independently (good for spawn variety).
-        var phase = target.Age.TotalSeconds / seconds;
+        var phase = _target.Age.TotalSeconds / seconds;
         var t = 0.5f + 0.5f * MathF.Sin((float)(phase * Math.Tau));
-        target.Tint = Color.Lerp(Low, High, t);
+        _target.Tint = Color.Lerp(Low, High, t);
     }
 
     /// <summary>

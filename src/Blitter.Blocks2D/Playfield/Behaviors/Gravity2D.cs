@@ -1,6 +1,8 @@
 using System.Numerics;
 
 namespace Blitter.Blocks2D;
+using Bits;
+
 
 /// <summary>
 /// Accelerates the sprite each tick by <see cref="Acceleration"/>.
@@ -20,8 +22,15 @@ public sealed class Gravity2D : SpriteBehavior2D
     /// </summary>
     public float MaxFallSpeed { get; set; }
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+    private Velocity2D? _velocity;
+
+    public override void Apply(in UpdateContext context)
     {
+        if (this.Entity is not IEntity entity)
+            return;
+
+        _velocity ??= entity.GetOrAddTrait<Velocity2D>();
+
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
         if (dt <= 0f)
             return;
@@ -30,7 +39,7 @@ public sealed class Gravity2D : SpriteBehavior2D
         if (accel.LengthSquared() <= float.Epsilon)
             return;
 
-        var v = Sprite2D.GetVelocity(target.Speed, target.Heading);
+        var v = _velocity.Vector;
         v += accel * dt;
 
         var cap = MaxFallSpeed;
@@ -44,6 +53,6 @@ public sealed class Gravity2D : SpriteBehavior2D
                 v -= axis * (along - cap);
         }
 
-        (target.Speed, target.Heading) = Sprite2D.GetSpeedAndHeading(v);
+        _velocity.Vector = v;
     }
 }

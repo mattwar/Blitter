@@ -93,10 +93,10 @@ var rocket = new Rocket
     Speed = 600f,
     Heading = 45f,
     Behaviors = 
-    { 
+    [ 
         new RocketController(window.Input),
         new AsteroidSmasher(scoreboard),
-    }
+    ]
 };
 
 // Camera scrolls the world to keep the rocket in view. Start it on
@@ -105,7 +105,7 @@ var camera = new Camera2D { Position = rocket.Center };
 window.Renderer.Camera = camera;
 
 var worldBounds = new Rect(0, 0, WorldW, WorldH);
-rocket.Behaviors.Add(new CameraFollow2D
+rocket.AddBehavior(new CameraFollow2D
 {
     Camera = camera,
     ViewportSize = new Vector2(DesignW, DesignH),
@@ -267,7 +267,7 @@ var hitDebug = new CustomLayer2D
 var scene = new Scene2D
 {
     Layers = 
-    { 
+    [ 
         starsFar, 
         starsMid, 
         playField,
@@ -277,9 +277,9 @@ var scene = new Scene2D
         scoreboard,
         hud,
         minimap,
-    },
+    ],
     Behaviors =
-    {
+    [
         new CustomSceneBehavior2D()
         {
             OnApply = (s, in ctx) =>
@@ -295,7 +295,7 @@ var scene = new Scene2D
                 }
             }
         }
-    },
+    ],
 };
 
 // Run the scene until done
@@ -374,7 +374,8 @@ sealed class Rocket : Sprite2D
 
     public Rocket()
     {
-        this.Behaviors.AddRange([
+        this.Behaviors =
+        [
             new Motion2D(),  // move with simple 2D physics
             // Face direction of travel, except while stunned — then
             // let RotationSpeed drive the spin freely.
@@ -389,13 +390,15 @@ sealed class Rocket : Sprite2D
             },
             new BounceInBounds2D  // bounce off the walls
             {
-                OnBounce = s =>
+                OnBounce = e =>
                 {
+                    if (e is not Sprite2D s)
+                        return;
                     s.Heading = (s.Heading + Random.Shared.Next(-10, 10) + 360f) % 360f;
                     Audio.Play(Sounds.Boing, volume: .2f);
                 },
             },
-        ]);
+        ];
     }
 
     public void Stun(TimeSpan duration)
@@ -599,7 +602,9 @@ sealed class AsteroidSmasher : SpriteBehavior2D
         _scoreboard = scoreboard;
     }
 
-    public override void OnHitSprite(Sprite2D self, Sprite2D other, in UpdateContext2D context)
+    public override void Apply(in UpdateContext context) { }
+
+    public override void OnHitSprite(Sprite2D self, Sprite2D other, in UpdateContext context)
     {
         // Grace period: ignore freshly-spawned shards so they
         // can spread out before being hit again. Without this
@@ -780,11 +785,11 @@ sealed class Asteroid : Sprite2D
         else if (kind == AsteriodKind.Radioactive)
         {
             this.Tint = _radioactiveTint;
-            this.Behaviors.Add(PulseTint2D.FromBrightness(_radioactiveTint, amount: 0.5f, period: TimeSpan.FromSeconds(0.6)));
+            this.AddBehavior(PulseTint2D.FromBrightness(_radioactiveTint, amount: 0.5f, period: TimeSpan.FromSeconds(0.6)));
         }
 
-        this.Behaviors.Add(new Motion2D());
-        this.Behaviors.Add(new BounceInBounds2D());
+        this.AddBehavior(new Motion2D());
+        this.AddBehavior(new BounceInBounds2D());
     }
 
     public void Smash()
@@ -871,8 +876,14 @@ sealed class RocketController : SpriteBehavior2D
         _input = input;
     } 
 
-    public override void Apply(Sprite2D rocket, in UpdateContext2D context)
+    private Sprite2D _rocket = null!;
+
+    protected override void OnAttach(IEntity entity) => _rocket = (Sprite2D)entity;
+
+    public override void Apply(in UpdateContext context)
     {
+        var rocket = _rocket;
+
         // No control input during stun.
         if (rocket is Rocket { IsStunned: true })
         {

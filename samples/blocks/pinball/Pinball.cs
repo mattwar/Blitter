@@ -161,7 +161,7 @@ var ball = new Pinball
     Center = plungerSpawn,
     Scale = (BallRadius * 2f) / ballImage.Width,
     Behaviors = 
-    {
+    [
         new Gravity2D { Acceleration = new Vector2(0f, 1400f), MaxFallSpeed = 1600f },
         new Motion2D(),
         new BarrierBounce2D
@@ -170,7 +170,7 @@ var ball = new Pinball
             TangentialDamping = 0.985f,
         },
         shaker
-    }
+    ]
 };
 
 playField.AddSprite(ball);
@@ -212,17 +212,17 @@ var hud = new CustomLayer2D
 var scene = new Scene2D
 {
     Layers = 
-    { 
+    [ 
         drainBand, 
         playField, 
         popups, 
         scoreboard, 
         hud 
-    },
+    ],
     Behaviors =
-    {
+    [
         gameController,
-    },
+    ],
 };
 
 // Run the scene (makes the game run within the window)
@@ -354,7 +354,7 @@ sealed class Bumper : CircleBarrier2D
         renderer.DrawDisc(Center, Radius, Tint);
     }
 
-    public override void OnHitSprite(Sprite2D hitter, in UpdateContext2D context)
+    public override void OnHitSprite(Sprite2D hitter, in UpdateContext context)
     {
         if (this.Scoreboard != null)
         {
@@ -392,7 +392,7 @@ sealed class Slingshot : LineBarrier2D
         renderer.DrawThickLine(Start, End, new Color(255, 150, 80), 5f);
     }
 
-    public override void OnHitSprite(Sprite2D hitter, in UpdateContext2D context)
+    public override void OnHitSprite(Sprite2D hitter, in UpdateContext context)
     {
         if (this.HitSound is {} hs)
         {
@@ -417,7 +417,7 @@ sealed class Flipper : SwingArmBarrier2D
 {
     public Sound? HitSound { get; set;}
 
-    protected override void OnPressed(in UpdateContext2D context)
+    protected override void OnPressed(in UpdateContext context)
     {
         if (this.HitSound is {} sound)
             Audio.Play(sound, 0.5f);
@@ -473,8 +473,10 @@ sealed class PinballGameController : SceneBehavior2D
 
     private readonly Random _rng = new();
 
-    public override void Apply(Scene2D scene, in UpdateContext2D context)
+    public override void Apply(in UpdateContext context)
     {
+        var scene = (Scene2D)this.Entity;
+
         // Flippers: each frame, drive Pressed off the shift keys.
         // The barriers handle slewing and surface velocity.
         _flipperLeft.Pressed = _input.IsDown(Key.LShift);

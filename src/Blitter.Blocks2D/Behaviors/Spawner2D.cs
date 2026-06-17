@@ -89,7 +89,7 @@ public sealed class Spawner2D : SceneBehavior2D
         return spawned;
     }
 
-    public override void Apply(Scene2D scene, in UpdateContext2D context)
+    public override void Apply(in UpdateContext context)
     {
         if (!_initialized)
         {

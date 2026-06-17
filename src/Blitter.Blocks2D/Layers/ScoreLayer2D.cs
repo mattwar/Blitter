@@ -99,7 +99,7 @@ public sealed class ScoreLayer2D : Layer2D
         Changed?.Invoke(old, Score);
     }
 
-    public override void Update(in UpdateContext2D context)
+    public override void Update(in UpdateContext context)
     {
         if (_sincePulse < PulseDuration)
             _sincePulse += context.ElapsedSinceLastUpdate;

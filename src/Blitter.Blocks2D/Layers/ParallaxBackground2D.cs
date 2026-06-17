@@ -24,9 +24,6 @@ public sealed class ParallaxBackground2D : Layer2D
     public float BottomY { get; set; }
 
     /// <inheritdoc/>
-    public override void Update(in UpdateContext2D context) { }
-
-    /// <inheritdoc/>
     protected override void DrawContent(Renderer2D renderer)
     {
         var main = renderer.Camera;

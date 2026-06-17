@@ -84,7 +84,7 @@ public sealed class FloatingTextLayer2D : Layer2D
     /// </summary>
     public int Count => _items.Count;
 
-    public override void Update(in UpdateContext2D context)
+    public override void Update(in UpdateContext context)
     {
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
         if (dt <= 0f) return;

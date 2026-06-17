@@ -24,13 +24,13 @@ public sealed class BarrierStop2D : SpriteBehavior2D
     // Apply within the same frame) sets it for next frame.
     private bool _floorContactSeen;
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+    public override void Apply(in UpdateContext context)
     {
         IsGrounded = _floorContactSeen;
         _floorContactSeen = false;
     }
 
-    public override void OnHitBarrier(Sprite2D self, Barrier2D barrier, in UpdateContext2D context)
+    public override void OnHitBarrier(Sprite2D self, Barrier2D barrier, in UpdateContext context)
     {
         if (barrier is not LineBarrier2D line)
             return;

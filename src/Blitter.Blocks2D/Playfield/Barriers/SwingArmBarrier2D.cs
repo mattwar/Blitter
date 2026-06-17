@@ -58,7 +58,7 @@ public class SwingArmBarrier2D : Barrier2D
         }
     }
 
-    public override void Update(in UpdateContext2D context)
+    public override void Update(in UpdateContext context)
     {
         // NaN doubles as a "first frame" flag: on initial Update we
         // seed CurrentAngleDeg and skip edge detection so an arm
@@ -98,13 +98,13 @@ public class SwingArmBarrier2D : Barrier2D
     /// <c>false</c> to <c>true</c>. Override to play a sound, emit
     /// particles, etc.
     /// </summary>
-    protected virtual void OnPressed(in UpdateContext2D context) { }
+    protected virtual void OnPressed(in UpdateContext context) { }
 
     /// <summary>
     /// Called once on the frame <see cref="Pressed"/> transitions from
     /// <c>true</c> to <c>false</c>.
     /// </summary>
-    protected virtual void OnReleased(in UpdateContext2D context) { }
+    protected virtual void OnReleased(in UpdateContext context) { }
 
     /// <summary>
     /// Velocity of the point on the rotating segment at world-space

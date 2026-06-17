@@ -1,4 +1,5 @@
 namespace Blitter.Blocks2D;
+using Bits;
 
 /// <summary>
 /// Integrates a sprite's <see cref="Sprite2D.Speed"/> /
@@ -6,7 +7,7 @@ namespace Blitter.Blocks2D;
 /// and its <see cref="Sprite2D.RotationSpeed"/>
 /// into <see cref="Sprite2D.Rotation"/> each tick.
 /// </summary>
-public class Motion2D : SpriteBehavior2D
+public class Motion2D : Behavior2D
 {
     /// <summary>
     /// Minimum time that must accumulate between successful integration
@@ -18,7 +19,16 @@ public class Motion2D : SpriteBehavior2D
     // MinUpdateInterval; carried forward to the next Update.
     private TimeSpan _pendingDelta;
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+    private Transform2D _transform = null!;
+    private Velocity2D _velocity = null!;
+
+    protected override void OnAttach(IEntity entity)
+    {
+        _velocity = entity.GetOrAddTrait<Velocity2D>();
+        _transform = entity.GetOrAddTrait<Transform2D>();
+    }
+
+    public override void Apply(in UpdateContext context)
     {
         if (context.ElapsedSinceLastUpdate == TimeSpan.Zero)
             return;
@@ -32,16 +42,16 @@ public class Motion2D : SpriteBehavior2D
         var timeDelta = _pendingDelta;
         _pendingDelta = TimeSpan.Zero;
 
-        if (target.RotationSpeed != 0f)
+        if (_velocity.RotationSpeed != 0f)
         {
-            var rotationDelta = (float)(target.RotationSpeed * timeDelta.TotalSeconds);
-            target.Rotation = (target.Rotation + rotationDelta) % 360f;
+            var rotationDelta = (float)(_velocity.RotationSpeed * timeDelta.TotalSeconds);
+            _transform.Rotation = (_transform.Rotation + rotationDelta) % 360f;
         }
 
-        if (target.Speed != 0f)
+        if (_velocity.Speed != 0f)
         {
-            var v = Sprite2D.GetVelocity(target.Speed, target.Heading);
-            target.Center += v * (float)timeDelta.TotalSeconds;
+            var v = _velocity.Vector;
+            _transform.Position += v * (float)timeDelta.TotalSeconds;
         }
     }
 }

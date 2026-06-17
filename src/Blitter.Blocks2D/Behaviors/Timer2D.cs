@@ -1,11 +1,12 @@
 namespace Blitter.Blocks2D;
+using Bits;
 
 /// <summary>
 /// Counts down each tick; invokes <see cref="OnExpired"/> when it reaches zero. 
 /// With <see cref="AutoRestart"/> enabled it fires repeatedly at <see cref="Duration"/> intervals — 
 /// useful for periodic AI checks, level countdowns, or rate-limited effects.
 /// </summary>
-public sealed class Timer2D : SceneBehavior2D
+public sealed class Timer2D : Behavior2D
 {
     /// <summary>Countdown length used on start and (when auto-restarting) after each fire.</summary>
     public TimeSpan Duration { get; set; }
@@ -26,7 +27,7 @@ public sealed class Timer2D : SceneBehavior2D
     public int FiredCount { get; private set; }
 
     /// <summary>Invoked once each time the timer hits zero.</summary>
-    public Action<Scene2D>? OnExpired { get; set; }
+    public Action<IEntity?>? OnExpired { get; set; }
 
     private bool _initialized;
 
@@ -40,7 +41,7 @@ public sealed class Timer2D : SceneBehavior2D
         _initialized = true;
     }
 
-    public override void Apply(Scene2D scene, in UpdateContext2D context)
+    public override void Apply(in UpdateContext context)
     {
         if (!_initialized)
         {
@@ -57,7 +58,7 @@ public sealed class Timer2D : SceneBehavior2D
         if (TimeRemaining <= TimeSpan.Zero)
         {
             FiredCount++;
-            OnExpired?.Invoke(scene);
+            OnExpired?.Invoke(this.Entity);
             // Preserve any overshoot so high-frequency timers don't drift.
             if (AutoRestart && Duration > TimeSpan.Zero)
                 TimeRemaining += Duration;

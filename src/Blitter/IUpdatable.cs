@@ -4,8 +4,7 @@ namespace Blitter;
 /// Implemented by stateful objects that advance once per frame from a per-frame inputs context.
 /// </summary>
 /// <typeparam name="TCtx">
-/// The context shape this object needs. Constraining to a specific interface 
-/// (e.g. <see cref="IUpdateContext2D"/>) lets the implementation receive typed extras without boxing.
+/// The context shape this object needs. Constraining to a specific interface lets the implementation receive typed extras without boxing.
 /// </typeparam>
 public interface IUpdatable<TCtx> where TCtx : IUpdateContext
 {

@@ -14,7 +14,7 @@ using Blitter;
 using Blitter.Bits;
 using Blitter.Blocks2D;
 
-// Resolve loose asset files next to this source file.
+// Resolve asset files relative to this source file.
 Application.Current.SetCallerAssetFolder();
 
 // Logical surface matches the artwork (1920x1080). 
@@ -37,7 +37,7 @@ var window = new Window2D
     Title = "Moon Scroller — ← → walk, Space jump, Esc quit",
     BackgroundColor = new Color(8, 8, 20),
     CloseKey = Key.Escape,
-    RelativeMouseMode = true,
+    //RelativeMouseMode = true,
     FullScreen = true,
     LogicalSize = (LogicalW, LogicalH),
     LogicalPresentation = LogicalPresentation.Letterbox,
@@ -47,7 +47,7 @@ var window = new Window2D
 var scene = new Scene2D
 {
     Layers =
-    {
+    [
         // camera layer responsible for giving the scene/renderer a camera.
         new CameraLayer2D(),
 
@@ -72,7 +72,7 @@ var scene = new Scene2D
             GroundY = GroundY 
         },
 
-        // The playfield where the sprites are
+        // The playfield contains any sprites
         new PlayField2D
         {
             Sprites =
@@ -94,7 +94,7 @@ var scene = new Scene2D
                     WalkSpeed = WalkSpeed,
                     GroundY = GroundY,
                     Behaviors =
-                    {
+                    [
                         // walks and jumps the spaceman using player input
                         new SpacemanController(window.Input),
 
@@ -105,14 +105,14 @@ var scene = new Scene2D
                             MarginFraction = 0.35f,
                             FollowY = false, // side-scroller: only track horizontal motion
                         },
-                    },
+                    ],
                 },
             ],
         },
-    }
+    ]
 };
 
-// runs the scene until exit condition
+// runs the scene until window close (or other exit condition)
 await scene.RunAsync(window);
 
 
@@ -131,8 +131,9 @@ public class Spaceman : Sprite2D
     public float WalkSpeed { get; set; }
     public float ShadowWidth { get; private set; }
 
-    protected override void OnAttach()
+    protected override void OnAttach(IEntity entity)
     {
+        base.OnAttach(entity);
         var standSize = ((ITextureRegion)((AnimatedVisual2D)Image.Visual!).Catalog["idle-right"].Frames[0].Texture).Region;
         FeetOffsetY = standSize.Height * 0.5f * Scale;
         ShadowWidth = standSize.Width * 0.9f * Scale;
@@ -162,8 +163,9 @@ public class SpacemanController : SpriteBehavior2D
         this.input = input;
     }
 
-    public override void Apply(Sprite2D self, in UpdateContext2D ctx)
+    public override void Apply(in UpdateContext ctx)
     {
+        var self = (Sprite2D)this.Entity;
         if (self is not Spaceman spaceman) 
             return;
 
@@ -219,10 +221,13 @@ public class SpacemanShadowLayer : Layer2D
     /// <summary>World Y the shadow is pinned to (the ground line).</summary>
     public float GroundY { get; set; }
 
-    protected override void OnAttach() =>
+    protected override void OnAttach(IEntity entity)
+    {
+        base.OnAttach(entity);
         _spaceman = Scene.GetLayer<PlayField2D>().GetSprite<Spaceman>();
+    }
 
-    public override void Update(in UpdateContext2D context) { }
+    public override void Update(in UpdateContext context) { }
 
     protected override void DrawContent(Renderer2D rd)
     {
@@ -230,15 +235,16 @@ public class SpacemanShadowLayer : Layer2D
         float shadowScale = 1f - 0.55f * airFraction;
         byte shadowAlpha = (byte)(110 - 70 * airFraction);
         DrawShadowEllipse(
-            rd, _spaceman.Center.X, GroundY + 1f,
+            rd, 
+            _spaceman.Center.X, GroundY + 1f,
             _spaceman.ShadowWidth * 0.5f * shadowScale,
             4f * shadowScale,
             new Color(0, 0, 0, shadowAlpha)
             );
     }
 
-    // Filled ellipse approximated as horizontal strips — no native
-    // ellipse primitive on Renderer2D today.
+    // Filled ellipse approximated as horizontal strips — 
+    // no native ellipse primitive on Renderer2D today.
     private static void DrawShadowEllipse(Renderer2D rd, float cx, float cy, float rx, float ry, Color color)
     {
         if (rx <= 0f || ry <= 0f) return;

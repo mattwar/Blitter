@@ -1,5 +1,7 @@
 using System.Numerics;
 
+using Blitter.Bits;
+
 namespace Blitter.Blocks2D;
 
 /// <summary>
@@ -9,7 +11,7 @@ namespace Blitter.Blocks2D;
 /// Concrete layers manage their own contents (see
 /// <see cref="PlayField2D"/> for sprites + barriers).
 /// </summary>
-public abstract class Layer2D : IUpdatable<UpdateContext2D>, IDrawable2D
+public abstract class Layer2D : Entity, IDrawable2D
 {
     /// <summary>
     /// Optional scene-unique name. When set, other nodes can resolve this
@@ -19,20 +21,20 @@ public abstract class Layer2D : IUpdatable<UpdateContext2D>, IDrawable2D
     public string? Name { get; set; }
 
     /// <summary>
-    /// The <see cref="Scene2D"/> this layer belongs to. Set by the scene
-    /// before <see cref="OnAttach"/> runs; throws if read before the layer
-    /// is attached to a running scene.
+    /// The <see cref="Scene2D"/> this layer belongs to.
     /// </summary>
     public Scene2D Scene =>
-        _scene ?? throw new InvalidOperationException("Layer is not attached to a Scene. Access Scene only while the layer is part of a running scene.");
+        this.Parent as Scene2D 
+            ?? throw new InvalidOperationException("Layer is not attached to a Scene. Access Scene only while the layer is part of a running scene.");
 
-    // Scene back-reference, set during the scene's attach walk.
-    internal Scene2D? _scene;
-
-    /// <summary>When false the scene skips this layer's update.</summary>
+    /// <summary>
+    /// When false the scene skips this layer's update.
+    /// </summary>
     public bool Enabled { get; set; } = true;
 
-    /// <summary>When false the scene skips this layer's draw.</summary>
+    /// <summary>
+    /// When false the scene skips this layer's draw.
+    /// </summary>
     public bool Visible { get; set; } = true;
 
     /// <summary>
@@ -43,9 +45,6 @@ public abstract class Layer2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// foreground. Has no effect when the renderer has no camera.
     /// </summary>
     public Vector2 ParallaxFactor { get; set; } = Vector2.One;
-
-    /// <summary>Advance the layer's contents by one tick.</summary>
-    public abstract void Update(in UpdateContext2D context);
 
     /// <summary>
     /// Renders the layer. Applies <see cref="ParallaxFactor"/> to the
@@ -73,15 +72,5 @@ public abstract class Layer2D : IUpdatable<UpdateContext2D>, IDrawable2D
 
     /// <summary>Render the layer's current state.</summary>
     protected abstract void DrawContent(Renderer2D renderer);
-
-    /// <summary>
-    /// Called once after the scene tree is built but before the first
-    /// frame, with <see cref="Scene"/> already set. Resolve dependencies on
-    /// other nodes via <c>Scene.GetLayer</c> here and cache them, and run
-    /// any one-time setup. The default does nothing.
-    /// </summary>
-    protected internal virtual void OnAttach()
-    {
-    }
 }
 

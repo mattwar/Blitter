@@ -47,11 +47,6 @@ public class StarField2D : Layer2D
         }
     }
 
-    public override void Update(in UpdateContext2D context)
-    {
-        // Static field; no per-tick state.
-    }
-
     protected override void DrawContent(Renderer2D renderer)
     {
         if (_positions.Length == 0)

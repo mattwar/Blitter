@@ -10,23 +10,26 @@ public sealed class FadeAndExpire2D : SpriteBehavior2D
     /// <summary>Total lifetime over which the alpha ramps to zero.</summary>
     public TimeSpan Duration { get; set; } = TimeSpan.FromSeconds(1);
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+    public override void Apply(in UpdateContext context)
     {
-        if (Duration <= TimeSpan.Zero)
+        if (this.Entity is Sprite2D sprite)
         {
-            target.IsAlive = false;
-            return;
-        }
+            if (Duration <= TimeSpan.Zero)
+            {
+                sprite.IsAlive = false;
+                return;
+            }
 
-        var t = (float)(target.Age.TotalSeconds / Duration.TotalSeconds);
-        if (t >= 1f)
-        {
-            target.IsAlive = false;
-            return;
-        }
+            var t = (float)(sprite.Age.TotalSeconds / Duration.TotalSeconds);
+            if (t >= 1f)
+            {
+                sprite.IsAlive = false;
+                return;
+            }
 
-        var tint = target.Tint;
-        byte a = (byte)Math.Clamp((1f - t) * 255f, 0f, 255f);
-        target.Tint = new Color(tint.R, tint.G, tint.B, a);
+            var tint = sprite.Tint;
+            byte a = (byte)Math.Clamp((1f - t) * 255f, 0f, 255f);
+            sprite.Tint = new Color(tint.R, tint.G, tint.B, a);
+        }         
     }
 }

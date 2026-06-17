@@ -2,6 +2,8 @@ namespace Blitter.Blocks2D;
 
 using System.Numerics;
 
+using Blitter.Bits;
+
 /// <summary>
 /// Scrolls a <see cref="Camera2D"/> to keep a target sprite inside a
 /// configurable margin of the viewport. The camera holds still while
@@ -65,29 +67,24 @@ public class CameraFollow2D : SpriteBehavior2D
     /// camera vertically.</summary>
     public bool FollowY { get; set; } = true;
 
-    /// <summary>
-    /// Resolves <see cref="Camera"/> from a <see cref="CameraLayer2D"/> when
-    /// it was not assigned explicitly: by <see cref="CameraName"/> if set,
-    /// otherwise the scene's single camera layer.
-    /// </summary>
-    protected internal override void OnAttach(Sprite2D self)
+    private IEntity _entity = null!;
+    private Transform2D _target = null!;
+
+    protected override void OnAttach(IEntity entity)
     {
-        if (Camera is not null)
-            return;
-
-        var scene = self.Scene;
-        CameraLayer2D? cameraLayer;
-        if (CameraName is null)
-            scene.TryGetLayer(out cameraLayer);
-        else
-            scene.TryGetLayer(CameraName, out cameraLayer);
-
-        if (cameraLayer is not null)
-            Camera = cameraLayer.Camera;
+        _entity = entity;
+        _target = entity.GetOrAddTrait<Transform2D>();
     }
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+    public override void Apply(in UpdateContext context)
     {
+        // The camera lives on a sibling layer reached through the scene,
+        // which isn't reachable when this behavior is attached (the sprite
+        // may not be in a scene yet). Resolve it opportunistically once the
+        // entity is part of a scene; retry each tick until it succeeds.
+        if (Camera is null)
+            ResolveCamera();
+
         var cam = Camera;
         if (cam is null)
             return;
@@ -100,7 +97,7 @@ public class CameraFollow2D : SpriteBehavior2D
         var margin = Math.Clamp(MarginFraction, 0f, 0.5f);
         var halfDead = viewWorld * (0.5f - margin);
 
-        var t = target.Center;
+        var t = _target.Position;
         var p = cam.Position;
 
         // Push the camera just enough to put the target back on the
@@ -137,5 +134,26 @@ public class CameraFollow2D : SpriteBehavior2D
         }
 
         cam.Position = p;
+    }
+
+    /// <summary>
+    /// Resolves <see cref="Camera"/> from a <see cref="CameraLayer2D"/> when
+    /// it was not assigned explicitly: by <see cref="CameraName"/> if set,
+    /// otherwise the scene's single camera layer. A no-op until the entity
+    /// is a sprite that is part of a running scene.
+    /// </summary>
+    private void ResolveCamera()
+    {
+        if (_entity is Sprite2D { Parent: PlayField2D playfield } && playfield.Parent is Scene2D scene)
+        {
+            CameraLayer2D? cameraLayer;
+            if (CameraName is null)
+                scene.TryGetLayer(out cameraLayer);
+            else
+                scene.TryGetLayer(CameraName, out cameraLayer);
+
+            if (cameraLayer is not null)
+                Camera = cameraLayer.Camera;
+        }
     }
 }

@@ -1,12 +1,13 @@
-using System.Collections;
 using System.Diagnostics.CodeAnalysis;
+
+using Blitter.Bits;
 
 namespace Blitter.Blocks2D;
 
 /// <summary>
 /// A 2D scene comprised of one or more layers.
 /// </summary>
-public class Scene2D
+public class Scene2D : Entity
 {
     private Window2D? _window;
 
@@ -14,26 +15,79 @@ public class Scene2D
     {
     }
 
+    private readonly List<Layer2D> _layers = new();
+
     /// <summary>
     /// The layers in this scene, back-to-front.
     /// </summary>
-    public List<Layer2D> Layers { get; } = new();
+    public IReadOnlyList<Layer2D> Layers
+    {
+        get => _layers; 
+        set
+        {
+            if (this.Parent != null)
+                throw new InvalidOperationException("Can only set layers collection during object initlialization");
+            _layers.Clear();
+            _layers.AddRange(value);
+        }   
+    }
+
+    public void AddLayer(Layer2D layer)
+    {
+        // attach any layers added via object initialization
+        AttachLayers();
+        _layers.Add(layer);
+        layer.Parent = this;
+    }
 
     /// <summary>
-    /// Scene-wide behaviors that run each tick before layers update.
+    /// Removes <paramref name="layer"/> from the scene. Returns <c>true</c>
+    /// if it was present.
     /// </summary>
-    public List<SceneBehavior2D> Behaviors { get; } = new();
+    public bool RemoveLayer(Layer2D layer)
+    {
+        AttachLayers();
+        if (!_layers.Remove(layer))
+            return false;
+        layer.Parent = null;
+        return true;
+    }
+
+    protected override void OnAttach(IEntity entity)
+    {
+        base.OnAttach(entity);
+    }
+
+    private bool _layersAttached;
+    
+    private void AttachLayers()
+    {
+        if (!_layersAttached)
+        {
+            _layersAttached = true;
+            // The scene is the root, so its own Parent is never set and
+            // OnAttach never fires — wire its scene behaviors here instead.
+            foreach (var behavior in Behaviors)
+            {
+                behavior.Entity = this;
+            }
+            foreach (var layer in Layers)
+            {
+                layer.Parent = this;
+            }
+        }
+    }
 
     /// <summary>
     /// Runs scene behaviors, updates all enabled layers, then evaluates any
     /// pending exit conditions.
     /// </summary>
-    internal void Update(in UpdateContext2D context)
+    public override void Update(in UpdateContext context)
     {
         foreach (var behavior in Behaviors)
         {
-            if (behavior.Enabled)
-                behavior.Apply(this, in context);
+            if (behavior is Behavior2D b && b.Enabled)
+                b.Apply(in context);
         }
 
         foreach (var layer in Layers)
@@ -101,10 +155,11 @@ public class Scene2D
         _exitConditions.Clear();
         RunState = RunState.Running;
 
-        Attach();
-
         try
         {
+            // attach layers if not already attached
+            AttachLayers();
+
             await window.RunAsync(
                 shouldExit: () => RunState == RunState.Exited || (shouldExit?.Invoke(this) ?? false),
                 renderFrame: rd =>
@@ -122,33 +177,18 @@ public class Scene2D
     }
 
     /// <summary>
-    /// Walks the fully-built scene tree once, before the first frame: wires
-    /// each layer's <see cref="Layer2D.Scene"/> back-reference, then calls
-    /// each node's <c>OnAttach</c> hook. Two passes so the back-references
-    /// (and thus cross-node lookups) are in place before any hook runs. Each
-    /// layer attaches its own contents (a <see cref="PlayField2D"/> recurses
-    /// into its sprites and their behaviors).
-    /// </summary>
-    private void Attach()
-    {
-        // Pass 1: wire back-references so Scene/PlayField navigation works.
-        foreach (var layer in Layers)
-            layer._scene = this;
-
-        // Pass 2: run the attach hooks now that the graph is navigable.
-        foreach (var behavior in Behaviors)
-            behavior.OnAttach(this);
-
-        foreach (var layer in Layers)
-            layer.OnAttach();
-    }
-
-    /// <summary>
     /// The renderer this scene draws through. Available only while the
     /// scene is running (including during <c>OnAttach</c>).
     /// </summary>
     public Renderer2D Renderer =>
         _window?.Renderer ?? throw new InvalidOperationException("The scene's renderer is available only while the scene is running.");
+
+    /// <summary>
+    /// The renderer this scene draws through, or <c>null</c> when the scene
+    /// is not currently running. Lets layers consult the renderer (e.g. for
+    /// the viewport) without throwing during off-frame updates or tests.
+    /// </summary>
+    internal Renderer2D? RendererOrNull => _window?.Renderer;
 
     /// <summary>
     /// Tries to resolve the single layer assignable to <typeparamref name="T"/>.
@@ -270,4 +310,4 @@ public class Scene2D
 /// <summary>
 /// A predicate that determines when a <see cref="Scene2D"/> should truly exit
 /// </summary>
-public delegate bool SceneExitCondition(in UpdateContext2D context);
+public delegate bool SceneExitCondition(in UpdateContext context);

@@ -1,7 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 
-using Blitter.Bits;
-
 namespace Blitter.Blocks2D;
 
 /// <summary>
@@ -28,28 +26,38 @@ public class PlayField2D : Layer2D
     private readonly List<Barrier2D> _pendingRemoveBarriers = new();
     private bool _updating;
 
+    // World-space bounds, refreshed each frame from WorldBounds or the
+    // viewport. Resolved by sprite behaviors via TryFindTrait.
+    private readonly Bounds2D _bounds = new();
+
     public PlayField2D()
     {
+        AddTrait(_bounds);
     }
 
     public PlayField2D(IEnumerable<Sprite2D> sprites)
     {
+        AddTrait(_bounds);
         AdoptSprites(sprites);
     }
 
     public PlayField2D(IEnumerable<Sprite2D> sprites, IEnumerable<Barrier2D> barriers)
     {
+        AddTrait(_bounds);
         AdoptSprites(sprites);
         foreach (var b in barriers)
+        {
+            b.Parent = this;
             _barriers.Add(b);
+        }
     }
 
     private void AdoptSprites(IEnumerable<Sprite2D> sprites)
     {
         foreach (var s in sprites)
         {
-            s._playField?.RemoveImmediate(s);
-            s._playField = this;
+            (s.Parent as PlayField2D)?.RemoveImmediate(s);
+            s.Parent = this;
             s._spawnedAt = Elapsed;
             _sprites.Add(s);
         }
@@ -64,22 +72,6 @@ public class PlayField2D : Layer2D
     {
         get => _sprites;
         init => AdoptSprites(value);
-    }
-
-    /// <summary>
-    /// Attaches this playfield's sprites (and their behaviors) after the
-    /// base layer attaches: the scene walks layers, but only a playfield
-    /// owns sprites, so the recursion into them lives here.
-    /// </summary>
-    protected internal override void OnAttach()
-    {
-        base.OnAttach();
-        foreach (var sprite in _sprites)
-        {
-            sprite.OnAttach();
-            foreach (var behavior in sprite.Behaviors)
-                behavior.OnAttach(sprite);
-        }
     }
 
     /// <summary>
@@ -175,16 +167,18 @@ public class PlayField2D : Layer2D
     }
 
     /// <summary>
-    /// Total time accumulated from <see cref="UpdateContext2D"/> deltas passed through this playfield's <see cref="Update"/>.
+    /// Total time accumulated from <see cref="UpdateContext"/> deltas passed through this playfield's <see cref="Update"/>.
     /// Used as the clock for <see cref="Sprite2D.Age"/>.
     /// </summary>
     public TimeSpan Elapsed { get; private set; }
 
     /// <summary>
     /// Optional world rectangle larger (or smaller) than the visible viewport. 
-    /// When set, sprites and behaviors see this rectangle as <see cref="UpdateContext2D.Bounds"/> instead of the renderer's
-    /// viewport — so edge-bounce, spawn placement, etc. operate in world space. 
-    /// When <c>null</c> (the default), the playfield passes the incoming context through unchanged.
+    /// When set, sprites and behaviors resolve this rectangle as their
+    /// <see cref="Bounds2D"/> trait instead of the renderer's viewport — so
+    /// edge-bounce, spawn placement, etc. operate in world space. 
+    /// When <c>null</c> (the default), the playfield publishes the renderer's
+    /// viewport as the active bounds.
     /// </summary>
     public Rect? WorldBounds { get; set; }
 
@@ -203,7 +197,7 @@ public class PlayField2D : Layer2D
     /// </summary>
     public void AddSprite(Sprite2D sprite)
     {
-        var existing = sprite._playField;
+        var existing = sprite.Parent as PlayField2D;
         if (existing == this)
         {
             // Already a member — cancel any pending removal so the
@@ -212,7 +206,7 @@ public class PlayField2D : Layer2D
             return;
         }
         existing?.RemoveImmediate(sprite);
-        sprite._playField = this;
+        sprite.Parent = this;
         sprite._spawnedAt = Elapsed;
         if (_updating)
         {
@@ -243,7 +237,7 @@ public class PlayField2D : Layer2D
     /// </summary>
     public void RemoveSprite(Sprite2D sprite)
     {
-        if (sprite._playField != this)
+        if (sprite.Parent != this)
             return;
         if (_updating)
         {
@@ -261,6 +255,7 @@ public class PlayField2D : Layer2D
     /// </summary>
     public void AddBarrier(Barrier2D barrier)
     {
+        barrier.Parent = this;
         if (_updating)
         {
             _pendingAddBarriers.Add(barrier);           
@@ -279,6 +274,7 @@ public class PlayField2D : Layer2D
         var sink = _updating ? _pendingAddBarriers : _barriers;
         foreach (var b in barriers)
         {
+            b.Parent = this;
             sink.Add(b);           
         }
     }
@@ -292,9 +288,9 @@ public class PlayField2D : Layer2D
         {
             _pendingRemoveBarriers.Add(barrier);
         }
-        else
+        else if (_barriers.Remove(barrier))
         {
-            _barriers.Remove(barrier);
+            barrier.Parent = null;
         }
     }
 
@@ -315,8 +311,10 @@ public class PlayField2D : Layer2D
     // sprite that's about to live in another playfield.
     private void Detach(Sprite2D sprite, bool retired)
     {
-        if (sprite._playField == this)
-            sprite._playField = null;
+        if (sprite.Parent == this)
+        {
+            sprite.Parent = null;
+        }
         if (retired)
             OnSpriteRetired(sprite);
     }
@@ -342,25 +340,26 @@ public class PlayField2D : Layer2D
     public int MaxSubsteps { get; set; } = 8;
 
     /// <inheritdoc/>
-    public override void Update(in UpdateContext2D context)
+    public override void Update(in UpdateContext context)
     {
         Elapsed += context.ElapsedSinceLastUpdate;
 
-        // Substitute world bounds for the viewport when configured so
-        // behaviors that consult context.Bounds (BounceInBounds2D,
-        // edge-spawning, etc.) operate in world space.
-        var frameContext = WorldBounds is Rect wb
-            ? context with { Bounds = wb }
-            : context;
+        // Publish the active world bounds as a trait so sprite behaviors can
+        // resolve them by walking up to this playfield. Prefer the explicit
+        // WorldBounds; otherwise fall back to the renderer's viewport while
+        // the scene is running (leaving the last value when neither applies).
+        _bounds.Rect = WorldBounds
+            ?? (this.Parent as Scene2D)?.RendererOrNull?.LogicalBounds
+            ?? _bounds.Rect;
 
         // Global substepping: every sprite and barrier gets the same
         // number of substeps with the same per-substep dt, so frame
         // determinism is preserved. Cost is 1 step in the common case.
-        var dt = (float)frameContext.ElapsedSinceLastUpdate.TotalSeconds;
+        var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
         int substeps = ComputeSubstepCount(dt);
         var subContext = substeps > 1
-            ? frameContext with { ElapsedSinceLastUpdate = frameContext.ElapsedSinceLastUpdate / substeps }
-            : frameContext;
+            ? context with { ElapsedSinceLastUpdate = context.ElapsedSinceLastUpdate / substeps }
+            : context;
 
         _updating = true;
         try
@@ -413,7 +412,7 @@ public class PlayField2D : Layer2D
         return Math.Clamp(n, 1, MaxSubsteps);
     }
 
-    private void RunOneStep(in UpdateContext2D spriteContext)
+    private void RunOneStep(in UpdateContext spriteContext)
     {
         // Animated barriers (flippers, moving platforms, etc.) tick
         // before sprites so this frame's sprite-vs-barrier pass sees
@@ -530,7 +529,10 @@ public class PlayField2D : Layer2D
             for (int i = _barriers.Count - 1; i >= 0; i--)
             {
                 if (_pendingRemoveBarriers.Contains(_barriers[i]))
+                {
+                    _barriers[i].Parent = null;
                     _barriers.RemoveAt(i);
+                }
             }
             _pendingRemoveBarriers.Clear();
         }

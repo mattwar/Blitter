@@ -1,6 +1,5 @@
 namespace Blitter.Blocks2D;
-
-using System.Numerics;
+using Blitter.Bits;
 
 /// <summary>
 /// Reflects a sprite's velocity when its center crosses the edge of the
@@ -12,31 +11,50 @@ public class BounceInBounds2D : SpriteBehavior2D
     /// Invoked after the velocity has been reflected for the current tick.
     /// Useful for playing a sound or jittering the heading on bounce.
     /// </summary>
-    public Action<Sprite2D>? OnBounce { get; set; }
+    public Action<IEntity>? OnBounce { get; set; }
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+    private IEntity _entity = null!;
+    private Bounds2D? _bounds;
+    private Velocity2D _velocity = null!;
+    private Transform2D _transform = null!;
+
+    protected override void OnAttach(IEntity entity)
     {
-        var bounds = context.Bounds;
-        var v = Sprite2D.GetVelocity(target.Speed, target.Heading);
+        _entity = entity;
+        _velocity = entity.GetOrAddTrait<Velocity2D>();
+        _transform = entity.GetOrAddTrait<Transform2D>();
+    }
+
+    public override void Apply(in UpdateContext context)
+    {
+        // Bounds live on an ancestor (the playfield), which isn't reachable
+        // when this behavior is attached (the sprite may not be parented
+        // yet). Resolve it opportunistically once the entity is parented.
+        _bounds ??= _entity.TryFindTrait<Bounds2D>(out var found) ? found : null;
+        if (_bounds is null)
+            return;
+
+        var bounds = _bounds.Rect;
+        var v = Sprite2D.GetVelocity(_velocity.Speed, _velocity.Heading);
         var bounced = false;
 
-        if (target.Center.X < bounds.X)
+        if (_transform.Position.X < bounds.X)
         {
             v.X = MathF.Abs(v.X);
             bounced = true;
         }
-        else if (target.Center.X > bounds.X + bounds.Width)
+        else if (_transform.Position.X > bounds.X + bounds.Width)
         {
             v.X = -MathF.Abs(v.X);
             bounced = true;
         }
 
-        if (target.Center.Y < bounds.Y)
+        if (_transform.Position.Y < bounds.Y)
         {
             v.Y = MathF.Abs(v.Y);
             bounced = true;
         }
-        else if (target.Center.Y > bounds.Y + bounds.Height)
+        else if (_transform.Position.Y > bounds.Y + bounds.Height)
         {
             v.Y = -MathF.Abs(v.Y);
             bounced = true;
@@ -45,7 +63,8 @@ public class BounceInBounds2D : SpriteBehavior2D
         if (!bounced)
             return;
 
-        (target.Speed, target.Heading) = Sprite2D.GetSpeedAndHeading(v);
-        OnBounce?.Invoke(target);
+        (_velocity.Speed, _velocity.Heading) = Sprite2D.GetSpeedAndHeading(v);
+    
+        OnBounce?.Invoke(_entity);
     }
 }

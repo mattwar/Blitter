@@ -30,14 +30,6 @@ public interface IUpdateContext
         (float)ElapsedSinceLastUpdate.TotalSeconds;
 }
 
-/// <summary>
-/// 2D-domain update context. 
-/// </summary>
-public interface IUpdateContext2D : IUpdateContext
-{
-    /// <summary>Logical update region in target pixels.</summary>
-    Rect Bounds { get; }
-}
 
 /// <summary>
 /// 3D-domain update context. 
@@ -55,15 +47,6 @@ public readonly struct UpdateContext : IUpdateContext
     public TimeSpan ElapsedSinceLastUpdate { get; init; }
 }
 
-/// <summary>
-/// 2D update context: timings + pixel <see cref="Bounds"/>.
-/// </summary>
-public readonly struct UpdateContext2D : IUpdateContext2D
-{
-    public TimeSpan ElapsedSinceStart { get; init; }
-    public TimeSpan ElapsedSinceLastUpdate { get; init; }
-    public Rect Bounds { get; init; }
-}
 
 /// <summary>
 /// 3D update context: timings only so far.

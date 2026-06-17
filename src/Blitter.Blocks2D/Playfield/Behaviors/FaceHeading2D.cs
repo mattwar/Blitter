@@ -1,4 +1,6 @@
 namespace Blitter.Blocks2D;
+using Bits;
+
 
 /// <summary>
 /// Aligns a sprite's <see cref="Sprite2D.Rotation"/> to its
@@ -14,8 +16,17 @@ public class FaceHeading2D : SpriteBehavior2D
     /// </summary>
     public float RotationOffset { get; set; }
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+    private Transform2D _transform = null!;
+    private Velocity2D _velocity = null!;
+
+    protected override void OnAttach(IEntity entity)
     {
-        target.Rotation = target.Heading + RotationOffset;
+        _transform = entity.GetOrAddTrait<Transform2D>();
+        _velocity = entity.GetOrAddTrait<Velocity2D>();
+    }
+
+    public override void Apply(in UpdateContext context)
+    {
+        _transform.Rotation = _velocity.Heading + RotationOffset;           
     }
 }

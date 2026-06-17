@@ -79,11 +79,6 @@ public sealed class MinimapLayer2D : Layer2D
     /// <summary>Clip markers to <see cref="ScreenRect"/> so they can't bleed past the border.</summary>
     public bool ClipToBounds { get; set; } = true;
 
-    public override void Update(in UpdateContext2D context)
-    {
-        // Purely presentational; no per-tick state.
-    }
-
     protected override void DrawContent(Renderer2D renderer)
     {
         var world = WorldRect ?? Source.WorldBounds ?? ScreenRect;

@@ -6,17 +6,12 @@ namespace Blitter.Blocks2D;
 /// An obstacle in a <see cref="PlayField2D"/>.
 /// Barriers collide with sprites, but not each other.
 /// </summary>
-public abstract class Barrier2D
+public abstract class Barrier2D : Entity
 {
     /// <summary>
     /// Collision shape of this barrier in world space.
     /// </summary>
     public abstract PosedHitShape2D HitShape { get; }
-
-    /// <summary>
-    /// Called by <see cref="PlayField2D"/> once per tick.
-    /// </summary>
-    public virtual void Update(in UpdateContext2D context) { }
 
     /// <summary>
     /// Render this barrier.
@@ -27,7 +22,7 @@ public abstract class Barrier2D
     /// <summary>
     /// Called when the <paramref name="hitter"/> collided with this barrier.
     /// </summary>
-    public virtual void OnHitSprite(Sprite2D hitter, in UpdateContext2D context) { }
+    public virtual void OnHitSprite(Sprite2D hitter, in UpdateContext context) { }
 
     /// <summary>
     /// Physical characteristics of this barrier.

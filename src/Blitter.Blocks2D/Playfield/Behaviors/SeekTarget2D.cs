@@ -1,6 +1,8 @@
-namespace Blitter.Blocks2D;
-
 using System.Numerics;
+
+namespace Blitter.Blocks2D;
+using Bits;
+
 
 /// <summary>
 /// Steers a sprite toward a target position. 
@@ -37,12 +39,22 @@ public class SeekTarget2D : SpriteBehavior2D
     /// </summary>
     public float ArriveRadius { get; set; } = 0f;
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+
+    private Velocity2D _velocity = null!;
+    private Transform2D _transform = null!;
+
+    protected override void OnAttach(IEntity entity)
+    {
+        _velocity = entity.GetOrAddTrait<Velocity2D>();
+        _transform = entity.GetOrAddTrait<Transform2D>();
+    }    
+
+    public override void Apply(in UpdateContext context)
     {
         if (Target() is not Vector2 dest)
             return;
 
-        var to = dest - target.Center;
+        var to = dest - _transform.Position;
         if (ArriveRadius > 0f && to.LengthSquared() <= ArriveRadius * ArriveRadius)
             return;
 
@@ -54,13 +66,13 @@ public class SeekTarget2D : SpriteBehavior2D
         {
             // Heading 0 = up (-Y), matching Sprite2D.GetVelocity.
             var desired = MathF.Atan2(to.X, -to.Y) * (180f / MathF.PI);
-            var diff = WrapSigned(desired - target.Heading);
+            var diff = WrapSigned(desired - _velocity.Heading);
             var maxStep = MaxTurnRate * dt;
             var step = Math.Clamp(diff, -maxStep, maxStep);
-            target.Heading = WrapDeg(target.Heading + step);
+            _velocity.Heading = WrapDeg(_velocity.Heading + step);
         }
 
-        target.Speed = Math.Min(MaxSpeed, target.Speed + Acceleration * dt);
+        _velocity.Speed = Math.Min(MaxSpeed, _velocity.Speed + Acceleration * dt);
     }
 
     // Wrap a delta to (-180, 180] so we always turn the short way around.

@@ -1,13 +1,15 @@
-namespace Blitter.Blocks2D;
-
 using System.Numerics;
+
+namespace Blitter.Blocks2D;
+using Bits;
+
 
 /// <summary>
 /// Shakes a sprite's <see cref="Sprite2D.Center"/> by an offset driven by a trauma value that decays each tick. 
 /// Place this behavior <em>after</em> <see cref="Motion2D"/> so motion
 /// integration runs against the unshaken position.
 /// </summary>
-public sealed class Shake2D : SpriteBehavior2D
+public sealed class Shake2D : Behavior
 {
     /// <summary>Maximum offset magnitude (pixels) at full trauma (=1).</summary>
     public float MaxOffset { get; set; } = 8f;
@@ -29,10 +31,18 @@ public sealed class Shake2D : SpriteBehavior2D
     public void AddTrauma(float amount) =>
         Trauma = Math.Clamp(Trauma + amount, 0f, 1f);
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+
+    private Transform2D _transform = null!;
+
+    protected override void OnAttach(IEntity entity)
+    {
+        _transform = entity.GetOrAddTrait<Transform2D>();
+    }
+
+    public override void Apply(in UpdateContext context)
     {
         // Roll back last frame's shake before recomputing.
-        target.Center -= _lastOffset;
+        _transform.Position -= _lastOffset;
 
         Trauma = Math.Max(0f, Trauma - Decay * (float)context.ElapsedSinceLastUpdate.TotalSeconds);
         var amplitude = MaxOffset * Trauma * Trauma;
@@ -43,6 +53,6 @@ public sealed class Shake2D : SpriteBehavior2D
                 (float)(Random.NextDouble() * 2.0 - 1.0) * amplitude)
             : Vector2.Zero;
 
-        target.Center += _lastOffset;
+        _transform.Position += _lastOffset;
     }
 }

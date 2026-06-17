@@ -37,7 +37,7 @@ public sealed class CameraShake2D : SpriteBehavior2D
     public void AddTrauma(float amount) =>
         Trauma = Math.Clamp(Trauma + amount, 0f, 1f);
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+    public override void Apply(in UpdateContext context)
     {
         var baseline = Camera.Position == _lastWritten
             ? Camera.Position - _lastOffset

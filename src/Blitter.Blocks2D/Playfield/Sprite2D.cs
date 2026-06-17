@@ -8,9 +8,34 @@ namespace Blitter.Blocks2D;
 /// A self-moving, collidable inhabitant of a <see cref="PlayField2D"/>.
 /// Its collection of behaviors defines its logic: movement, collision response, and so on.
 /// </summary>
-public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
+public class Sprite2D : Entity, IEntity, IDrawable2D
 {
+    public Sprite2D()
+    {
+    }
+
     private ImageSource _image = new();
+
+    private Transform2D? _transform = null;
+    private Velocity2D? _velocity = null;
+
+    /// <summary>
+    /// The sprite's position, rotation and scale in world space.
+    /// </summary>
+    public Transform2D Transform => _transform ?? this.GetOrAddTrait<Transform2D>();
+
+    /// <summary>
+    /// The sprite's velocity, expressed as speed and heading plus rotation speed.
+    /// </summary>
+    public Velocity2D Velocity => _velocity ?? this.GetOrAddTrait<Velocity2D>();
+
+    protected override void OnAttach(IEntity entity)
+    {
+        _transform = this.GetOrAddTrait<Transform2D>();
+        _velocity = this.GetOrAddTrait<Velocity2D>();
+        _spawnedAt = TimeSpan.Zero;
+        base.OnAttach(entity);
+    }
 
     /// <summary>
     /// Optional scene-unique name.
@@ -31,22 +56,22 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     }
 
     /// <summary>The position of the center of the sprite.</summary>
-    public Vector2 Center { get; set; }
+    public Vector2 Center { get => Transform.Position; set => Transform.Position = value; }
 
     /// <summary>The direction of movement.</summary>
-    public float Heading { get; set; }
+    public float Heading { get => Velocity.Heading; set => Velocity.Heading = value; }
 
     /// <summary>The speed of the sprite in world units per second along the heading.</summary>
-    public float Speed { get; set; }
+    public float Speed { get => Velocity.Speed; set => Velocity.Speed = value; }
 
     /// <summary>The current orientation in degrees.</summary>
-    public float Rotation { get; set; }
+    public float Rotation { get => Transform.Rotation; set => Transform.Rotation = value; }
 
     /// <summary>How many degrees the sprite rotates in a second.</summary>
-    public float RotationSpeed { get; set; }
+    public float RotationSpeed { get => Velocity.RotationSpeed; set => Velocity.RotationSpeed = value; }
 
     /// <summary>The scale factor to apply to the visual.</summary>
-    public float Scale { get; set; } = 1f;
+    public float Scale { get => Transform.Scale; set => Transform.Scale = value; }
 
     /// <summary>
     /// Runtime mirror applied to the visual at draw time and to the
@@ -55,22 +80,15 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// </summary>
     public FlipMode Flipped = FlipMode.None;
 
-    /// <summary>Per-channel tint multiplied into the visual at draw time.
-    /// Defaults to <see cref="Color.White"/> (no change).</summary>
+    /// <summary>
+    /// Tint color applied to the visual.
+    /// </summary>
     public Color Tint { get; set; } = Color.White;
 
     /// <summary>
     /// Whether this sprite participates in the playfield's hit-detection pass.
-    /// Set to <c>false</c> for purely decorative sprites (score popups,
-    /// particles, debris) that should move and render but never trigger
-    /// <see cref="OnHitSprite"/> or <see cref="OnHitBarrier"/>.
     /// </summary>
     public bool CanBeHit { get; set; } = true;
-
-    /// <summary>
-    /// Behaviors attached to this sprite. Run in list order each tick.
-    /// </summary>
-    public List<SpriteBehavior2D> Behaviors { get; } = new();
 
     /// <summary>
     /// The sprite is active and not about to be culled.
@@ -81,7 +99,8 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// The <see cref="PlayField2D"/> this sprite belongs to.
     /// </summary>
     public PlayField2D PlayField =>  
-        _playField ?? throw new InvalidOperationException("Sprite is not attached to a PlayField. Access PlayField only while the sprite is a member of one.");
+        this.Parent as PlayField2D 
+            ?? throw new InvalidOperationException("Sprite is not attached to a PlayField. Access PlayField only while the sprite is a member of one.");
 
     /// <summary>
     /// The <see cref="Scene2D"/> this sprite's <see cref="PlayField"/>
@@ -90,9 +109,6 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// </summary>
     public Scene2D Scene => PlayField.Scene;
 
-    // PlayField backing field.
-    internal PlayField2D? _playField;
-
     // Time sprite was added to playfield.
     internal TimeSpan _spawnedAt;
 
@@ -100,7 +116,7 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// How long this sprite has been a member of its current <see cref="PlayField"/>.
     /// </summary>
     public TimeSpan Age => 
-        _playField is { } p 
+        this.Parent is PlayField2D p 
             ? p.Elapsed - _spawnedAt 
             : TimeSpan.Zero;
 
@@ -115,28 +131,21 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// </summary>
     public BoundingCircle HitCircle => HitShape.BoundingCircle;
 
-    public Sprite2D()
-    {
-    }
-
-    /// <summary>
-    /// Called once after the scene tree is built but before the first
-    /// frame, with <see cref="PlayField"/> and <see cref="Scene"/> already
-    /// set. Resolve dependencies on other nodes via <c>Scene.Find…</c> here
-    /// and cache them, and run any one-time self-measurement. The default
-    /// does nothing.
-    /// </summary>
-    protected internal virtual void OnAttach()
-    {
-    }
-
     /// <summary>Apply every enabled behavior in order.</summary>
-    public virtual void Update(in UpdateContext2D context)
+    public override void Update(in UpdateContext context)
     {
-        foreach (var behavior in this.Behaviors)
+        for (int i = 0; i < this.Behaviors.Count; i++)
         {
-            if (behavior.Enabled)
-                behavior.Apply(this, in context);
+            var behavior = this.Behaviors[i];
+            if (behavior is SpriteBehavior2D sb)
+            {
+                if (sb.Enabled)
+                    sb.Apply(in context);
+            }
+            else 
+            {
+                behavior.Apply(in context);
+            }
         }
     }
 
@@ -145,12 +154,15 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// sprite's <see cref="HitCircle"/> intersects another sprite's.
     /// Forwards to each enabled behavior.
     /// </summary>
-    public virtual void OnHitSprite(Sprite2D other, in UpdateContext2D context)
+    public virtual void OnHitSprite(Sprite2D other, in UpdateContext context)
     {
-        foreach (var behavior in this.Behaviors)
+        for (int i = 0; i < this.Behaviors.Count; i++)
         {
-            if (behavior.Enabled)
-                behavior.OnHitSprite(this, other, in context);
+            var behavior = this.Behaviors[i];
+            if (behavior is SpriteBehavior2D spriteBehavior && spriteBehavior.Enabled)
+            {
+                 spriteBehavior.OnHitSprite(this, other, in context);
+            }
         }
     }
 
@@ -159,12 +171,14 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
     /// sprite's <see cref="HitCircle"/> overlaps a
     /// <see cref="Barrier2D"/>. Forwards to each enabled behavior.
     /// </summary>
-    public virtual void OnHitBarrier(Barrier2D barrier, in UpdateContext2D context)
+    public virtual void OnHitBarrier(Barrier2D barrier, in UpdateContext context)
     {
         foreach (var behavior in this.Behaviors)
         {
-            if (behavior.Enabled)
-                behavior.OnHitBarrier(this, barrier, in context);
+            if (behavior is SpriteBehavior2D spriteBehavior && spriteBehavior.Enabled)
+            {
+                spriteBehavior.OnHitBarrier(this, barrier, in context);
+            }
         }
     }
 
@@ -202,5 +216,4 @@ public class Sprite2D : IUpdatable<UpdateContext2D>, IDrawable2D
             heading -= 360f;
         return (speed, heading);
     }
-
 }

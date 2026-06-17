@@ -4,7 +4,7 @@ using System.Numerics;
 
 public class SpriteTests
 {
-    private static UpdateContext2D Context(double seconds) =>
+    private static UpdateContext Context(double seconds) =>
         new() { ElapsedSinceLastUpdate = TimeSpan.FromSeconds(seconds) };
 
     [Fact]
@@ -22,7 +22,7 @@ public class SpriteTests
     public void Update_HeadingZero_MovesUp()
     {
         // Heading 0 = up (negative Y), per GetVelocity (heading - 90 → cos/sin).
-        var sprite = new Sprite2D { Heading = 0f, Speed = 100f, Behaviors = { new Motion2D() } };
+        var sprite = new Sprite2D { Heading = 0f, Speed = 100f, Behaviors = [new Motion2D()] };
         sprite.Update(Context(0));
 
         sprite.Update(Context(1.0));
@@ -33,7 +33,7 @@ public class SpriteTests
     [Fact]
     public void Update_Heading90_MovesRight()
     {
-        var sprite = new Sprite2D { Heading = 90f, Speed = 50f, Behaviors = { new Motion2D() } };
+        var sprite = new Sprite2D { Heading = 90f, Speed = 50f, Behaviors = [new Motion2D()] };
         sprite.Update(Context(0));
 
         sprite.Update(Context(2.0));
@@ -44,7 +44,7 @@ public class SpriteTests
     [Fact]
     public void Update_Heading180_MovesDown()
     {
-        var sprite = new Sprite2D { Heading = 180f, Speed = 10f, Behaviors = { new Motion2D() } };
+        var sprite = new Sprite2D { Heading = 180f, Speed = 10f, Behaviors = [new Motion2D()] };
         sprite.Update(Context(0));
 
         sprite.Update(Context(1.0));
@@ -55,7 +55,7 @@ public class SpriteTests
     [Fact]
     public void Update_AccumulatesRotation_AndWrapsAt360()
     {
-        var sprite = new Sprite2D { Rotation = 350f, RotationSpeed = 30f, Behaviors = { new Motion2D() } };
+        var sprite = new Sprite2D { Rotation = 350f, RotationSpeed = 30f, Behaviors = [new Motion2D()] };
         sprite.Update(Context(0));
 
         sprite.Update(Context(1.0)); // +30° → 380 % 360 → 20
@@ -65,7 +65,7 @@ public class SpriteTests
     [Fact]
     public void Update_MovesSpritePosition()
     {
-        var sprite = new Sprite2D { Heading = 90f, Speed = 1f, Behaviors = { new Motion2D() } };
+        var sprite = new Sprite2D { Heading = 90f, Speed = 1f, Behaviors = [new Motion2D()] };
         sprite.Update(Context(0));
         sprite.Update(Context(1.0));
         Assert.Equal(1f, sprite.Center.X, 3);
