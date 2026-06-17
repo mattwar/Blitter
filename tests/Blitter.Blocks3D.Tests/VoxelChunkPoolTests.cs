@@ -1,7 +1,5 @@
 using System.Numerics;
 
-using Blitter.Bits;
-
 namespace Blitter.Tests;
 
 /// <summary>

@@ -7,11 +7,6 @@ namespace Blitter.Blocks3D;
 /// <see cref="Scene3D.Exit"/>). Behaviors don't render — anything
 /// visual goes in a <see cref="Layer3D"/>.
 /// </summary>
-public abstract class SceneBehavior3D
+public abstract class SceneBehavior3D : Behavior3D
 {
-    /// <summary>When false the scene skips this behavior.</summary>
-    public bool Enabled { get; set; } = true;
-
-    /// <summary>Apply this behavior to <paramref name="scene"/> for one frame.</summary>
-    public abstract void Apply(Scene3D scene, in UpdateContext3D context);
 }

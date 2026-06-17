@@ -1,5 +1,3 @@
-using static SDL3.SDL;
-
 namespace Blitter;
 
 /// <summary>

@@ -1,12 +1,10 @@
 using System.Numerics;
 
-using Blitter.Bits;
-
 namespace Blitter.Tests;
 
 public class BarrierBounce3DTests
 {
-    private static readonly UpdateContext3D Ctx = new()
+    private static readonly UpdateContext Ctx = new()
     {
         ElapsedSinceStart = TimeSpan.FromSeconds(0.1),
         ElapsedSinceLastUpdate = TimeSpan.FromSeconds(0.1),

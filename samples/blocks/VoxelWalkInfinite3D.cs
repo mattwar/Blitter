@@ -178,7 +178,7 @@ var player = new Sprite3D
     Visible = false,
     Position = new Vector3(spawnX, groundY + 4f, spawnZ),
     Behaviors =
-    {
+    [
         walkController,
         new Gravity3D
         {
@@ -191,7 +191,7 @@ var player = new Sprite3D
             TangentialDamping = 1f,
         },
         new Motion3D(),
-    },
+    ]
 };
 chunkSource.AddSprite(player);
 
@@ -231,7 +231,7 @@ var skyLayer = new CustomLayer3D
 
 var scene = new Scene3D
 {
-    Layers = { skyLayer, streamer, playField, hud },
+    Layers = [ skyLayer, streamer, playField, hud ]
 };
 
 await scene.RunAsync(window);

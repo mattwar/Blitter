@@ -1,6 +1,7 @@
 using System.Numerics;
 
 namespace Blitter.Blocks3D;
+using Bits;
 
 /// <summary>
 /// Integrates a sprite's <see cref="Sprite3D.Velocity"/> into
@@ -21,7 +22,14 @@ public class Motion3D : SpriteBehavior3D
     // MinUpdateInterval; carried forward to the next Update.
     private TimeSpan _pendingDelta;
 
-    public override void Apply(Sprite3D target, in UpdateContext3D context)
+    private Sprite3D _target = null!;
+
+    protected override void OnAttach(IEntity entity)
+    {
+        _target = (Sprite3D)entity;
+    }
+
+    public override void Apply(in UpdateContext context)
     {
         if (context.ElapsedSinceLastUpdate == TimeSpan.Zero)
             return;
@@ -36,7 +44,7 @@ public class Motion3D : SpriteBehavior3D
         _pendingDelta = TimeSpan.Zero;
         var dt = (float)timeDelta.TotalSeconds;
 
-        var av = target.AngularVelocity;
+        var av = _target.AngularVelocity;
         var avLenSq = av.LengthSquared();
         if (avLenSq > 0f)
         {
@@ -47,12 +55,12 @@ public class Motion3D : SpriteBehavior3D
             var avLen = MathF.Sqrt(avLenSq);
             var axis = av / avLen;
             var delta = Quaternion.CreateFromAxisAngle(axis, avLen * dt);
-            target.Orientation = Quaternion.Normalize(delta * target.Orientation);
+            _target.Orientation = Quaternion.Normalize(delta * _target.Orientation);
         }
 
-        if (target.Velocity != Vector3.Zero)
+        if (_target.Velocity != Vector3.Zero)
         {
-            target.Position += target.Velocity * dt;
+            _target.Position += _target.Velocity * dt;
         }
     }
 }

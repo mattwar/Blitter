@@ -51,31 +51,33 @@ public class PlayField3D : Layer3D, ISpriteHost3D
     /// <summary>Adds a sprite to the playfield.</summary>
     public void AddSprite(Sprite3D sprite)
     {
-        if (sprite.Host == this)
+        if (ReferenceEquals(sprite.Host, this))
         {
-            if (_updating)
-            {
-                _pendingRemoveSprites.Remove(sprite);
-            }
-            else
-            {
-                this.RemoveImmediate(sprite);
-            }
-        }
-        else if (sprite.Host is {} otherHost)
-        {
-            otherHost.RemoveSprite(sprite); 
+            // Already a member — cancel any pending removal so the
+            // sprite stays around past the current frame.
+            _pendingRemoveSprites.Remove(sprite);
+            return;
         }
 
-        sprite.Host = this;
+        // Evict the sprite from any previous host before adopting it. Use the
+        // immediate, non-retiring path for PlayField3D hosts so reparenting
+        // doesn't fire OnSpriteRetired; fall back to the host API otherwise.
+        if (sprite.Host is PlayField3D previous)
+            previous.RemoveImmediate(sprite);
+        else
+            sprite.Host?.RemoveSprite(sprite);
+
+        // Parenting drives attachment (Entity.OnAttach wires behaviors).
+        sprite.Parent = this;
+        sprite._spawnedAt = Elapsed;
 
         if (_updating)
         {
-            _pendingAddSprites.Add(sprite);           
+            _pendingAddSprites.Add(sprite);
         }
         else
         {
-            _sprites.Add(sprite);            
+            _sprites.Add(sprite);
         }
     }
 
@@ -147,8 +149,8 @@ public class PlayField3D : Layer3D, ISpriteHost3D
 
     private void Detach(Sprite3D sprite, bool retired)
     {
-        if (sprite.Host == this)
-            sprite.Host = null;
+        if (sprite.Parent == this)
+            sprite.Parent = null;
         if (retired)
             OnSpriteRetired(sprite);
     }
@@ -165,7 +167,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
     }
 
     /// <inheritdoc/>
-    public override void Update(in UpdateContext3D context)
+    public override void Update(in UpdateContext context)
     {
         Elapsed += context.ElapsedSinceLastUpdate;
 
@@ -182,7 +184,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         ApplyPendingChanges();
     }
 
-    private void RunOneStep(in UpdateContext3D spriteContext)
+    private void RunOneStep(in UpdateContext spriteContext)
     {
         // Animated barriers tick before sprites so this frame's
         // sprite-vs-barrier pass sees the new geometry.

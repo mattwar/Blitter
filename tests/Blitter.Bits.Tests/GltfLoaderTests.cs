@@ -1,6 +1,5 @@
 using System.Numerics;
 using Blitter.Bits;
-using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
 using SharpGLTF.Materials;
 using SharpGLTF.Scenes;

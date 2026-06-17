@@ -77,7 +77,7 @@ public sealed class CameraOrbiter : CameraController
         _wheelAccum += e.Scroll.Y;
     }
 
-    public override void Update(in UpdateContext3D context)
+    public override void Update(in UpdateContext context)
     {
         var pos = Mouse.GetPosition(_window);
 

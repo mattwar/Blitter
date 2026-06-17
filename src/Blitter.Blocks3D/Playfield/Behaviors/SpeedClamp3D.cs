@@ -1,4 +1,4 @@
-using System.Numerics;
+using Blitter.Bits;
 
 namespace Blitter.Blocks3D;
 
@@ -16,9 +16,16 @@ public sealed class SpeedClamp3D : SpriteBehavior3D
     /// <summary>Upper speed bound. A sprite faster than this is pulled back down to it.</summary>
     public float Max { get; set; } = float.PositiveInfinity;
 
-    public override void Apply(Sprite3D target, in UpdateContext3D context)
+    private Sprite3D _target = null!;
+
+    protected override void OnAttach(IEntity entity)
     {
-        var v = target.Velocity;
+        _target = (Sprite3D)entity;
+    }
+
+    public override void Apply(in UpdateContext context)
+    {
+        var v = _target.Velocity;
         var speedSq = v.LengthSquared();
         if (speedSq == 0f)
             return;
@@ -26,12 +33,12 @@ public sealed class SpeedClamp3D : SpriteBehavior3D
         if (speedSq < Min * Min && Min > 0f)
         {
             var speed = MathF.Sqrt(speedSq);
-            target.Velocity = v * (Min / speed);
+            _target.Velocity = v * (Min / speed);
         }
         else if (speedSq > Max * Max)
         {
             var speed = MathF.Sqrt(speedSq);
-            target.Velocity = v * (Max / speed);
+            _target.Velocity = v * (Max / speed);
         }
     }
 }

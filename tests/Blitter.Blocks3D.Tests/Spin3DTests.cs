@@ -4,7 +4,7 @@ namespace Blitter.Tests;
 
 public class Spin3DTests
 {
-    private static UpdateContext3D Ctx(double dt) => new()
+    private static UpdateContext Ctx(double dt) => new()
     {
         ElapsedSinceStart = TimeSpan.FromSeconds(dt),
         ElapsedSinceLastUpdate = TimeSpan.FromSeconds(dt),
@@ -13,10 +13,10 @@ public class Spin3DTests
     [Fact]
     public void RotatesAroundYAxis()
     {
-        var sprite = new Sprite3D();
         var spin = new Spin3D { RotationSpeed = MathF.PI }; // half turn per second
+        var sprite = new Sprite3D { Behaviors = [ spin ] };
 
-        spin.Apply(sprite, Ctx(1.0));
+        spin.Apply(Ctx(1.0));
 
         // Forward -Z rotated half a turn about Y lands on +Z.
         var forward = Vector3.Transform(-Vector3.UnitZ, sprite.Orientation);
@@ -27,10 +27,10 @@ public class Spin3DTests
     [Fact]
     public void KeepsYAxisFixed()
     {
-        var sprite = new Sprite3D();
         var spin = new Spin3D { RotationSpeed = 1.23f };
+        var sprite = new Sprite3D { Behaviors = [ spin ] };
 
-        spin.Apply(sprite, Ctx(0.7));
+        spin.Apply(Ctx(0.7));
 
         // Spinning about Y leaves the up axis unmoved.
         var up = Vector3.Transform(Vector3.UnitY, sprite.Orientation);
@@ -42,10 +42,10 @@ public class Spin3DTests
     [Fact]
     public void ZeroSpeed_DoesNothing()
     {
-        var sprite = new Sprite3D();
         var spin = new Spin3D { RotationSpeed = 0f };
+        var sprite = new Sprite3D { Behaviors = [ spin ] };
 
-        spin.Apply(sprite, Ctx(1.0));
+        spin.Apply(Ctx(1.0));
 
         Assert.Equal(Quaternion.Identity, sprite.Orientation);
     }
@@ -53,10 +53,10 @@ public class Spin3DTests
     [Fact]
     public void ZeroElapsed_DoesNothing()
     {
-        var sprite = new Sprite3D();
         var spin = new Spin3D { RotationSpeed = 5f };
+        var sprite = new Sprite3D { Behaviors = [ spin ] };
 
-        spin.Apply(sprite, Ctx(0));
+        spin.Apply(Ctx(0));
 
         Assert.Equal(Quaternion.Identity, sprite.Orientation);
     }
@@ -64,13 +64,14 @@ public class Spin3DTests
     [Fact]
     public void Accumulates_OverFrames()
     {
-        var oneStep = new Sprite3D();
-        var twoSteps = new Sprite3D();
-        new Spin3D { RotationSpeed = 1f }.Apply(oneStep, Ctx(0.5));
+        var oneSpin = new Spin3D { RotationSpeed = 1f };
+        var oneStep = new Sprite3D { Behaviors = [ oneSpin ] };
+        oneSpin.Apply(Ctx(0.5));
 
         var spin = new Spin3D { RotationSpeed = 1f };
-        spin.Apply(twoSteps, Ctx(0.25));
-        spin.Apply(twoSteps, Ctx(0.25));
+        var twoSteps = new Sprite3D { Behaviors = [ spin ] };
+        spin.Apply(Ctx(0.25));
+        spin.Apply(Ctx(0.25));
 
         // Two quarter-second steps equal one half-second step.
         var a = Vector3.Transform(-Vector3.UnitZ, oneStep.Orientation);

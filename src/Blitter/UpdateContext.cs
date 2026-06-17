@@ -30,28 +30,10 @@ public interface IUpdateContext
         (float)ElapsedSinceLastUpdate.TotalSeconds;
 }
 
-
-/// <summary>
-/// 3D-domain update context. 
-/// </summary>
-public interface IUpdateContext3D : IUpdateContext
-{
-}
-
 /// <summary>
 /// Bare update context: timings only. 
 /// </summary>
 public readonly struct UpdateContext : IUpdateContext
-{
-    public TimeSpan ElapsedSinceStart { get; init; }
-    public TimeSpan ElapsedSinceLastUpdate { get; init; }
-}
-
-
-/// <summary>
-/// 3D update context: timings only so far.
-/// </summary>
-public readonly struct UpdateContext3D : IUpdateContext3D
 {
     public TimeSpan ElapsedSinceStart { get; init; }
     public TimeSpan ElapsedSinceLastUpdate { get; init; }

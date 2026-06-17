@@ -1,6 +1,7 @@
 using System.Numerics;
 
 namespace Blitter.Blocks3D;
+using Bits;
 
 /// <summary>
 /// Accelerates the sprite each frame by <see cref="Acceleration"/>.
@@ -22,7 +23,14 @@ public sealed class Gravity3D : SpriteBehavior3D
     /// </summary>
     public float MaxFallSpeed { get; set; }
 
-    public override void Apply(Sprite3D target, in UpdateContext3D context)
+    private Sprite3D _target = null!;
+
+    protected override void OnAttach(IEntity entity)
+    {
+        _target = (Sprite3D)entity;
+    }
+
+    public override void Apply(in UpdateContext context)
     {
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
         if (dt <= 0f)
@@ -32,7 +40,7 @@ public sealed class Gravity3D : SpriteBehavior3D
         if (accel.LengthSquared() <= float.Epsilon)
             return;
 
-        var v = target.Velocity + accel * dt;
+        var v = _target.Velocity + accel * dt;
 
         var cap = MaxFallSpeed;
         if (cap > 0f)
@@ -45,6 +53,6 @@ public sealed class Gravity3D : SpriteBehavior3D
                 v -= axis * (along - cap);
         }
 
-        target.Velocity = v;
+        _target.Velocity = v;
     }
 }

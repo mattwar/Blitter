@@ -9,7 +9,7 @@ namespace Blitter.Blocks3D;
 /// Its collection of behaviors defines its logic: movement, collision
 /// response, and so on. The 3D analog of <c>Blitter.Blocks2D.Sprite2D</c>.
 /// </summary>
-public class Sprite3D : IUpdatable<UpdateContext3D>, IDrawable3D
+public class Sprite3D : Entity, IDrawable3D
 {
     /// <summary>The visual to render.</summary>
     public Visual3D? Visual { get; set; }
@@ -51,41 +51,21 @@ public class Sprite3D : IUpdatable<UpdateContext3D>, IDrawable3D
     /// </summary>
     public bool Visible { get; set; } = true;
 
-    /// <summary>Behaviors attached to this sprite. Run in list order each frame.</summary>
-    public List<SpriteBehavior3D> Behaviors { get; } = new();
-
     /// <summary>The sprite is active and not about to be culled.</summary>
     public bool IsAlive { get; set; } = true;
 
     /// <summary>
-    /// The host this sprite belongs to.
+    /// The host this sprite belongs to: its <see cref="Entity.Parent"/>
+    /// viewed as a sprite container, or <c>null</c> if it has none. This
+    /// is a read-only projection of <see cref="Entity.Parent"/>. To move a
+    /// sprite into a host, call <see cref="ISpriteHost3D.AddSprite"/> on the
+    /// destination host, which evicts the sprite from any current host first.
     /// </summary>
-    public ISpriteHost3D? Host 
-    {
-        get; 
+    public ISpriteHost3D? Host => this.Parent as ISpriteHost3D;
 
-        set
-        {
-            if (value != field)
-            {
-                if (field is {} oldHost)
-                {
-                    oldHost.RemoveSprite(this);             
-                }
-
-                field = value;
-
-                if (value is {} newHost)
-                {
-                    newHost.AddSprite(this);
-                    _spawnedAt = newHost.Elapsed;
-                }               
-            }
-        }
-    }
-        
-    // Time sprite was added to its current host.
-    private TimeSpan _spawnedAt;
+    // Time the sprite was added to its current host; stamped by the host
+    // when it adopts the sprite (see PlayField3D.AddSprite).
+    internal TimeSpan _spawnedAt;
 
     /// <summary>How long this sprite has been a member of its current <see cref="Host"/>.</summary>
     public TimeSpan Age =>
@@ -114,12 +94,19 @@ public class Sprite3D : IUpdatable<UpdateContext3D>, IDrawable3D
     }
 
     /// <summary>Apply every enabled behavior in order.</summary>
-    public virtual void Update(in UpdateContext3D context)
+    public override void Update(in UpdateContext context)
     {
         foreach (var behavior in this.Behaviors)
         {
-            if (behavior.Enabled)
-                behavior.Apply(this, in context);
+            if (behavior is Behavior3D sb)
+            {
+                if (sb.Enabled)
+                    sb.Apply(in context);
+            }
+            else
+            {
+                behavior.Apply(in context);
+            }
         }
     }
 
@@ -128,12 +115,14 @@ public class Sprite3D : IUpdatable<UpdateContext3D>, IDrawable3D
     /// <see cref="HitShape"/> intersects another sprite's. Forwards to
     /// each enabled behavior.
     /// </summary>
-    public virtual void OnHitSprite(Sprite3D other, in UpdateContext3D context)
+    public virtual void OnHitSprite(Sprite3D other, in UpdateContext context)
     {
         foreach (var behavior in this.Behaviors)
         {
-            if (behavior.Enabled)
-                behavior.OnHitSprite(this, other, in context);
+            if (behavior is SpriteBehavior3D sb && sb.Enabled)
+            {
+                sb.OnHitSprite(this, other, in context);
+            }
         }
     }
 
@@ -142,12 +131,14 @@ public class Sprite3D : IUpdatable<UpdateContext3D>, IDrawable3D
     /// <see cref="HitSphere"/> overlaps a <see cref="Barrier3D"/>.
     /// Forwards to each enabled behavior.
     /// </summary>
-    public virtual void OnHitBarrier(Barrier3D barrier, in UpdateContext3D context)
+    public virtual void OnHitBarrier(Barrier3D barrier, in UpdateContext context)
     {
         foreach (var behavior in this.Behaviors)
         {
-            if (behavior.Enabled)
-                behavior.OnHitBarrier(this, barrier, in context);
+            if (behavior is SpriteBehavior3D sb && sb.Enabled)
+            {
+                sb.OnHitBarrier(this, barrier, in context);               
+            }
         }
     }
 

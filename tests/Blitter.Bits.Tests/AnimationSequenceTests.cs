@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-using Blitter;
 using Blitter.Bits;
 
 namespace Blitter.Tests;

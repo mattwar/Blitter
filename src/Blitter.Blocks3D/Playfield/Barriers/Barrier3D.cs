@@ -1,8 +1,7 @@
 using System.Numerics;
 
-using Blitter.Bits;
-
 namespace Blitter.Blocks3D;
+using Bits;
 
 /// <summary>
 /// A static, non-sprite obstacle in a <see cref="PlayField3D"/>.
@@ -11,10 +10,10 @@ namespace Blitter.Blocks3D;
 /// playfield dispatches <see cref="Sprite3D.OnHitBarrier"/>.
 /// Unlike sprites, barriers do not collide with other barriers.
 /// </summary>
-public abstract class Barrier3D
+public abstract class Barrier3D : Entity, IDrawable3D
 {
     /// <summary>
-    /// Optional visual rendered by the default <see cref="Draw"/> and used by the default <see cref="HitShape"/>.
+    /// Optional visual
     /// </summary>
     public Visual3D? Visual { get; set; }
 
@@ -50,14 +49,16 @@ public abstract class Barrier3D
     /// <summary>
     /// Called by <see cref="PlayField3D"/> once per frame.
     /// </summary>
-    public virtual void Update(in UpdateContext3D context) { }
+    public override void Update(in UpdateContext context) { }
 
     /// <summary>
     /// Render this barrier. Default draws <see cref="Visual"/> at the
     /// barrier's pose, or does nothing if no visual is set.
     /// </summary>
-    public virtual void Draw(Renderer3D renderer) =>
-        Visual?.Draw(renderer, new Pose3D(Position, Orientation, Scale), Tint, TimeSpan.Zero);
+    public virtual void Draw(Renderer3D renderer)
+    {
+        this.Visual?.Draw(renderer, new Pose3D(Position, Orientation, Scale), Tint, TimeSpan.Zero);
+    }
 
     /// <summary>
     /// Render the part of this barrier belonging to <paramref name="pass"/>.
@@ -73,7 +74,7 @@ public abstract class Barrier3D
     }
 
     /// <summary>Called when a sprite collides with this barrier.</summary>
-    public virtual void OnHitSprite(Sprite3D hitter, in UpdateContext3D context) { }
+    public virtual void OnHitSprite(Sprite3D hitter, in UpdateContext context) { }
 
     /// <summary>
     /// Physical characteristics of this barrier.

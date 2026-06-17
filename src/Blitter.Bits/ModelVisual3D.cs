@@ -1,5 +1,3 @@
-using System.Numerics;
-
 namespace Blitter.Bits;
 
 /// <summary>

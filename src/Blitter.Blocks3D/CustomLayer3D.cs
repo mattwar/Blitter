@@ -7,10 +7,10 @@ namespace Blitter.Blocks3D;
 /// </summary>
 public sealed class CustomLayer3D : Layer3D
 {
-    public Action<UpdateContext3D>? OnUpdate { get; set; }
+    public Action<UpdateContext>? OnUpdate { get; set; }
     public Action<Renderer3D>? OnRender { get; set; }
 
-    public override void Update(in UpdateContext3D context)
+    public override void Update(in UpdateContext context)
     {
         OnUpdate?.Invoke(context);
     }

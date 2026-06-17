@@ -1,8 +1,7 @@
 using System.Numerics;
 
-using Blitter.Bits;
-
 namespace Blitter.Blocks3D;
+using Bits;
 
 /// <summary>
 /// A barrier based on a mesh. Treats the mesh as immutable from a
@@ -32,7 +31,6 @@ public class MeshBarrier3D<TVertex> : Barrier3D
 
     /// <summary>
     /// The mesh used for both collision and (optionally) drawing.
-    /// Override <see cref="Barrier3D.Draw"/> to render it.
     /// </summary>
     public Mesh<TVertex> Mesh => _mesh;
 

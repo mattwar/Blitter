@@ -1,6 +1,7 @@
 using System.Numerics;
 
 namespace Blitter.Blocks3D;
+using Bits;
 
 /// <summary>
 /// First-person walk controller for a <see cref="Sprite3D"/>. Drives
@@ -89,7 +90,15 @@ public class WalkController3D : SpriteBehavior3D
     public Key SprintKey    { get; set; } = Key.LShift;
     public Key SprintAltKey { get; set; } = Key.RShift;
 
-    public override void Apply(Sprite3D target, in UpdateContext3D context)
+
+    private Sprite3D _target = null!;
+
+    protected override void OnAttach(IEntity entity)
+    {
+        _target = (Sprite3D)entity;
+    }
+
+    public override void Apply(in UpdateContext context)
     {
         _elapsed += context.ElapsedSinceLastUpdate;
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
@@ -151,7 +160,7 @@ public class WalkController3D : SpriteBehavior3D
             _wallCount = 0;
         }
 
-        var v = target.Velocity;
+        var v = _target.Velocity;
         v.X = horiz.X;
         v.Z = horiz.Z;
 
@@ -163,7 +172,7 @@ public class WalkController3D : SpriteBehavior3D
             v.Y = JumpSpeed;
             _lastGroundedAt = null;   // consume
         }
-        target.Velocity = v;
+        _target.Velocity = v;
 
         // Look vector + camera follow.
         var cosP = MathF.Cos(Pitch);
@@ -171,7 +180,7 @@ public class WalkController3D : SpriteBehavior3D
             -cosP * MathF.Sin(Yaw),
              MathF.Sin(Pitch),
             -cosP * MathF.Cos(Yaw));
-        Eye = target.Position + new Vector3(0f, EyeOffsetY, 0f);
+        Eye = _target.Position + new Vector3(0f, EyeOffsetY, 0f);
 
         if (Camera is { } camera)
         {
@@ -181,7 +190,7 @@ public class WalkController3D : SpriteBehavior3D
         }
     }
 
-    public override void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext3D context)
+    public override void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
     {
         if (!self.HitShape.TryGetContact(barrier.HitShape, out var contact))
             return;

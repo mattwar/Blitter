@@ -40,7 +40,7 @@ public class ChunkedPlayField3D : Layer3D
         MaxChunk = maxChunk;
     }
 
-    public override void Update(in UpdateContext3D context)
+    public override void Update(in UpdateContext context)
     {
         ChunkSource.Update(context);
 
@@ -137,7 +137,7 @@ public class ChunkedPlayField3D : Layer3D
         }
     }
 
-    private void RunCollisionPass(in UpdateContext3D context)
+    private void RunCollisionPass(in UpdateContext context)
     {
         for (int i = 0; i < _frameSprites.Count; i++)
         {
@@ -293,7 +293,7 @@ public interface IChunkSource3D : ISpriteHost3D
     IChunk3D? GetChunk(Vector3 position);
 
     /// <summary>Per-frame source tick (advances the host clock).</summary>
-    void Update(in UpdateContext3D context);
+    void Update(in UpdateContext context);
 }
 
 /// <summary>
@@ -464,7 +464,7 @@ public abstract class ChunkSource3D : IChunkSource3D
     /// </summary>
     protected virtual void OnChunkUnloaded(IChunk3D chunk) { }
 
-    public virtual void Update(in UpdateContext3D context)
+    public virtual void Update(in UpdateContext context)
     {
         this.Elapsed += context.ElapsedSinceLastUpdate;
     }
@@ -545,7 +545,7 @@ public interface IChunk3D
     void RemoveBarrier(Barrier3D barrier);
 
     /// <summary>Per-frame chunk update (barrier ticks plus any chunk-scoped work).</summary>
-    void Update(in UpdateContext3D context);
+    void Update(in UpdateContext context);
 
     /// <summary>Draws the chunk's barriers and live sprites (both passes).</summary>
     void Draw(Renderer3D renderer);
@@ -675,7 +675,7 @@ public class Chunk3D : IChunk3D
     /// remeshing. Sprite ticks, rebucketing, collision, and dead-sprite
     /// reaping are orchestrated by <see cref="ChunkedPlayField3D"/>.
     /// </summary>
-    public virtual void Update(in UpdateContext3D context)
+    public virtual void Update(in UpdateContext context)
     {
         for (int i = 0; i < _barriers.Count; i++)
             _barriers[i].Update(context);

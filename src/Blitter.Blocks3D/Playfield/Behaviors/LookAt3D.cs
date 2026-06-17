@@ -12,12 +12,6 @@ namespace Blitter.Blocks3D;
 /// enemies, signposts, or billboards track something without writing
 /// any rotation math.
 /// </summary>
-/// <remarks>
-/// This behavior writes <see cref="Sprite3D.Orientation"/> directly. If
-/// the sprite also has a <see cref="Motion3D"/> behavior that integrates
-/// <see cref="Sprite3D.AngularVelocity"/>, place this behavior after it
-/// in the sprite's <see cref="Sprite3D.Behaviors"/> list so the aim wins.
-/// </remarks>
 public sealed class LookAt3D : SpriteBehavior3D
 {
     /// <summary>
@@ -62,12 +56,19 @@ public sealed class LookAt3D : SpriteBehavior3D
     /// </summary>
     public float TurnSpeed { get; set; }
 
-    public override void Apply(Sprite3D target, in UpdateContext3D context)
+    private Sprite3D _target = null!;
+
+    protected override void OnAttach(IEntity entity)
+    {
+        _target = (Sprite3D)entity;
+    }
+
+    public override void Apply(in UpdateContext context)
     {
         if (ResolveTarget() is not { } point)
             return;
 
-        var toTarget = point - target.Position;
+        var toTarget = point - _target.Position;
         if (KeepUpright)
             toTarget.Y = 0f;
 
@@ -78,7 +79,7 @@ public sealed class LookAt3D : SpriteBehavior3D
 
         if (TurnSpeed <= 0f)
         {
-            target.Orientation = desired;
+            _target.Orientation = desired;
             return;
         }
 
@@ -86,26 +87,26 @@ public sealed class LookAt3D : SpriteBehavior3D
         if (dt <= 0f)
             return;
 
-        var current = target.Orientation;
+        var current = _target.Orientation;
 
         // Shortest-arc angle between the current and desired orientations.
         var dot = Math.Clamp(MathF.Abs(Quaternion.Dot(current, desired)), -1f, 1f);
         var angle = 2f * MathF.Acos(dot);
         if (angle <= 1e-6f)
         {
-            target.Orientation = desired;
+            _target.Orientation = desired;
             return;
         }
 
         var maxStep = TurnSpeed * dt;
         if (maxStep >= angle)
         {
-            target.Orientation = desired;
+            _target.Orientation = desired;
             return;
         }
 
         var t = maxStep / angle;
-        target.Orientation = Quaternion.Normalize(Quaternion.Slerp(current, desired, t));
+        _target.Orientation = Quaternion.Normalize(Quaternion.Slerp(current, desired, t));
     }
 
     // Picks the active target point following the documented priority:

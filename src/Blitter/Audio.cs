@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Runtime.InteropServices;
 
 using Blitter.Devices;
 

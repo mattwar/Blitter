@@ -1,4 +1,3 @@
-using Blitter.Bits;
 using System.Numerics;
 
 namespace Blitter.Blocks2D;

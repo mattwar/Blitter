@@ -1,7 +1,5 @@
-using System.Numerics;
- 
 namespace Blitter.Blocks3D;
-
+using Bits;
  
 /// <summary>
 /// Makes the sprite bob up and down over time, like a floating coin or 
@@ -21,10 +19,17 @@ public sealed class Float3D : SpriteBehavior3D
     /// </summary>
     public float Frequency { get; set; } = 1f;
 
-    public override void Apply(Sprite3D target, in UpdateContext3D context)
+    private Sprite3D _target = null!;
+
+    protected override void OnAttach(IEntity entity)
+    {
+        _target = (Sprite3D)entity;
+    }
+
+    public override void Apply(in UpdateContext context)
     {
         var time = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
-        var newY = target.Position.Y + (MathF.Sin(time * Frequency) * Amplitude);
-        target.Position = target.Position with { Y = newY };
+        var newY = _target.Position.Y + (MathF.Sin(time * Frequency) * Amplitude);
+        _target.Position = _target.Position with { Y = newY };
     }
 }

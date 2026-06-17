@@ -38,7 +38,7 @@ public sealed class CameraFollower : CameraController
     /// </summary>
     public float LookSmoothing { get; set; } = 0.1f;
 
-    public override void Update(in UpdateContext3D context)
+    public override void Update(in UpdateContext context)
     {
         var goalPosition = Target + Offset;
 

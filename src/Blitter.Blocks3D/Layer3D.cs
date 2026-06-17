@@ -1,4 +1,5 @@
 namespace Blitter.Blocks3D;
+using Bits;
 
 /// <summary>
 /// A stacked drawable layer in a <see cref="Scene3D"/>. Scenes update
@@ -6,16 +7,13 @@ namespace Blitter.Blocks3D;
 /// every <see cref="Visible"/> layer. Concrete layers manage their own
 /// contents (see <see cref="PlayField3D"/> for sprites + barriers).
 /// </summary>
-public abstract class Layer3D : IUpdatable<UpdateContext3D>, IDrawable3D
+public abstract class Layer3D : Entity, IDrawable3D
 {
     /// <summary>When false the scene skips this layer's update.</summary>
     public bool Enabled { get; set; } = true;
 
     /// <summary>When false the scene skips this layer's draw.</summary>
     public bool Visible { get; set; } = true;
-
-    /// <summary>Advance the layer's contents by one frame.</summary>
-    public abstract void Update(in UpdateContext3D context);
 
     /// <summary>Render the layer's current state.</summary>
     public abstract void Draw(Renderer3D renderer);

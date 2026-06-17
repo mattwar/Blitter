@@ -1,32 +1,63 @@
 namespace Blitter.Blocks3D;
+using Bits;
 
 /// <summary>
-/// A 3D scene comprised of one or more layers. The 3D analog of
-/// <c>Blitter.Blocks2D.Scene2D</c>.
+/// A 3D scene comprised of one or more layers. 
+/// The 3D analog of <c>Blitter.Blocks2D.Scene2D</c>.
 /// </summary>
-public class Scene3D
+public class Scene3D : Entity
 {
     public Scene3D()
     {
     }
 
+    private readonly List<Layer3D> _layers = new();
+
     /// <summary>
-    /// The layers in this scene. Each layer's <see cref="Layer3D.Update"/>
-    /// runs in list order, then each <see cref="Layer3D.Draw"/> renders in
-    /// list order — there is no parallax/back-to-front compositing in 3D;
-    /// the depth buffer sorts geometry naturally.
+    /// The layers in this scene.
     /// </summary>
-    public List<Layer3D> Layers { get; } = new();
+    public IReadOnlyList<Layer3D> Layers 
+    { 
+        get => _layers;
+        init
+        {
+            if (_layers.Count > 0)
+            {
+                // we may have a collision during initialization.
+                foreach (var layer in value)
+                {
+                    int i = _layers.FindIndex(existing => existing.GetType() == layer.GetType());
+                    if (i >= 0)
+                    {
+                        // let new value win
+                        _layers[i] = layer;
+                    }
+                    else
+                    {
+                        _layers.Add(layer);
+                    }
+                }
+            }
+            else
+            {
+                _layers.AddRange(value);
+            }            
+        }
+    }
 
-    /// <summary>Scene-wide behaviors that run each frame before layers update.</summary>
-    public List<SceneBehavior3D> Behaviors { get; } = new();
-
-    internal void Update(in UpdateContext3D context)
+    public override void Update(in UpdateContext context)
     {
         foreach (var behavior in Behaviors)
         {
-            if (behavior.Enabled)
-                behavior.Apply(this, in context);
+            if (behavior is Behavior3D b3)
+            {
+                if (b3.Enabled)
+                    b3.Apply(in context);
+            }
+            else
+            {
+                behavior.Apply(in context);
+            }
         }
 
         foreach (var layer in Layers)
@@ -138,4 +169,4 @@ public class Scene3D
 /// <summary>
 /// A predicate that determines when a <see cref="Scene3D"/> should truly exit.
 /// </summary>
-public delegate bool SceneExitCondition3D(in UpdateContext3D context);
+public delegate bool SceneExitCondition3D(in UpdateContext context);
