@@ -8,7 +8,7 @@ using Bits;
 /// Pair with <see cref="Motion3D"/> to actually integrate position.
 /// The 3D analog of <c>Blitter.Blocks2D.Gravity2D</c>.
 /// </summary>
-public sealed class Gravity3D : SpriteBehavior3D
+public sealed class Gravity3D : Behavior
 {
     /// <summary>
     /// Acceleration in world units / s². Defaults to (0, -9.81, 0) —
@@ -23,11 +23,11 @@ public sealed class Gravity3D : SpriteBehavior3D
     /// </summary>
     public float MaxFallSpeed { get; set; }
 
-    private Sprite3D _target = null!;
+    private Velocity3D _velocity = null!;
 
     protected override void OnAttach(IEntity entity)
     {
-        _target = (Sprite3D)entity;
+        _velocity = entity.GetOrAddTrait<Velocity3D>();
     }
 
     public override void Apply(in UpdateContext context)
@@ -40,7 +40,7 @@ public sealed class Gravity3D : SpriteBehavior3D
         if (accel.LengthSquared() <= float.Epsilon)
             return;
 
-        var v = _target.Velocity + accel * dt;
+        var v = _velocity.Velocity + accel * dt;
 
         var cap = MaxFallSpeed;
         if (cap > 0f)
@@ -53,6 +53,6 @@ public sealed class Gravity3D : SpriteBehavior3D
                 v -= axis * (along - cap);
         }
 
-        _target.Velocity = v;
+        _velocity.Velocity = v;
     }
 }

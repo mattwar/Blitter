@@ -45,19 +45,19 @@ public class Scene3D : Entity
         }
     }
 
+    /// <summary>
+    /// Reports whether <paramref name="child"/> is a layer this scene holds.
+    /// </summary>
+    public override Containment GetContainment(IEntity child) =>
+        child is Layer3D layer && _layers.Contains(layer)
+            ? Containment.Contained
+            : Containment.NotContained;
+
     public override void Update(in UpdateContext context)
     {
         foreach (var behavior in Behaviors)
         {
-            if (behavior is Behavior3D b3)
-            {
-                if (b3.Enabled)
-                    b3.Apply(in context);
-            }
-            else
-            {
-                behavior.Apply(in context);
-            }
+            behavior.Apply(in context);
         }
 
         foreach (var layer in Layers)

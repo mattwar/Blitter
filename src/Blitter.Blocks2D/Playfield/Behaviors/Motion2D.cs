@@ -7,7 +7,7 @@ using Bits;
 /// and its <see cref="Sprite2D.RotationSpeed"/>
 /// into <see cref="Sprite2D.Rotation"/> each tick.
 /// </summary>
-public class Motion2D : Behavior2D
+public class Motion2D : Behavior
 {
     /// <summary>
     /// Minimum time that must accumulate between successful integration

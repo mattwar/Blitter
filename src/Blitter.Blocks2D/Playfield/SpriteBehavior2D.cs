@@ -1,9 +1,10 @@
 namespace Blitter.Blocks2D;
+using Bits;
 
 /// <summary>
 /// A behavior that controls a <see cref="Sprite2D"/>.
 /// </summary>
-public abstract class SpriteBehavior2D : Behavior2D
+public abstract class SpriteBehavior2D : Behavior
 {
     /// <summary>
     /// Invoked when the host sprite's <see cref="Sprite2D.HitCircle"/>

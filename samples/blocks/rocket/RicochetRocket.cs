@@ -672,7 +672,7 @@ sealed class AsteroidSmasher : SpriteBehavior2D
 
         // Mark the meteor for removal; the playfield reaps it
         // on its next update pass.
-        other.IsAlive = false;
+        other.PlayField.RemoveSprite(other);
         self.Heading = (self.Heading + Random.Shared.Next(-15, 15) + 360f) % 360f;
         Audio.Play(Sounds.Explosion, volume: .3f);
 
@@ -734,7 +734,7 @@ sealed class AsteroidSmasher : SpriteBehavior2D
 
         // split the asteroid into shards
         asteroid.Smash();
-        asteroid.IsAlive = false;
+        asteroid.PlayField.RemoveSprite(asteroid);
     }
 
     private static float NudgeToward(float current, float target, float fraction, float jitterDeg, float maxDeg)

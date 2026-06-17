@@ -94,7 +94,7 @@ sealed class Block : Sprite2D
             {
                 if (sprite.TryFindTrait<Bounds2D>(out var bounds)
                     && sprite.Center.Y - Size > bounds.Rect.Height)
-                    sprite.IsAlive = false;
+                    sprite.PlayField.RemoveSprite(sprite);
             }
         });
         CanBeHit = false;

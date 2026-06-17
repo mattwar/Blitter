@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 
 namespace Blitter.Blocks2D;
+using Bits;
 
 /// <summary>
 /// The 2D "world" layer: owns a set of <see cref="Sprite2D"/>s and
@@ -228,17 +229,15 @@ public class PlayField2D : Layer2D
     }
 
     /// <summary>
-    /// Removes a sprite from the playfield. 
-    /// Safe to call during <see cref="Update"/>; 
-    /// the actual removal is deferred to end of frame.
-    /// The normal way to retire a sprite is to set <see cref="Sprite2D.IsAlive"/> to <c>false</c>.
-    /// This method is for callers that need to evict a sprite
-    /// without killing it (e.g. reparenting to another playfield).
+    /// Retires a sprite from the playfield. Safe to call during
+    /// <see cref="Update"/>: the sprite stops updating and colliding
+    /// immediately and the actual removal is deferred to end of frame.
     /// </summary>
     public void RemoveSprite(Sprite2D sprite)
     {
         if (sprite.Parent != this)
             return;
+        sprite.IsAlive = false;
         if (_updating)
         {
             _pendingAddSprites.Remove(sprite);
@@ -248,6 +247,39 @@ public class PlayField2D : Layer2D
         {
             Detach(sprite, retired: true);
         }
+    }
+
+    /// <summary>
+    /// Whether <paramref name="sprite"/> is a live member of this
+    /// playfield — still held and not retired during the current frame.
+    /// Returns <c>false</c> for sprites that were never added, have been
+    /// reaped, or were retired earlier this frame.
+    /// </summary>
+    public bool IsAlive(Sprite2D sprite) =>
+        GetContainment(sprite) == Containment.Contained;
+
+    /// <summary>
+    /// Reports whether <paramref name="child"/> is a sprite or barrier this
+    /// playfield contains, is removing this frame, or does not hold.
+    /// </summary>
+    public override Containment GetContainment(IEntity child)
+    {
+        if (child is Sprite2D sprite)
+        {
+            if (!ReferenceEquals(sprite.Parent, this))
+                return Containment.NotContained;
+            return sprite.IsAlive ? Containment.Contained : Containment.Removing;
+        }
+
+        if (child is Barrier2D barrier)
+        {
+            if (_pendingRemoveBarriers.Contains(barrier))
+                return Containment.Removing;
+            if (_barriers.Contains(barrier) || _pendingAddBarriers.Contains(barrier))
+                return Containment.Contained;
+        }
+
+        return Containment.NotContained;
     }
 
     /// <summary>
@@ -296,7 +328,7 @@ public class PlayField2D : Layer2D
 
     // Removes `sprite` from this playfield immediately, regardless of update state. 
     // Used by the reparenting path on AddSprite where we can't wait until end-of-frame. 
-    // User-facing removal goes through `sprite.IsAlive = false` and is reaped via the pending pipeline.
+    // User-facing removal goes through `RemoveSprite` and is reaped via the pending pipeline.
     internal void RemoveImmediate(Sprite2D sprite)
     {
         _pendingAddSprites.Remove(sprite);
@@ -320,9 +352,9 @@ public class PlayField2D : Layer2D
     }
 
     /// <summary>
-    /// Called once for each sprite that leaves this playfield, either because
-    /// its <see cref="Sprite2D.IsAlive"/> went to <c>false</c> or because <see cref="RemoveSprite"/> evicted it. 
-    /// Not called when a sprite is reparented into another playfield.
+    /// Called once for each sprite that leaves this playfield via
+    /// <see cref="RemoveSprite"/>. Not called when a sprite is reparented
+    /// into another playfield.
     /// Override to return the sprite to a pool, recycle resources, etc.
     /// </summary>
     protected virtual void OnSpriteRetired(Sprite2D sprite)

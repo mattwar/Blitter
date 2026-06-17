@@ -8,6 +8,6 @@ using Bits;
 /// <see cref="Scene2D.Exit"/>). Behaviors don't render — anything
 /// visual goes in a <see cref="Layer2D"/>.
 /// </summary>
-public abstract class SceneBehavior2D : Behavior2D
+public abstract class SceneBehavior2D : Behavior
 {
 }

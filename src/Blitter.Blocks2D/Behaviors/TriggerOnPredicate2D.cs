@@ -5,7 +5,7 @@ using Bits;
 /// Rising-edge trigger: invokes <see cref="Action"/> once each time <see cref="Predicate"/> transitions from <c>false</c> to <c>true</c>.
 /// Useful for "all enemies dead", "player reached the exit", "score ≥ N", or any other one-shot scene gate.
 /// </summary>
-public sealed class TriggerOnPredicate2D : Behavior2D
+public sealed class TriggerOnPredicate2D : Behavior
 {
     /// <summary>Condition evaluated each tick.</summary>
     public required Func<IEntity, bool> Predicate { get; init; }
@@ -27,8 +27,14 @@ public sealed class TriggerOnPredicate2D : Behavior2D
     // already true on the first tick fires immediately.
     private bool _last;
 
+    // Set once a non-repeating trigger has fired; further ticks are ignored.
+    private bool _spent;
+
     public override void Apply(in UpdateContext context)
     {
+        if (_spent)
+            return;
+
         if (this.Entity is {} entity)
         {
             var now = Predicate(entity);
@@ -37,7 +43,7 @@ public sealed class TriggerOnPredicate2D : Behavior2D
                 FiredCount++;
                 Action(entity);
                 if (!Repeating)
-                    Enabled = false;
+                    _spent = true;
             }
             _last = now;
         }

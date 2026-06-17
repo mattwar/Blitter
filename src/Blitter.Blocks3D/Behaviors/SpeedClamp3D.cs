@@ -3,12 +3,9 @@ using Blitter.Bits;
 namespace Blitter.Blocks3D;
 
 /// <summary>
-/// Clamps a sprite's <see cref="Sprite3D.Velocity"/> magnitude into the
-/// <c>[Min, Max]</c> range each frame, preserving direction. Useful as
-/// the last behavior in a ball's chain so successive bounces and
-/// barrier kicks can't let it slow to a crawl or run away.
+/// Clamps an entity's <see cref="Velocity3D"/> magnitude into the <c>[Min, Max]</c> range each frame, preserving direction. 
 /// </summary>
-public sealed class SpeedClamp3D : SpriteBehavior3D
+public sealed class SpeedClamp3D : Behavior
 {
     /// <summary>Lower speed bound. A moving sprite below this is pushed back up to it.</summary>
     public float Min { get; set; }
@@ -16,16 +13,16 @@ public sealed class SpeedClamp3D : SpriteBehavior3D
     /// <summary>Upper speed bound. A sprite faster than this is pulled back down to it.</summary>
     public float Max { get; set; } = float.PositiveInfinity;
 
-    private Sprite3D _target = null!;
+    private Velocity3D _velocity = null!;
 
     protected override void OnAttach(IEntity entity)
     {
-        _target = (Sprite3D)entity;
+        _velocity = entity.GetOrAddTrait<Velocity3D>();
     }
 
     public override void Apply(in UpdateContext context)
     {
-        var v = _target.Velocity;
+        var v = _velocity.Velocity;
         var speedSq = v.LengthSquared();
         if (speedSq == 0f)
             return;
@@ -33,12 +30,12 @@ public sealed class SpeedClamp3D : SpriteBehavior3D
         if (speedSq < Min * Min && Min > 0f)
         {
             var speed = MathF.Sqrt(speedSq);
-            _target.Velocity = v * (Min / speed);
+            _velocity.Velocity = v * (Min / speed);
         }
         else if (speedSq > Max * Max)
         {
             var speed = MathF.Sqrt(speedSq);
-            _target.Velocity = v * (Max / speed);
+            _velocity.Velocity = v * (Max / speed);
         }
     }
 }

@@ -33,7 +33,7 @@ public class LookAt3DTests
         var targetSprite = new Sprite3D { Position = new Vector3(0f, 0f, -1f) };
         var look = new LookAt3D
         {
-            TargetSprite = targetSprite,
+            Target = targetSprite,
             TargetPoint = new Vector3(1f, 0f, 0f),
         };
         var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
@@ -44,23 +44,6 @@ public class LookAt3DTests
         var fwd = ForwardOf(sprite);
         Assert.Equal(0f, fwd.X, 4);
         Assert.Equal(-1f, fwd.Z, 4);
-    }
-
-    [Fact]
-    public void DeadTargetSprite_FallsBackToPoint()
-    {
-        var dead = new Sprite3D { Position = new Vector3(0f, 0f, -1f), IsAlive = false };
-        var look = new LookAt3D
-        {
-            TargetSprite = dead,
-            TargetPoint = new Vector3(1f, 0f, 0f),
-        };
-        var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
-
-        look.Apply(Ctx(0.016));
-
-        var fwd = ForwardOf(sprite);
-        Assert.Equal(1f, fwd.X, 4);
     }
 
     [Fact]

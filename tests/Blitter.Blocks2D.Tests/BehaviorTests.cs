@@ -187,7 +187,6 @@ public class BehaviorTests
         flag = false; scene.Update(Context2D());
         flag = true; scene.Update(Context2D());
         Assert.Equal(1, fires);
-        Assert.False(trig.Enabled);
     }
 
     // ---- Shake2D ----

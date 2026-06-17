@@ -1,4 +1,5 @@
 namespace Blitter.Blocks3D;
+using Bits;
 
 /// <summary>
 /// Scene-wide logic that runs once per frame, before the scene's layers
@@ -7,6 +8,6 @@ namespace Blitter.Blocks3D;
 /// <see cref="Scene3D.Exit"/>). Behaviors don't render — anything
 /// visual goes in a <see cref="Layer3D"/>.
 /// </summary>
-public abstract class SceneBehavior3D : Behavior3D
+public abstract class SceneBehavior3D : Behavior
 {
 }

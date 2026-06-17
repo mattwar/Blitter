@@ -15,8 +15,11 @@ public interface ISpriteHost3D
     /// <summary>Adds a sprite to this host.</summary>
     void AddSprite(Sprite3D sprite);
 
-    /// <summary>Removes a sprite from this host. The normal way to retire a sprite is to set <see cref="Sprite3D.IsAlive"/> to <c>false</c>; use this when a caller needs to evict a sprite without killing it.</summary>
+    /// <summary>Retires a sprite from this host. Safe to call while the host is updating; the sprite stops colliding immediately and is reaped at end of frame.</summary>
     void RemoveSprite(Sprite3D sprite);
+
+    /// <summary>Whether <paramref name="sprite"/> is a live member of this host — still held and not retired during the current frame.</summary>
+    bool IsAlive(Sprite3D sprite);
 
     /// <summary>Adds a barrier to this host.</summary>
     void AddBarrier(Barrier3D barrier);

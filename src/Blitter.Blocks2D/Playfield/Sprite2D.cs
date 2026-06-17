@@ -34,6 +34,7 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
         _transform = this.GetOrAddTrait<Transform2D>();
         _velocity = this.GetOrAddTrait<Velocity2D>();
         _spawnedAt = TimeSpan.Zero;
+        IsAlive = true;
         base.OnAttach(entity);
     }
 
@@ -90,10 +91,10 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
     /// </summary>
     public bool CanBeHit { get; set; } = true;
 
-    /// <summary>
-    /// The sprite is active and not about to be culled.
-    /// </summary>
-    public bool IsAlive { get; set; } = true;
+    // Engine-owned liveness. Not part of the public sprite surface:
+    // query a host with PlayField2D.IsAlive(sprite) and retire a sprite
+    // via RemoveSprite.
+    internal bool IsAlive { get; set; } = true;
 
     /// <summary>
     /// The <see cref="PlayField2D"/> this sprite belongs to.
@@ -131,35 +132,26 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
     /// </summary>
     public BoundingCircle HitCircle => HitShape.BoundingCircle;
 
-    /// <summary>Apply every enabled behavior in order.</summary>
+    /// <summary>Apply every behavior in order.</summary>
     public override void Update(in UpdateContext context)
     {
         for (int i = 0; i < this.Behaviors.Count; i++)
         {
-            var behavior = this.Behaviors[i];
-            if (behavior is SpriteBehavior2D sb)
-            {
-                if (sb.Enabled)
-                    sb.Apply(in context);
-            }
-            else 
-            {
-                behavior.Apply(in context);
-            }
+            this.Behaviors[i].Apply(in context);
         }
     }
 
     /// <summary>
     /// Called by the owning <see cref="PlayField2D"/> when this
     /// sprite's <see cref="HitCircle"/> intersects another sprite's.
-    /// Forwards to each enabled behavior.
+    /// Forwards to each behavior.
     /// </summary>
     public virtual void OnHitSprite(Sprite2D other, in UpdateContext context)
     {
         for (int i = 0; i < this.Behaviors.Count; i++)
         {
             var behavior = this.Behaviors[i];
-            if (behavior is SpriteBehavior2D spriteBehavior && spriteBehavior.Enabled)
+            if (behavior is SpriteBehavior2D spriteBehavior)
             {
                  spriteBehavior.OnHitSprite(this, other, in context);
             }
@@ -169,13 +161,13 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
     /// <summary>
     /// Called by the owning <see cref="PlayField2D"/> when this
     /// sprite's <see cref="HitCircle"/> overlaps a
-    /// <see cref="Barrier2D"/>. Forwards to each enabled behavior.
+    /// <see cref="Barrier2D"/>. Forwards to each behavior.
     /// </summary>
     public virtual void OnHitBarrier(Barrier2D barrier, in UpdateContext context)
     {
         foreach (var behavior in this.Behaviors)
         {
-            if (behavior is SpriteBehavior2D spriteBehavior && spriteBehavior.Enabled)
+            if (behavior is SpriteBehavior2D spriteBehavior)
             {
                 spriteBehavior.OnHitBarrier(this, barrier, in context);
             }

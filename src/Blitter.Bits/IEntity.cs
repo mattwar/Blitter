@@ -43,6 +43,13 @@ public interface IEntity
     T GetOrAddBehavior<T>() where T : Behavior, new();
 
     /// <summary>
+    /// Reports the membership state of <paramref name="child"/> within this
+    /// entity: whether it is contained, not contained, or being removed.
+    /// The container owns this answer; a child never tracks its own status.
+    /// </summary>
+    Containment GetContainment(IEntity child);
+
+    /// <summary>
     /// Advance this entity one tick.
     /// </summary>
     void Update(in UpdateContext context);

@@ -1,9 +1,10 @@
 namespace Blitter.Blocks3D;
+using Bits;
 
 /// <summary>
 /// A behavior that controls a <see cref="Sprite3D"/>.
 /// </summary>
-public abstract class SpriteBehavior3D : Behavior3D
+public abstract class SpriteBehavior3D : Behavior
 {
     /// <summary>
     /// Invoked when the host sprite's <see cref="Sprite3D.HitSphere"/>

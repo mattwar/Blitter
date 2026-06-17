@@ -2,7 +2,8 @@ namespace Blitter.Blocks2D;
 
 /// <summary>
 /// Fades the host sprite's <see cref="Sprite2D.Tint"/> alpha to zero
-/// over <see cref="Duration"/>, then sets <see cref="Sprite2D.IsAlive"/> to <c>false</c> so the playfield
+/// over <see cref="Duration"/>, then retires it via
+/// <see cref="PlayField2D.RemoveSprite(Sprite2D)"/> so the playfield
 /// reaps it. Useful for transient effects like score popups, debris, and impact flashes.
 /// </summary>
 public sealed class FadeAndExpire2D : SpriteBehavior2D
@@ -16,14 +17,14 @@ public sealed class FadeAndExpire2D : SpriteBehavior2D
         {
             if (Duration <= TimeSpan.Zero)
             {
-                sprite.IsAlive = false;
+                sprite.PlayField.RemoveSprite(sprite);
                 return;
             }
 
             var t = (float)(sprite.Age.TotalSeconds / Duration.TotalSeconds);
             if (t >= 1f)
             {
-                sprite.IsAlive = false;
+                sprite.PlayField.RemoveSprite(sprite);
                 return;
             }
 

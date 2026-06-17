@@ -6,7 +6,7 @@ using Bits;
 /// hovering item. This is a simple way to add "life" to objects without 
 /// complex physics.
 /// </summary>
-public sealed class Float3D : SpriteBehavior3D
+public sealed class Float3D : Behavior
 {
     /// <summary>
     /// The height of the oscillation in world units.
@@ -19,17 +19,17 @@ public sealed class Float3D : SpriteBehavior3D
     /// </summary>
     public float Frequency { get; set; } = 1f;
 
-    private Sprite3D _target = null!;
+    private Transform3D _transform = null!;
 
     protected override void OnAttach(IEntity entity)
     {
-        _target = (Sprite3D)entity;
+        _transform = entity.GetOrAddTrait<Transform3D>();
     }
 
     public override void Apply(in UpdateContext context)
     {
         var time = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
-        var newY = _target.Position.Y + (MathF.Sin(time * Frequency) * Amplitude);
-        _target.Position = _target.Position with { Y = newY };
+        var newY = _transform.Position.Y + (MathF.Sin(time * Frequency) * Amplitude);
+        _transform.Position = _transform.Position with { Y = newY };
     }
 }

@@ -168,6 +168,14 @@ public class Entity : IEntity
     }
 
     /// <summary>
+    /// Reports the membership state of <paramref name="child"/> within this
+    /// entity. A plain entity owns no children, so the default is
+    /// <see cref="Containment.NotContained"/>; containers override this to
+    /// answer from the lists they hold.
+    /// </summary>
+    public virtual Containment GetContainment(IEntity child) => Containment.NotContained;
+
+    /// <summary>
     /// Advances the entity one tick by applying each attached behavior in order.
     /// </summary>
     public virtual void Update(in UpdateContext context)

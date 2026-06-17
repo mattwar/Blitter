@@ -11,27 +11,44 @@ namespace Blitter.Blocks3D;
 /// </summary>
 public class Sprite3D : Entity, IDrawable3D
 {
+    private Transform3D? _transform = null;
+    private Velocity3D? _velocity = null;
+
     /// <summary>The visual to render.</summary>
     public Visual3D? Visual { get; set; }
 
+    /// <summary>
+    /// The sprite's position, orientation and scale in world space. The
+    /// canonical pose behind <see cref="Position"/>, <see cref="Orientation"/>
+    /// and <see cref="Scale"/>; read <see cref="Transform3D.Pose"/> to draw
+    /// or hit-test.
+    /// </summary>
+    public Transform3D Transform => _transform ?? this.GetOrAddTrait<Transform3D>();
+
+    /// <summary>
+    /// The sprite's linear and angular velocity. Integrated by a motion
+    /// behavior, not by the sprite itself.
+    /// </summary>
+    public Velocity3D Motion => _velocity ?? this.GetOrAddTrait<Velocity3D>();
+
     /// <summary>World-space position of the sprite's local origin.</summary>
-    public Vector3 Position { get; set; }
+    public Vector3 Position { get => Transform.Position; set => Transform.Position = value; }
 
     /// <summary>Orientation of the sprite's local axes in world space.</summary>
-    public Quaternion Orientation { get; set; } = Quaternion.Identity;
+    public Quaternion Orientation { get => Transform.Orientation; set => Transform.Orientation = value; }
 
     /// <summary>Linear velocity in world units per second. Integrated by a motion behavior, not by the sprite itself.</summary>
-    public Vector3 Velocity { get; set; }
+    public Vector3 Velocity { get => Motion.Velocity; set => Motion.Velocity = value; }
 
     /// <summary>
     /// Angular velocity as an axis-times-radians-per-second vector. 
     /// The vector's direction is the rotation axis; its length is the angular speed.
     /// Integrated by a motion behavior, not by the sprite itself.
     /// </summary>
-    public Vector3 AngularVelocity { get; set; }
+    public Vector3 AngularVelocity { get => Motion.AngularVelocity; set => Motion.AngularVelocity = value; }
 
     /// <summary>Uniform scale applied to the visual and hit shape.</summary>
-    public float Scale { get; set; } = 1f;
+    public float Scale { get => Transform.Scale; set => Transform.Scale = value; }
 
     /// <summary>Per-channel tint multiplied into the visual at draw time. Defaults to <see cref="Color.White"/>.</summary>
     public Color Tint { get; set; } = Color.White;
@@ -51,15 +68,13 @@ public class Sprite3D : Entity, IDrawable3D
     /// </summary>
     public bool Visible { get; set; } = true;
 
-    /// <summary>The sprite is active and not about to be culled.</summary>
-    public bool IsAlive { get; set; } = true;
+    // Engine-owned liveness. Not part of the public sprite surface:
+    // query a host with ISpriteHost3D.IsAlive(sprite) (or
+    // PlayField3D.IsAlive(sprite)) and retire a sprite via RemoveSprite.
+    internal bool IsAlive { get; set; } = true;
 
     /// <summary>
-    /// The host this sprite belongs to: its <see cref="Entity.Parent"/>
-    /// viewed as a sprite container, or <c>null</c> if it has none. This
-    /// is a read-only projection of <see cref="Entity.Parent"/>. To move a
-    /// sprite into a host, call <see cref="ISpriteHost3D.AddSprite"/> on the
-    /// destination host, which evicts the sprite from any current host first.
+    /// The host this sprite belongs to.
     /// </summary>
     public ISpriteHost3D? Host => this.Parent as ISpriteHost3D;
 
@@ -81,7 +96,7 @@ public class Sprite3D : Entity, IDrawable3D
     /// (still posed by the sprite).
     /// </summary>
     public virtual PosedHitShape3D HitShape =>
-        new(Visual?.HitShape ?? HitShape3D.None, new Pose3D(Position, Orientation, Scale));
+        new(Visual?.HitShape ?? HitShape3D.None, Transform.Pose);
 
     /// <summary>
     /// Bounding sphere of the sprite for collision purposes; equivalent
@@ -93,33 +108,34 @@ public class Sprite3D : Entity, IDrawable3D
     {
     }
 
-    /// <summary>Apply every enabled behavior in order.</summary>
+    protected override void OnAttach(IEntity entity)
+    {
+        _transform = this.GetOrAddTrait<Transform3D>();
+        _velocity = this.GetOrAddTrait<Velocity3D>();
+        _spawnedAt = TimeSpan.Zero;
+        IsAlive = true;
+        base.OnAttach(entity);
+    }
+
+    /// <summary>Apply every behavior in order.</summary>
     public override void Update(in UpdateContext context)
     {
         foreach (var behavior in this.Behaviors)
         {
-            if (behavior is Behavior3D sb)
-            {
-                if (sb.Enabled)
-                    sb.Apply(in context);
-            }
-            else
-            {
-                behavior.Apply(in context);
-            }
+            behavior.Apply(in context);
         }
     }
 
     /// <summary>
     /// Called by the owning <see cref="PlayField3D"/> when this sprite's
     /// <see cref="HitShape"/> intersects another sprite's. Forwards to
-    /// each enabled behavior.
+    /// each behavior.
     /// </summary>
     public virtual void OnHitSprite(Sprite3D other, in UpdateContext context)
     {
         foreach (var behavior in this.Behaviors)
         {
-            if (behavior is SpriteBehavior3D sb && sb.Enabled)
+            if (behavior is SpriteBehavior3D sb)
             {
                 sb.OnHitSprite(this, other, in context);
             }
@@ -129,13 +145,13 @@ public class Sprite3D : Entity, IDrawable3D
     /// <summary>
     /// Called by the owning <see cref="PlayField3D"/> when this sprite's
     /// <see cref="HitSphere"/> overlaps a <see cref="Barrier3D"/>.
-    /// Forwards to each enabled behavior.
+    /// Forwards to each behavior.
     /// </summary>
     public virtual void OnHitBarrier(Barrier3D barrier, in UpdateContext context)
     {
         foreach (var behavior in this.Behaviors)
         {
-            if (behavior is SpriteBehavior3D sb && sb.Enabled)
+            if (behavior is SpriteBehavior3D sb)
             {
                 sb.OnHitBarrier(this, barrier, in context);               
             }
@@ -147,6 +163,6 @@ public class Sprite3D : Entity, IDrawable3D
     {
         if (!this.Visible)
             return;
-        this.Visual?.Draw(renderer, new Pose3D(Position, Orientation, Scale), this.Tint, this.Age);
+        this.Visual?.Draw(renderer, Transform.Pose, this.Tint, this.Age);
     }
 }

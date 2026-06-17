@@ -4,24 +4,14 @@ namespace Blitter.Blocks3D;
 using Bits;
 
 /// <summary>
-/// First-person walk controller for a <see cref="Sprite3D"/>. Drives
-/// the host sprite's horizontal <see cref="Sprite3D.Velocity"/> from
-/// keyboard input, fires a vertical jump impulse on a key press while
-/// recently grounded, and (optionally) slaves a <see cref="Camera3D"/>
-/// to the sprite's eye every frame. The vertical velocity channel is
-/// left to other behaviors such as <see cref="Gravity3D"/> and
-/// <see cref="BarrierBounce3D"/>.
+/// First-person walk controller for an entity. 
 /// </summary>
-/// <remarks>
-/// Pair with <c>RelativeMouseMode = true</c> on the source
-/// <see cref="Window"/> so <see cref="FrameInput.MouseDelta"/>
-/// reports unclamped per-frame motion in pixels.
-/// </remarks>
 public class WalkController3D : SpriteBehavior3D
 {
     private readonly Window _window;
     private TimeSpan _elapsed;
     private TimeSpan? _lastGroundedAt;
+
     // Wall normals recorded from OnHitBarrier during the most recent
     // collision pass. Consumed on the next Apply to clip requested
     // motion against each wall independently, so corners (two walls
@@ -91,11 +81,13 @@ public class WalkController3D : SpriteBehavior3D
     public Key SprintAltKey { get; set; } = Key.RShift;
 
 
-    private Sprite3D _target = null!;
+    private Transform3D _transform = null!;
+    private Velocity3D _velocity = null!;
 
     protected override void OnAttach(IEntity entity)
     {
-        _target = (Sprite3D)entity;
+        _transform = entity.GetOrAddTrait<Transform3D>();
+        _velocity = entity.GetOrAddTrait<Velocity3D>();
     }
 
     public override void Apply(in UpdateContext context)
@@ -160,7 +152,7 @@ public class WalkController3D : SpriteBehavior3D
             _wallCount = 0;
         }
 
-        var v = _target.Velocity;
+        var v = _velocity.Velocity;
         v.X = horiz.X;
         v.Z = horiz.Z;
 
@@ -172,7 +164,7 @@ public class WalkController3D : SpriteBehavior3D
             v.Y = JumpSpeed;
             _lastGroundedAt = null;   // consume
         }
-        _target.Velocity = v;
+        _velocity.Velocity = v;
 
         // Look vector + camera follow.
         var cosP = MathF.Cos(Pitch);
@@ -180,7 +172,7 @@ public class WalkController3D : SpriteBehavior3D
             -cosP * MathF.Sin(Yaw),
              MathF.Sin(Pitch),
             -cosP * MathF.Cos(Yaw));
-        Eye = _target.Position + new Vector3(0f, EyeOffsetY, 0f);
+        Eye = _transform.Position + new Vector3(0f, EyeOffsetY, 0f);
 
         if (Camera is { } camera)
         {

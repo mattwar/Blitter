@@ -53,6 +53,16 @@ public class Scene2D : Entity
         return true;
     }
 
+    /// <summary>
+    /// Reports whether <paramref name="child"/> is a layer this scene holds.
+    /// Scenes remove layers immediately, so this never returns
+    /// <see cref="Containment.Removing"/>.
+    /// </summary>
+    public override Containment GetContainment(IEntity child) =>
+        child is Layer2D layer && _layers.Contains(layer)
+            ? Containment.Contained
+            : Containment.NotContained;
+
     protected override void OnAttach(IEntity entity)
     {
         base.OnAttach(entity);
@@ -86,8 +96,7 @@ public class Scene2D : Entity
     {
         foreach (var behavior in Behaviors)
         {
-            if (behavior is Behavior2D b && b.Enabled)
-                b.Apply(in context);
+            behavior.Apply(in context);
         }
 
         foreach (var layer in Layers)

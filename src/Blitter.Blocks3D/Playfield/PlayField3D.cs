@@ -1,4 +1,5 @@
 namespace Blitter.Blocks3D;
+using Bits;
 
 /// <summary>
 /// The 3D "world" layer, containing a set of sprites and barriers
@@ -89,16 +90,15 @@ public class PlayField3D : Layer3D, ISpriteHost3D
     }
 
     /// <summary>
-    /// Removes a sprite from the playfield. Safe to call during
-    /// <see cref="Update"/>; the actual removal is deferred to end of
-    /// frame. The normal way to retire a sprite is to set
-    /// <see cref="Sprite3D.IsAlive"/> to <c>false</c>. This method is
-    /// for callers that need to evict a sprite without killing it.
+    /// Retires a sprite from the playfield. Safe to call during
+    /// <see cref="Update"/>: the sprite stops updating and colliding
+    /// immediately and the actual removal is deferred to end of frame.
     /// </summary>
     public void RemoveSprite(Sprite3D sprite)
     {
         if (sprite.Host != this)
             return;
+        sprite.IsAlive = false;
         if (_updating)
         {
             _pendingAddSprites.Remove(sprite);
@@ -108,6 +108,39 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         {
             Detach(sprite, retired: true);
         }
+    }
+
+    /// <summary>
+    /// Whether <paramref name="sprite"/> is a live member of this
+    /// playfield — still held and not retired during the current frame.
+    /// Returns <c>false</c> for sprites that were never added, have been
+    /// reaped, or were retired earlier this frame.
+    /// </summary>
+    public bool IsAlive(Sprite3D sprite) =>
+        GetContainment(sprite) == Containment.Contained;
+
+    /// <summary>
+    /// Reports whether <paramref name="child"/> is a sprite or barrier this
+    /// playfield contains, is removing this frame, or does not hold.
+    /// </summary>
+    public override Containment GetContainment(IEntity child)
+    {
+        if (child is Sprite3D sprite)
+        {
+            if (!ReferenceEquals(sprite.Parent, this))
+                return Containment.NotContained;
+            return sprite.IsAlive ? Containment.Contained : Containment.Removing;
+        }
+
+        if (child is Barrier3D barrier)
+        {
+            if (_pendingRemoveBarriers.Contains(barrier))
+                return Containment.Removing;
+            if (_barriers.Contains(barrier) || _pendingAddBarriers.Contains(barrier))
+                return Containment.Contained;
+        }
+
+        return Containment.NotContained;
     }
 
     /// <summary>Adds a barrier to the playfield.</summary>
@@ -156,11 +189,10 @@ public class PlayField3D : Layer3D, ISpriteHost3D
     }
 
     /// <summary>
-    /// Called once for each sprite that leaves this playfield, either
-    /// because its <see cref="Sprite3D.IsAlive"/> went to <c>false</c>
-    /// or because <see cref="RemoveSprite"/> evicted it. Not called when
-    /// a sprite is reparented into another playfield. Override to
-    /// return the sprite to a pool, recycle resources, etc.
+    /// Called once for each sprite that leaves this playfield via
+    /// <see cref="RemoveSprite"/>. Not called when a sprite is
+    /// reparented into another playfield. Override to return the sprite
+    /// to a pool, recycle resources, etc.
     /// </summary>
     protected virtual void OnSpriteRetired(Sprite3D sprite)
     {

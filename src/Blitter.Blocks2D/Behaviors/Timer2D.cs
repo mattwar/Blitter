@@ -6,7 +6,7 @@ using Bits;
 /// With <see cref="AutoRestart"/> enabled it fires repeatedly at <see cref="Duration"/> intervals — 
 /// useful for periodic AI checks, level countdowns, or rate-limited effects.
 /// </summary>
-public sealed class Timer2D : Behavior2D
+public sealed class Timer2D : Behavior
 {
     /// <summary>Countdown length used on start and (when auto-restarting) after each fire.</summary>
     public TimeSpan Duration { get; set; }

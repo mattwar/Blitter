@@ -484,13 +484,19 @@ public abstract class ChunkSource3D : IChunkSource3D
     }
 
     /// <summary>
-    /// Removes <paramref name="sprite"/> from the chunk that contains its current <see cref="Sprite3D.Position"/>.
+    /// Retires <paramref name="sprite"/> from the chunk that contains its
+    /// current <see cref="Sprite3D.Position"/>. The sprite stops colliding
+    /// immediately and is reaped from its chunk at end of frame.
     /// </summary>
     public virtual void RemoveSprite(Sprite3D sprite)
     {
+        sprite.IsAlive = false;
         var chunk = GetChunk(sprite.Position);
         chunk?.RemoveSprite(sprite);
     }
+
+    /// <inheritdoc/>
+    public virtual bool IsAlive(Sprite3D sprite) => sprite.IsAlive;
 
     /// <summary>
     /// Adds <paramref name="barrier"/> to the chunk that contains its current <see cref="Barrier3D.Position"/>.

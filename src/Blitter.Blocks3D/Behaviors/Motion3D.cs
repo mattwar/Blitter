@@ -4,13 +4,11 @@ namespace Blitter.Blocks3D;
 using Bits;
 
 /// <summary>
-/// Integrates a sprite's <see cref="Sprite3D.Velocity"/> into
-/// <see cref="Sprite3D.Position"/> and its
-/// <see cref="Sprite3D.AngularVelocity"/> into
-/// <see cref="Sprite3D.Orientation"/> each frame. The 3D analog of
-/// <c>Blitter.Blocks2D.Motion2D</c>.
+/// Applies an entity's <see cref="Velocity3D.Velocity"/> into <see cref="Transform3D.Position"/> 
+/// and its <see cref="Velocity3D.AngularVelocity"/> to <see cref="Transform3D.Orientation"/> each frame.
+/// The 3D analog of <c>Blitter.Blocks2D.Motion2D</c>.
 /// </summary>
-public class Motion3D : SpriteBehavior3D
+public class Motion3D : Behavior
 {
     /// <summary>
     /// Minimum time that must accumulate between successful integration
@@ -22,11 +20,13 @@ public class Motion3D : SpriteBehavior3D
     // MinUpdateInterval; carried forward to the next Update.
     private TimeSpan _pendingDelta;
 
-    private Sprite3D _target = null!;
+    private Transform3D _transform = null!;
+    private Velocity3D _velocity = null!;
 
     protected override void OnAttach(IEntity entity)
     {
-        _target = (Sprite3D)entity;
+        _transform = entity.GetOrAddTrait<Transform3D>();
+        _velocity = entity.GetOrAddTrait<Velocity3D>();
     }
 
     public override void Apply(in UpdateContext context)
@@ -44,7 +44,7 @@ public class Motion3D : SpriteBehavior3D
         _pendingDelta = TimeSpan.Zero;
         var dt = (float)timeDelta.TotalSeconds;
 
-        var av = _target.AngularVelocity;
+        var av = _velocity.AngularVelocity;
         var avLenSq = av.LengthSquared();
         if (avLenSq > 0f)
         {
@@ -55,12 +55,12 @@ public class Motion3D : SpriteBehavior3D
             var avLen = MathF.Sqrt(avLenSq);
             var axis = av / avLen;
             var delta = Quaternion.CreateFromAxisAngle(axis, avLen * dt);
-            _target.Orientation = Quaternion.Normalize(delta * _target.Orientation);
+            _transform.Orientation = Quaternion.Normalize(delta * _transform.Orientation);
         }
 
-        if (_target.Velocity != Vector3.Zero)
+        if (_velocity.Velocity != Vector3.Zero)
         {
-            _target.Position += _target.Velocity * dt;
+            _transform.Position += _velocity.Velocity * dt;
         }
     }
 }
