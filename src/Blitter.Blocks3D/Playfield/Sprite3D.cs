@@ -68,11 +68,6 @@ public class Sprite3D : Entity, IDrawable3D
     /// </summary>
     public bool Visible { get; set; } = true;
 
-    // Engine-owned liveness. Not part of the public sprite surface:
-    // query a host with ISpriteHost3D.IsAlive(sprite) (or
-    // PlayField3D.IsAlive(sprite)) and retire a sprite via RemoveSprite.
-    internal bool IsAlive { get; set; } = true;
-
     /// <summary>
     /// The host this sprite belongs to.
     /// </summary>
@@ -113,7 +108,6 @@ public class Sprite3D : Entity, IDrawable3D
         _transform = this.GetOrAddTrait<Transform3D>();
         _velocity = this.GetOrAddTrait<Velocity3D>();
         _spawnedAt = TimeSpan.Zero;
-        IsAlive = true;
         base.OnAttach(entity);
     }
 

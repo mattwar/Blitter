@@ -34,7 +34,6 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
         _transform = this.GetOrAddTrait<Transform2D>();
         _velocity = this.GetOrAddTrait<Velocity2D>();
         _spawnedAt = TimeSpan.Zero;
-        IsAlive = true;
         base.OnAttach(entity);
     }
 
@@ -90,11 +89,6 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
     /// Whether this sprite participates in the playfield's hit-detection pass.
     /// </summary>
     public bool CanBeHit { get; set; } = true;
-
-    // Engine-owned liveness. Not part of the public sprite surface:
-    // query a host with PlayField2D.IsAlive(sprite) and retire a sprite
-    // via RemoveSprite.
-    internal bool IsAlive { get; set; } = true;
 
     /// <summary>
     /// The <see cref="PlayField2D"/> this sprite belongs to.

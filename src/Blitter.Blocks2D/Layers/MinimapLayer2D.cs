@@ -1,6 +1,7 @@
 using System.Numerics;
 
 namespace Blitter.Blocks2D;
+using Bits;
 
 /// <summary>
 /// Shapes a <see cref="MinimapLayer2D"/> can draw for a sprite marker.
@@ -108,7 +109,7 @@ public sealed class MinimapLayer2D : Layer2D
 
         foreach (var sprite in Source.Sprites)
         {
-            if (!sprite.IsAlive) continue;
+            if (Source.GetContainment(sprite) == Containment.Removing) continue;
             if (MarkerSelector(sprite) is not { } m) continue;
             if (m.Radius <= 0f || m.Color.A == 0) continue;
 

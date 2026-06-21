@@ -1,4 +1,5 @@
 namespace Blitter.Blocks3D;
+using Bits;
 
 /// <summary>
 /// What a <see cref="Sprite3D"/> sees as its container: a small surface
@@ -18,8 +19,8 @@ public interface ISpriteHost3D
     /// <summary>Retires a sprite from this host. Safe to call while the host is updating; the sprite stops colliding immediately and is reaped at end of frame.</summary>
     void RemoveSprite(Sprite3D sprite);
 
-    /// <summary>Whether <paramref name="sprite"/> is a live member of this host — still held and not retired during the current frame.</summary>
-    bool IsAlive(Sprite3D sprite);
+    /// <summary>Reports whether <paramref name="child"/> is contained by this host, being removed this frame, or not held. A sprite is live when this returns <see cref="Containment.Contained"/>.</summary>
+    Containment GetContainment(IEntity child);
 
     /// <summary>Adds a barrier to this host.</summary>
     void AddBarrier(Barrier3D barrier);

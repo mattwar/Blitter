@@ -40,6 +40,11 @@ public class ChunkedPlayField3D : Layer3D
         MaxChunk = maxChunk;
     }
 
+    // Liveness is host-owned: a sprite is live unless its chunk source
+    // reports it pending removal this frame. Sprites carry no flag.
+    private bool IsLive(Sprite3D sprite) =>
+        ChunkSource.GetContainment(sprite) != Containment.Removing;
+
     public override void Update(in UpdateContext context)
     {
         ChunkSource.Update(context);
@@ -81,7 +86,7 @@ public class ChunkedPlayField3D : Layer3D
             for (int i = 0; i < sprites.Count; i++)
             {
                 var s = sprites[i];
-                if (!s.IsAlive)
+                if (!IsLive(s))
                     continue;
                 _frameSpriteIndex[s] = _frameSprites.Count;
                 _frameSprites.Add((s, chunk));
@@ -93,7 +98,7 @@ public class ChunkedPlayField3D : Layer3D
         for (int i = 0; i < _frameSprites.Count; i++)
         {
             var s = _frameSprites[i].Sprite;
-            if (s.IsAlive)
+            if (IsLive(s))
                 s.Update(context);
         }
 
@@ -104,7 +109,7 @@ public class ChunkedPlayField3D : Layer3D
         for (int i = 0; i < _frameSprites.Count; i++)
         {
             var (s, chunk) = _frameSprites[i];
-            if (!s.IsAlive)
+            if (!IsLive(s))
                 continue;
             var newCoord = ChunkSource.GetChunkCoords(s.Position);
             if (newCoord.Equals(chunk.Coord))
@@ -123,7 +128,7 @@ public class ChunkedPlayField3D : Layer3D
         for (int i = 0; i < _frameSprites.Count; i++)
         {
             var (s, chunk) = _frameSprites[i];
-            if (!s.IsAlive)
+            if (!IsLive(s))
                 chunk.RemoveSprite(s);
         }
 
@@ -142,7 +147,7 @@ public class ChunkedPlayField3D : Layer3D
         for (int i = 0; i < _frameSprites.Count; i++)
         {
             var sprite = _frameSprites[i].Sprite;
-            if (!sprite.IsAlive || !sprite.CanBeHit)
+            if (!IsLive(sprite) || !sprite.CanBeHit)
                 continue;
 
             var shape = sprite.HitShape;
@@ -162,9 +167,9 @@ public class ChunkedPlayField3D : Layer3D
             var maxY = Math.Min(qMax.Y, MaxChunk.Y);
             var maxZ = Math.Min(qMax.Z, MaxChunk.Z);
 
-            for (int qy = minY; qy <= maxY && sprite.IsAlive; qy++)
-            for (int qz = minZ; qz <= maxZ && sprite.IsAlive; qz++)
-            for (int qx = minX; qx <= maxX && sprite.IsAlive; qx++)
+            for (int qy = minY; qy <= maxY && IsLive(sprite); qy++)
+            for (int qz = minZ; qz <= maxZ && IsLive(sprite); qz++)
+            for (int qx = minX; qx <= maxX && IsLive(sprite); qx++)
             {
                 var qcoord = new ChunkCoord(qx, qy, qz);
                 var qchunk = ChunkSource.GetChunk(in qcoord);
@@ -173,10 +178,10 @@ public class ChunkedPlayField3D : Layer3D
 
                 // sprite-vs-sprite: each pair tested once via index order.
                 var qSprites = qchunk.Sprites;
-                for (int k = 0; k < qSprites.Count && sprite.IsAlive; k++)
+                for (int k = 0; k < qSprites.Count && IsLive(sprite); k++)
                 {
                     var other = qSprites[k];
-                    if (other == sprite || !other.IsAlive || !other.CanBeHit)
+                    if (other == sprite || !IsLive(other) || !other.CanBeHit)
                         continue;
                     if (!_frameSpriteIndex.TryGetValue(other, out var j) || j <= i)
                         continue;
@@ -186,19 +191,19 @@ public class ChunkedPlayField3D : Layer3D
                     if (!shape.TestHit(otherShape))
                         continue;
                     sprite.OnHitSprite(other, context);
-                    if (sprite.IsAlive && other.IsAlive)
+                    if (IsLive(sprite) && IsLive(other))
                         other.OnHitSprite(sprite, context);
                 }
 
                 // sprite-vs-barrier: no dedup; barriers don't pair with each other.
                 var qBarriers = qchunk.Barriers;
-                for (int k = 0; k < qBarriers.Count && sprite.IsAlive; k++)
+                for (int k = 0; k < qBarriers.Count && IsLive(sprite); k++)
                 {
                     var barrier = qBarriers[k];
                     if (!shape.TestHit(barrier.HitShape))
                         continue;
                     sprite.OnHitBarrier(barrier, context);
-                    if (sprite.IsAlive)
+                    if (IsLive(sprite))
                         barrier.OnHitSprite(sprite, context);
                 }
             }
@@ -307,6 +312,10 @@ public abstract class ChunkSource3D : IChunkSource3D
     private readonly Dictionary<ChunkCoord, IChunk3D> _chunks = new();
     private readonly List<ChunkCoord> _trimScratch = new();
     private readonly Stack<Chunk3D> _pool = new();
+
+    // Host-owned liveness: sprites retired via RemoveSprite this frame.
+    // A sprite is live unless it is in this set; sprites carry no flag.
+    private readonly HashSet<Sprite3D> _removing = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>Number of chunks currently loaded (in the active window).</summary>
     public int ActiveChunkCount => _chunks.Count;
@@ -467,6 +476,10 @@ public abstract class ChunkSource3D : IChunkSource3D
     public virtual void Update(in UpdateContext context)
     {
         this.Elapsed += context.ElapsedSinceLastUpdate;
+
+        // Open a new frame: last frame's retired sprites have already been
+        // reaped from their chunks, so clear the pending-removal set.
+        _removing.Clear();
     }
 
     #region ISpriteHost3D
@@ -490,13 +503,16 @@ public abstract class ChunkSource3D : IChunkSource3D
     /// </summary>
     public virtual void RemoveSprite(Sprite3D sprite)
     {
-        sprite.IsAlive = false;
+        _removing.Add(sprite);
         var chunk = GetChunk(sprite.Position);
         chunk?.RemoveSprite(sprite);
     }
 
     /// <inheritdoc/>
-    public virtual bool IsAlive(Sprite3D sprite) => sprite.IsAlive;
+    public virtual Containment GetContainment(IEntity child) =>
+        child is Sprite3D sprite
+            ? (_removing.Contains(sprite) ? Containment.Removing : Containment.Contained)
+            : Containment.NotContained;
 
     /// <summary>
     /// Adds <paramref name="barrier"/> to the chunk that contains its current <see cref="Barrier3D.Position"/>.
@@ -742,7 +758,7 @@ public class Chunk3D : IChunk3D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var s = _sprites[i];
-            if (s.IsAlive)
+            if (Source.GetContainment(s) != Containment.Removing)
                 s.Draw(renderer);
         }
     }

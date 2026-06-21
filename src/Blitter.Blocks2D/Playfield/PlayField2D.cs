@@ -22,7 +22,7 @@ public class PlayField2D : Layer2D
     // update push into these pending lists and the changes are
     // applied at the end of the frame.
     private readonly List<Sprite2D> _pendingAddSprites = new();
-    private readonly List<Sprite2D> _pendingRemoveSprites = new();
+    private readonly HashSet<Sprite2D> _pendingRemoveSprites = new(ReferenceEqualityComparer.Instance);
     private readonly List<Barrier2D> _pendingAddBarriers = new();
     private readonly List<Barrier2D> _pendingRemoveBarriers = new();
     private bool _updating;
@@ -237,7 +237,6 @@ public class PlayField2D : Layer2D
     {
         if (sprite.Parent != this)
             return;
-        sprite.IsAlive = false;
         if (_updating)
         {
             _pendingAddSprites.Remove(sprite);
@@ -249,14 +248,9 @@ public class PlayField2D : Layer2D
         }
     }
 
-    /// <summary>
-    /// Whether <paramref name="sprite"/> is a live member of this
-    /// playfield — still held and not retired during the current frame.
-    /// Returns <c>false</c> for sprites that were never added, have been
-    /// reaped, or were retired earlier this frame.
-    /// </summary>
-    public bool IsAlive(Sprite2D sprite) =>
-        GetContainment(sprite) == Containment.Contained;
+    // A sprite is live while it is a member and not pending removal this
+    // frame. Membership/removal is host-owned state; sprites carry no flag.
+    private bool IsLive(Sprite2D sprite) => !_pendingRemoveSprites.Contains(sprite);
 
     /// <summary>
     /// Reports whether <paramref name="child"/> is a sprite or barrier this
@@ -268,7 +262,7 @@ public class PlayField2D : Layer2D
         {
             if (!ReferenceEquals(sprite.Parent, this))
                 return Containment.NotContained;
-            return sprite.IsAlive ? Containment.Contained : Containment.Removing;
+            return _pendingRemoveSprites.Contains(sprite) ? Containment.Removing : Containment.Contained;
         }
 
         if (child is Barrier2D barrier)
@@ -423,7 +417,7 @@ public class PlayField2D : Layer2D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var s = _sprites[i];
-            if (!s.IsAlive || !s.CanBeHit)
+            if (!IsLive(s) || !s.CanBeHit)
                 continue;
             var r = s.HitCircle.Radius;
             if (r <= 0f)
@@ -455,7 +449,7 @@ public class PlayField2D : Layer2D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var sprite = _sprites[i];
-            if (!sprite.IsAlive)
+            if (!IsLive(sprite))
                 continue;
             sprite.Update(spriteContext);
         }
@@ -464,7 +458,7 @@ public class PlayField2D : Layer2D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var a = _sprites[i];
-            if (!a.IsAlive || !a.CanBeHit)
+            if (!IsLive(a) || !a.CanBeHit)
                 continue;
             var aShape = a.HitShape;
             if (aShape.BoundingCircle.Radius <= 0f)
@@ -472,11 +466,11 @@ public class PlayField2D : Layer2D
 
             for (int j = i + 1; j < _sprites.Count; j++)
             {
-                if (!a.IsAlive)
+                if (!IsLive(a))
                     break;
 
                 var b = _sprites[j];
-                if (!b.IsAlive || !b.CanBeHit)
+                if (!IsLive(b) || !b.CanBeHit)
                     continue;
                 var bShape = b.HitShape;
                 if (bShape.BoundingCircle.Radius <= 0f)
@@ -485,7 +479,7 @@ public class PlayField2D : Layer2D
                     continue;
 
                 a.OnHitSprite(b, spriteContext);
-                if (a.IsAlive && b.IsAlive)
+                if (IsLive(a) && IsLive(b))
                     b.OnHitSprite(a, spriteContext);
             }
         }
@@ -496,7 +490,7 @@ public class PlayField2D : Layer2D
             for (int s = 0; s < _sprites.Count; s++)
             {
                 var sprite = _sprites[s];
-                if (!sprite.IsAlive || !sprite.CanBeHit)
+                if (!IsLive(sprite) || !sprite.CanBeHit)
                     continue;
                 var spriteShape = sprite.HitShape;
                 if (spriteShape.BoundingCircle.IsEmpty)
@@ -504,7 +498,7 @@ public class PlayField2D : Layer2D
 
                 for (int k = 0; k < _barriers.Count; k++)
                 {
-                    if (!sprite.IsAlive)
+                    if (!IsLive(sprite))
                         break;
                     var barrier = _barriers[k];
                     // Re-read each time: the previous barrier handler
@@ -517,7 +511,7 @@ public class PlayField2D : Layer2D
                     // swapping its Material) is visible to the
                     // sprite's bounce resolution on the same frame.
                     barrier.OnHitSprite(sprite, spriteContext);
-                    if (sprite.IsAlive)
+                    if (IsLive(sprite))
                         sprite.OnHitBarrier(barrier, spriteContext);
                 }
             }
@@ -539,15 +533,6 @@ public class PlayField2D : Layer2D
                 Detach(s, retired: true);
             }
             _pendingRemoveSprites.Clear();
-        }
-
-        // Reap any sprite that died during this frame.
-        for (int i = _sprites.Count - 1; i >= 0; i--)
-        {
-            var s = _sprites[i];
-            if (s.IsAlive) continue;
-            _sprites.RemoveAt(i);
-            Detach(s, retired: true);
         }
 
         if (_pendingAddSprites.Count > 0)
@@ -587,7 +572,7 @@ public class PlayField2D : Layer2D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var sprite = _sprites[i];
-            if (sprite.IsAlive)
+            if (IsLive(sprite))
                 sprite.Draw(renderer);
         }
 

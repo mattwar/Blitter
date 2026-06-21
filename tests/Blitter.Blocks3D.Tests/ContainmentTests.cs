@@ -20,7 +20,6 @@ public class ContainmentTests
         field.AddSprite(sprite);
 
         Assert.Equal(Containment.Contained, field.GetContainment(sprite));
-        Assert.True(field.IsAlive(sprite));
     }
 
     [Fact]
@@ -30,7 +29,6 @@ public class ContainmentTests
         var sprite = new Sprite3D();
 
         Assert.Equal(Containment.NotContained, field.GetContainment(sprite));
-        Assert.False(field.IsAlive(sprite));
     }
 
     [Fact]

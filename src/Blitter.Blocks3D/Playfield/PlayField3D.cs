@@ -14,7 +14,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
     // directly. Adds/removes during update push into these pending
     // lists and the changes are applied at the end of the frame.
     private readonly List<Sprite3D> _pendingAddSprites = new();
-    private readonly List<Sprite3D> _pendingRemoveSprites = new();
+    private readonly HashSet<Sprite3D> _pendingRemoveSprites = new(ReferenceEqualityComparer.Instance);
     private readonly List<Barrier3D> _pendingAddBarriers = new();
     private readonly List<Barrier3D> _pendingRemoveBarriers = new();
     private bool _updating;
@@ -98,7 +98,6 @@ public class PlayField3D : Layer3D, ISpriteHost3D
     {
         if (sprite.Host != this)
             return;
-        sprite.IsAlive = false;
         if (_updating)
         {
             _pendingAddSprites.Remove(sprite);
@@ -110,14 +109,9 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         }
     }
 
-    /// <summary>
-    /// Whether <paramref name="sprite"/> is a live member of this
-    /// playfield — still held and not retired during the current frame.
-    /// Returns <c>false</c> for sprites that were never added, have been
-    /// reaped, or were retired earlier this frame.
-    /// </summary>
-    public bool IsAlive(Sprite3D sprite) =>
-        GetContainment(sprite) == Containment.Contained;
+    // A sprite is live while it is a member and not pending removal this
+    // frame. Membership/removal is host-owned state; sprites carry no flag.
+    private bool IsLive(Sprite3D sprite) => !_pendingRemoveSprites.Contains(sprite);
 
     /// <summary>
     /// Reports whether <paramref name="child"/> is a sprite or barrier this
@@ -129,7 +123,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         {
             if (!ReferenceEquals(sprite.Parent, this))
                 return Containment.NotContained;
-            return sprite.IsAlive ? Containment.Contained : Containment.Removing;
+            return _pendingRemoveSprites.Contains(sprite) ? Containment.Removing : Containment.Contained;
         }
 
         if (child is Barrier3D barrier)
@@ -226,7 +220,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var sprite = _sprites[i];
-            if (!sprite.IsAlive)
+            if (!IsLive(sprite))
                 continue;
             sprite.Update(spriteContext);
         }
@@ -235,7 +229,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var a = _sprites[i];
-            if (!a.IsAlive || !a.CanBeHit)
+            if (!IsLive(a) || !a.CanBeHit)
                 continue;
             var aShape = a.HitShape;
             if (aShape.BoundingSphere.Radius <= 0f)
@@ -243,11 +237,11 @@ public class PlayField3D : Layer3D, ISpriteHost3D
 
             for (int j = i + 1; j < _sprites.Count; j++)
             {
-                if (!a.IsAlive)
+                if (!IsLive(a))
                     break;
 
                 var b = _sprites[j];
-                if (!b.IsAlive || !b.CanBeHit)
+                if (!IsLive(b) || !b.CanBeHit)
                     continue;
                 var bShape = b.HitShape;
                 if (bShape.BoundingSphere.Radius <= 0f)
@@ -256,7 +250,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
                     continue;
 
                 a.OnHitSprite(b, spriteContext);
-                if (a.IsAlive && b.IsAlive)
+                if (IsLive(a) && IsLive(b))
                     b.OnHitSprite(a, spriteContext);
             }
         }
@@ -265,7 +259,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var sprite = _sprites[i];
-            if (!sprite.IsAlive || !sprite.CanBeHit)
+            if (!IsLive(sprite) || !sprite.CanBeHit)
                 continue;
             var spriteShape = sprite.HitShape;
             if (spriteShape.BoundingSphere.IsEmpty)
@@ -273,22 +267,15 @@ public class PlayField3D : Layer3D, ISpriteHost3D
 
             for (int j = 0; j < _barriers.Count; j++)
             {
-                if (!sprite.IsAlive)
+                if (!IsLive(sprite))
                     break;
                 var barrier = _barriers[j];
                 if (!spriteShape.TestHit(barrier.HitShape))
                     continue;
                 sprite.OnHitBarrier(barrier, spriteContext);
-                if (sprite.IsAlive)
+                if (IsLive(sprite))
                     barrier.OnHitSprite(sprite, spriteContext);
             }
-        }
-
-        // Reap any sprite that died during this step.
-        for (int i = 0; i < _sprites.Count; i++)
-        {
-            if (!_sprites[i].IsAlive)
-                _pendingRemoveSprites.Add(_sprites[i]);
         }
     }
 
@@ -330,7 +317,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var s = _sprites[i];
-            if (s.IsAlive)
+            if (IsLive(s))
                 s.Draw(renderer);
         }
     }

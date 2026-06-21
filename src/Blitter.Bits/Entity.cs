@@ -136,19 +136,6 @@ public class Entity : IEntity
     }
 
     /// <summary>
-    /// Returns the first existing behavior of type <typeparamref name="T"/>, or
-    /// creates, attaches, and returns a new one if absent.
-    /// </summary>
-    public T GetOrAddBehavior<T>() where T : Behavior, new()
-    {
-        if (this.TryGetBehavior<T>(out var existing))
-            return existing;
-        var newBehavior = new T();
-        AddBehavior(newBehavior);
-        return newBehavior;
-    }
-
-    /// <summary>
     /// Searches this entity and its ancestors for a trait by type/>.
     /// </summary>
     public bool TryGetAncestor<TEntity>(out TEntity? ancestor) where TEntity : class, IEntity
@@ -168,12 +155,16 @@ public class Entity : IEntity
     }
 
     /// <summary>
-    /// Reports the membership state of <paramref name="child"/> within this
-    /// entity. A plain entity owns no children, so the default is
-    /// <see cref="Containment.NotContained"/>; containers override this to
-    /// answer from the lists they hold.
+    /// Reports the membership state of <paramref name="child"/> within this entity. 
     /// </summary>
-    public virtual Containment GetContainment(IEntity child) => Containment.NotContained;
+    public virtual Containment GetContainment(IEntity child) => 
+        Containment.NotContained;
+
+    /// <summary>
+    /// Determines whether this entity contains the specified <paramref name="child"/>.
+    /// </summary>
+    public bool Contains(IEntity child) => 
+        GetContainment(child) == Containment.Contained;
 
     /// <summary>
     /// Advances the entity one tick by applying each attached behavior in order.
@@ -187,3 +178,49 @@ public class Entity : IEntity
         }
     }
 }
+
+
+#if false
+public class EntityContainer : Entity
+{
+    private readonly List<IEntity> _children = new();
+
+    /// <summary>
+    /// The entities contained by this entity.
+    /// </summary>
+    public IReadOnlyList<IEntity> Children
+    {
+        get => _children;
+
+        init
+        {
+            _children.AddRange(value);
+            foreach (var entity in value)
+            {
+                if (entity is Entity e)
+                {
+                    e.Parent = this;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds a child to this entity.
+    /// </summary>
+    public void AddChild(IEntity child)
+    {
+        _children.Add(child);
+        if (child is Entity e)
+        {
+            e.Parent = this;
+        }
+    }
+
+    /// <inheritdoc/>
+    public override Containment GetContainment(IEntity child) =>
+        _children.Contains(child)
+            ? Containment.Contained
+            : Containment.NotContained;
+}
+#endif

@@ -37,20 +37,33 @@ public interface IEntity
     T GetOrAddTrait<T>() where T : Trait, new();
 
     /// <summary>
-    /// Gets the first existing behavior of type <typeparamref name="T"/>, 
-    /// or creates and adds one if absent.
+    /// Reports the membership state of <paramref name="child"/> within this entity
     /// </summary>
-    T GetOrAddBehavior<T>() where T : Behavior, new();
+    Containment GetContainment(IEntity child) =>
+        Containment.NotContained;
 
     /// <summary>
-    /// Reports the membership state of <paramref name="child"/> within this
-    /// entity: whether it is contained, not contained, or being removed.
-    /// The container owns this answer; a child never tracks its own status.
+    /// Reports whether <paramref name="child"/> is contained by this entity.
     /// </summary>
-    Containment GetContainment(IEntity child);
+    bool Contains(IEntity child) =>
+        GetContainment(child) == Containment.Contained;
 
     /// <summary>
     /// Advance this entity one tick.
     /// </summary>
     void Update(in UpdateContext context);
+}
+
+
+public interface IContainerEntity : IEntity
+{
+    /// <summary>
+    /// The entities directly contained by this container.
+    /// </summary>
+    IReadOnlyList<IEntity> Children { get; }
+
+    /// <summary>
+    /// Adds a child entity to this container.
+    /// </summary>
+    void AddChild(IEntity child);
 }
