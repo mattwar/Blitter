@@ -429,7 +429,7 @@ sealed class BrickBarrier3D : Barrier3D
 // english from off-center paddle hits can compound into a near-flat
 // X/Y trajectory that ping-pongs between the side walls indefinitely
 // without ever returning to the bricks or to the paddle.
-sealed class ForwardKickFromPaddle3D : SpriteBehavior3D
+sealed class ForwardKickFromPaddle3D : Behavior, IHitHandler3D
 {
     public Paddle3D? Paddle { get; set; }
 
@@ -441,7 +441,7 @@ sealed class ForwardKickFromPaddle3D : SpriteBehavior3D
         // do nothing.. work happens in OnHitBarrier
     }
 
-    public override void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
+    public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
     {
         if (Paddle is null || !ReferenceEquals(barrier, Paddle))
             return;

@@ -6,7 +6,7 @@ using Bits;
 /// <summary>
 /// First-person walk controller for an entity. 
 /// </summary>
-public class WalkController3D : SpriteBehavior3D
+public class WalkController3D : Behavior, IHitHandler3D
 {
     private readonly Window _window;
     private TimeSpan _elapsed;
@@ -182,7 +182,7 @@ public class WalkController3D : SpriteBehavior3D
         }
     }
 
-    public override void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
+    public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
     {
         if (!self.HitShape.TryGetContact(barrier.HitShape, out var contact))
             return;

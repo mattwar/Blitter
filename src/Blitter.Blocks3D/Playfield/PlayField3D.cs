@@ -249,9 +249,9 @@ public class PlayField3D : Layer3D, ISpriteHost3D
                 if (!aShape.TestHit(bShape))
                     continue;
 
-                a.OnHitSprite(b, spriteContext);
+                HitDispatch3D.SpriteHit(a, b, in spriteContext);
                 if (IsLive(a) && IsLive(b))
-                    b.OnHitSprite(a, spriteContext);
+                    HitDispatch3D.SpriteHit(b, a, in spriteContext);
             }
         }
 
@@ -272,7 +272,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
                 var barrier = _barriers[j];
                 if (!spriteShape.TestHit(barrier.HitShape))
                     continue;
-                sprite.OnHitBarrier(barrier, spriteContext);
+                HitDispatch3D.BarrierHit(sprite, barrier, in spriteContext);
                 if (IsLive(sprite))
                     barrier.OnHitSprite(sprite, spriteContext);
             }

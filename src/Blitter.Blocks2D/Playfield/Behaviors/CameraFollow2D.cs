@@ -12,7 +12,7 @@ using Blitter.Bits;
 /// target back to the dead-zone edge. Optionally clamped so the
 /// viewport never extends outside <see cref="WorldBounds"/>.
 /// </summary>
-public class CameraFollow2D : SpriteBehavior2D
+public class CameraFollow2D : Behavior
 {
     /// <summary>
     /// The camera being driven. If <c>null</c>, the behavior does

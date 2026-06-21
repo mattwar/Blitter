@@ -190,9 +190,9 @@ public class ChunkedPlayField3D : Layer3D
                         continue;
                     if (!shape.TestHit(otherShape))
                         continue;
-                    sprite.OnHitSprite(other, context);
+                    HitDispatch3D.SpriteHit(sprite, other, in context);
                     if (IsLive(sprite) && IsLive(other))
-                        other.OnHitSprite(sprite, context);
+                        HitDispatch3D.SpriteHit(other, sprite, in context);
                 }
 
                 // sprite-vs-barrier: no dedup; barriers don't pair with each other.
@@ -202,7 +202,7 @@ public class ChunkedPlayField3D : Layer3D
                     var barrier = qBarriers[k];
                     if (!shape.TestHit(barrier.HitShape))
                         continue;
-                    sprite.OnHitBarrier(barrier, context);
+                    HitDispatch3D.BarrierHit(sprite, barrier, in context);
                     if (IsLive(sprite))
                         barrier.OnHitSprite(sprite, context);
                 }

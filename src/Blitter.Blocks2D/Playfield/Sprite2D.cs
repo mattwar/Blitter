@@ -135,39 +135,6 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
         }
     }
 
-    /// <summary>
-    /// Called by the owning <see cref="PlayField2D"/> when this
-    /// sprite's <see cref="HitCircle"/> intersects another sprite's.
-    /// Forwards to each behavior.
-    /// </summary>
-    public virtual void OnHitSprite(Sprite2D other, in UpdateContext context)
-    {
-        for (int i = 0; i < this.Behaviors.Count; i++)
-        {
-            var behavior = this.Behaviors[i];
-            if (behavior is SpriteBehavior2D spriteBehavior)
-            {
-                 spriteBehavior.OnHitSprite(this, other, in context);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Called by the owning <see cref="PlayField2D"/> when this
-    /// sprite's <see cref="HitCircle"/> overlaps a
-    /// <see cref="Barrier2D"/>. Forwards to each behavior.
-    /// </summary>
-    public virtual void OnHitBarrier(Barrier2D barrier, in UpdateContext context)
-    {
-        foreach (var behavior in this.Behaviors)
-        {
-            if (behavior is SpriteBehavior2D spriteBehavior)
-            {
-                spriteBehavior.OnHitBarrier(this, barrier, in context);
-            }
-        }
-    }
-
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer2D renderer)
     {

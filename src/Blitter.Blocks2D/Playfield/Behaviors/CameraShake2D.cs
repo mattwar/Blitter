@@ -1,6 +1,7 @@
 namespace Blitter.Blocks2D;
 
 using System.Numerics;
+using Bits;
 
 /// <summary>
 /// Shakes a <see cref="Camera2D"/>'s position by an offset driven by a trauma value that decays each tick. 
@@ -8,7 +9,7 @@ using System.Numerics;
 /// Attach to whichever sprite already drives the camera (typically the player) and place <em>after</em>
 /// <see cref="CameraFollow2D"/> so the shake offset is added on top of the followed position.
 /// </summary>
-public sealed class CameraShake2D : SpriteBehavior2D
+public sealed class CameraShake2D : Behavior
 {
     /// <summary>Camera being jittered. Required.</summary>
     public required Camera2D Camera { get; init; }

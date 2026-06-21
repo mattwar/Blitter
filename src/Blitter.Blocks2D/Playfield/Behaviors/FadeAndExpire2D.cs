@@ -1,4 +1,5 @@
 namespace Blitter.Blocks2D;
+using Bits;
 
 /// <summary>
 /// Fades the host sprite's <see cref="Sprite2D.Tint"/> alpha to zero
@@ -6,7 +7,7 @@ namespace Blitter.Blocks2D;
 /// <see cref="PlayField2D.RemoveSprite(Sprite2D)"/> so the playfield
 /// reaps it. Useful for transient effects like score popups, debris, and impact flashes.
 /// </summary>
-public sealed class FadeAndExpire2D : SpriteBehavior2D
+public sealed class FadeAndExpire2D : Behavior
 {
     /// <summary>Total lifetime over which the alpha ramps to zero.</summary>
     public TimeSpan Duration { get; set; } = TimeSpan.FromSeconds(1);

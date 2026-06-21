@@ -7,7 +7,7 @@ namespace Blitter.Blocks2D;
 /// when its center crosses an edge — 
 /// the classic Asteroids-style toroidal world.
 /// </summary>
-public class WrapInBounds2D : SpriteBehavior2D
+public class WrapInBounds2D : Behavior
 {
     /// <summary>Invoked after the sprite has wrapped this tick.</summary>
     public Action<Sprite2D>? OnWrap { get; set; }

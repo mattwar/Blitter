@@ -6,9 +6,8 @@ using Bits;
 /// <summary>
 /// The 2D "world" layer: owns a set of <see cref="Sprite2D"/>s and
 /// <see cref="Barrier2D"/>s, drives their per-tick updates, and
-/// runs the collision pass that dispatches
-/// <see cref="Sprite2D.OnHitSprite"/> and
-/// <see cref="Sprite2D.OnHitBarrier"/>.
+/// runs the collision pass that dispatches hits to each sprite's
+/// <see cref="IHitHandler2D"/> behaviors.
 /// </summary>
 public class PlayField2D : Layer2D
 {
@@ -478,9 +477,9 @@ public class PlayField2D : Layer2D
                 if (!aShape.TestHit(bShape))
                     continue;
 
-                a.OnHitSprite(b, spriteContext);
+                HitDispatch2D.SpriteHit(a, b, in spriteContext);
                 if (IsLive(a) && IsLive(b))
-                    b.OnHitSprite(a, spriteContext);
+                    HitDispatch2D.SpriteHit(b, a, in spriteContext);
             }
         }
 
@@ -512,7 +511,7 @@ public class PlayField2D : Layer2D
                     // sprite's bounce resolution on the same frame.
                     barrier.OnHitSprite(sprite, spriteContext);
                     if (IsLive(sprite))
-                        sprite.OnHitBarrier(barrier, spriteContext);
+                        HitDispatch2D.BarrierHit(sprite, barrier, in spriteContext);
                 }
             }
         }

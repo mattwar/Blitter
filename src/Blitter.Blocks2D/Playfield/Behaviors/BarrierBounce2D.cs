@@ -13,7 +13,7 @@ namespace Blitter.Blocks2D;
 /// <see cref="Barrier2D"/> whose <see cref="Barrier2D.HitShape"/>
 /// reports a contact participates.
 /// </summary>
-public sealed class BarrierBounce2D : SpriteBehavior2D
+public sealed class BarrierBounce2D : Behavior, IHitHandler2D
 {
     /// <summary>Ball-side elastic coefficient. Multiplied with the barrier's <see cref="PhysicsMaterial.Restitution"/>. 1 = perfectly elastic, 0 = sticks.</summary>
     public float Restitution { get; set; } = 1f;
@@ -29,7 +29,7 @@ public sealed class BarrierBounce2D : SpriteBehavior2D
         // No per-tick logic; bounce happens in OnHitBarrier.
     }
     
-    public override void OnHitBarrier(Sprite2D self, Barrier2D barrier, in UpdateContext context)
+    public void OnHitBarrier(Sprite2D self, Barrier2D barrier, in UpdateContext context)
     {
         // Normal convention: TryGetContact returns normal from b → a;
         // here a = self.HitShape, b = barrier.HitShape, so `contact.Normal`

@@ -145,7 +145,7 @@ public class Spaceman : Sprite2D
 /// The spaceman movement controller.
 /// This handles all the spaceman's motion and gravity.
 /// </summary>
-public class SpacemanController : SpriteBehavior2D
+public class SpacemanController : Behavior
 {
     private readonly FrameInput input;
 

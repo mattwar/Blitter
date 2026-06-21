@@ -1,6 +1,7 @@
 using System.Numerics;
 
 namespace Blitter.Blocks2D;
+using Bits;
 
 /// <summary>
 /// On contact with a <see cref="LineBarrier2D"/>, snaps the sprite out
@@ -9,7 +10,7 @@ namespace Blitter.Blocks2D;
 /// (sliding along the barrier) is preserved, so this works for floors,
 /// walls, and ceilings simultaneously.
 /// </summary>
-public sealed class BarrierStop2D : SpriteBehavior2D
+public sealed class BarrierStop2D : Behavior, IHitHandler2D
 {
     /// <summary>
     /// True while the sprite is resting on a floor (a barrier whose
@@ -30,7 +31,7 @@ public sealed class BarrierStop2D : SpriteBehavior2D
         _floorContactSeen = false;
     }
 
-    public override void OnHitBarrier(Sprite2D self, Barrier2D barrier, in UpdateContext context)
+    public void OnHitBarrier(Sprite2D self, Barrier2D barrier, in UpdateContext context)
     {
         if (barrier is not LineBarrier2D line)
             return;

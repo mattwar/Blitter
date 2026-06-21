@@ -10,7 +10,7 @@ using Bits;
 /// and accelerates <see cref="Sprite2D.Speed"/> toward <see cref="MaxSpeed"/>. 
 /// Composes with <see cref="Motion2D"/>, which actually integrates the updated heading + speed.
 /// </summary>
-public class SeekTarget2D : SpriteBehavior2D
+public class SeekTarget2D : Behavior
 {
     /// <summary>
     /// Returns the current world-space target, or <c>null</c> to stop

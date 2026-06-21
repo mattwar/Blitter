@@ -578,7 +578,7 @@ sealed class Rocket : Sprite2D
     }
 }
 
-sealed class AsteroidSmasher : SpriteBehavior2D
+sealed class AsteroidSmasher : Behavior, IHitHandler2D
 {
     private readonly ScoreLayer2D _scoreboard;
 
@@ -604,7 +604,7 @@ sealed class AsteroidSmasher : SpriteBehavior2D
 
     public override void Apply(in UpdateContext context) { }
 
-    public override void OnHitSprite(Sprite2D self, Sprite2D other, in UpdateContext context)
+    public void OnHitSprite(Sprite2D self, Sprite2D other, in UpdateContext context)
     {
         // Grace period: ignore freshly-spawned shards so they
         // can spread out before being hit again. Without this
@@ -858,7 +858,7 @@ sealed class Asteroid : Sprite2D
     }
 }
 
-sealed class RocketController : SpriteBehavior2D
+sealed class RocketController : Behavior
 {
     private readonly FrameInput _input;
 

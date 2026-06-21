@@ -5,7 +5,7 @@ using Blitter.Bits;
 /// Reflects a sprite's velocity when its center crosses the edge of the
 /// update context bounds, so the sprite stays inside the playfield.
 /// </summary>
-public class BounceInBounds2D : SpriteBehavior2D
+public class BounceInBounds2D : Behavior
 {
     /// <summary>
     /// Invoked after the velocity has been reflected for the current tick.

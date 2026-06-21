@@ -7,7 +7,7 @@ using Bits;
 /// with the given <see cref="Period"/>. Useful for radioactive /
 /// hazard markers, charged power-ups, and "hold to interact" prompts.
 /// </summary>
-public sealed class PulseTint2D : SpriteBehavior2D
+public sealed class PulseTint2D : Behavior
 {
     /// <summary>
     /// Tint at the trough/bottom of the pulse (t = 0).

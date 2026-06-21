@@ -8,7 +8,7 @@ using Bits;
 /// Accelerates the sprite each tick by <see cref="Acceleration"/>.
 /// Pair with <see cref="Motion2D"/> to actually integrate position.
 /// </summary>
-public sealed class Gravity2D : SpriteBehavior2D
+public sealed class Gravity2D : Behavior
 {
     /// <summary>
     /// Acceleration in world units / s². Defaults to (0, 1500) — downward in screen space.

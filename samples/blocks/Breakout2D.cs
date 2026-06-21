@@ -226,7 +226,7 @@ sealed class BreakoutBall : Sprite2D
 
 // Optional ball-side behavior that clamps Speed each tick.
 // Keeps the ball lively even when bricks/paddle introduce damping.
-sealed class SpeedClamp2D : SpriteBehavior2D
+sealed class SpeedClamp2D : Behavior
 {
     public float Min { get; set; }
     public float Max { get; set; }

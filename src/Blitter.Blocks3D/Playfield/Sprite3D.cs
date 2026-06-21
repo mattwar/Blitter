@@ -120,38 +120,6 @@ public class Sprite3D : Entity, IDrawable3D
         }
     }
 
-    /// <summary>
-    /// Called by the owning <see cref="PlayField3D"/> when this sprite's
-    /// <see cref="HitShape"/> intersects another sprite's. Forwards to
-    /// each behavior.
-    /// </summary>
-    public virtual void OnHitSprite(Sprite3D other, in UpdateContext context)
-    {
-        foreach (var behavior in this.Behaviors)
-        {
-            if (behavior is SpriteBehavior3D sb)
-            {
-                sb.OnHitSprite(this, other, in context);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Called by the owning <see cref="PlayField3D"/> when this sprite's
-    /// <see cref="HitSphere"/> overlaps a <see cref="Barrier3D"/>.
-    /// Forwards to each behavior.
-    /// </summary>
-    public virtual void OnHitBarrier(Barrier3D barrier, in UpdateContext context)
-    {
-        foreach (var behavior in this.Behaviors)
-        {
-            if (behavior is SpriteBehavior3D sb)
-            {
-                sb.OnHitBarrier(this, barrier, in context);               
-            }
-        }
-    }
-
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer3D renderer)
     {

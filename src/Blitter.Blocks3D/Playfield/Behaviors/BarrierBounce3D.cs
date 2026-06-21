@@ -14,7 +14,7 @@ namespace Blitter.Blocks3D;
 /// <see cref="Barrier3D.HitShape"/> participates. The 3D analog of
 /// <c>Blitter.Blocks2D.BarrierBounce2D</c>.
 /// </summary>
-public sealed class BarrierBounce3D : SpriteBehavior3D
+public sealed class BarrierBounce3D : Behavior, IHitHandler3D
 {
     /// <summary>Ball-side elastic coefficient. Multiplied with the barrier's <see cref="PhysicsMaterial.Restitution"/>. 1 = perfectly elastic, 0 = sticks.</summary>
     public float Restitution { get; set; } = 1f;
@@ -30,7 +30,7 @@ public sealed class BarrierBounce3D : SpriteBehavior3D
         // no nothing - real work happens in OnHitBarrier.
     }
 
-    public override void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
+    public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
     {
         // Normal convention: TryGetContact returns normal from b → a;
         // here a = self.HitShape, b = barrier.HitShape, so `contact.Normal`

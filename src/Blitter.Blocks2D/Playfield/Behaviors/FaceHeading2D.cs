@@ -7,7 +7,7 @@ using Bits;
 /// <see cref="Sprite2D.Heading"/> each tick, so the image points
 /// in the direction of travel.
 /// </summary>
-public class FaceHeading2D : SpriteBehavior2D
+public class FaceHeading2D : Behavior
 {
     /// <summary>
     /// Degrees added to <see cref="Sprite2D.Heading"/> when assigning
