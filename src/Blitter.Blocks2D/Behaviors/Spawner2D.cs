@@ -1,4 +1,5 @@
 namespace Blitter.Blocks2D;
+using Bits;
 
 /// <summary>
 /// Scene behavior that periodically adds new sprites to a
@@ -7,7 +8,7 @@ namespace Blitter.Blocks2D;
 /// "spawn another one every N seconds" without each game hand-rolling
 /// its own timer.
 /// </summary>
-public sealed class Spawner2D : SceneBehavior2D
+public sealed class Spawner2D : Behavior
 {
     /// <summary>Playfield that receives spawned sprites.</summary>
     public required PlayField2D Target { get; init; }

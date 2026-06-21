@@ -460,7 +460,7 @@ sealed class Brick : Barrier2D
 
 // Scene-wide game loop: input, paddle motion, launch flow, lives,
 // drain detection, win/lose state, level reset.
-sealed class BreakoutController : SceneBehavior2D
+sealed class BreakoutController : Behavior
 {
     private readonly FrameInput _input;
     private readonly Renderer2D _renderer;

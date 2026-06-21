@@ -434,7 +434,7 @@ sealed class Flipper : SwingArmBarrier2D
 }
 
 // Coordinates pinball gameplay controls and ball lifecycle at scene scope.
-sealed class PinballGameController : SceneBehavior2D
+sealed class PinballGameController : Behavior
 {
     private readonly FrameInput _input;
     private readonly Pinball _ball;

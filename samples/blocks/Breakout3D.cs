@@ -477,7 +477,7 @@ sealed class ForwardKickFromPaddle3D : SpriteBehavior3D
 
 // Top-level game state: input → paddle, ball launch / drain flow,
 // brick clean-up + scoring, win/lose banner.
-sealed class Breakout3DController : SceneBehavior3D
+sealed class Breakout3DController : Behavior
 {
     private readonly FrameInput _input;
     private readonly PlayField3D _playField;
