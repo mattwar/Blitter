@@ -401,6 +401,21 @@ public class PlayField2D : Layer2D
         ApplyPendingChanges();
     }
 
+    // World-space collision shape for a sprite, pulled from its
+    // ColliderShape2D provider. Returns false when the sprite has no
+    // collider behavior (then it takes no part in hit detection).
+    private static bool TryGetPosedShape(Sprite2D sprite, out PosedHitShape2D shape)
+    {
+        if (sprite.TryGetBehavior<ColliderShape2D>(out var collider))
+        {
+            shape = collider.GetShape();
+            return true;
+        }
+
+        shape = default;
+        return false;
+    }
+
     // Estimate the substep count needed to keep the fastest sprite's
     // per-substep displacement under half the smallest hit radius.
     // Uses the sprite's current Speed as the velocity proxy — that's
@@ -417,7 +432,9 @@ public class PlayField2D : Layer2D
             var s = _sprites[i];
             if (!IsLive(s) || !s.CanBeHit)
                 continue;
-            var r = s.HitCircle.Radius;
+            if (!TryGetPosedShape(s, out var posed))
+                continue;
+            var r = posed.BoundingCircle.Radius;
             if (r <= 0f)
                 continue;
             if (r < minRadius)
@@ -458,8 +475,7 @@ public class PlayField2D : Layer2D
             var a = _sprites[i];
             if (!IsLive(a) || !a.CanBeHit)
                 continue;
-            var aShape = a.HitShape;
-            if (aShape.BoundingCircle.Radius <= 0f)
+            if (!TryGetPosedShape(a, out var aShape) || aShape.BoundingCircle.Radius <= 0f)
                 continue;
 
             for (int j = i + 1; j < _sprites.Count; j++)
@@ -470,8 +486,7 @@ public class PlayField2D : Layer2D
                 var b = _sprites[j];
                 if (!IsLive(b) || !b.CanBeHit)
                     continue;
-                var bShape = b.HitShape;
-                if (bShape.BoundingCircle.Radius <= 0f)
+                if (!TryGetPosedShape(b, out var bShape) || bShape.BoundingCircle.Radius <= 0f)
                     continue;
                 if (!aShape.TestHit(bShape))
                     continue;
@@ -490,8 +505,7 @@ public class PlayField2D : Layer2D
                 var sprite = _sprites[s];
                 if (!IsLive(sprite) || !sprite.CanBeHit)
                     continue;
-                var spriteShape = sprite.HitShape;
-                if (spriteShape.BoundingCircle.IsEmpty)
+                if (!TryGetPosedShape(sprite, out var spriteShape) || spriteShape.BoundingCircle.IsEmpty)
                     continue;
 
                 for (int k = 0; k < _barriers.Count; k++)
@@ -501,7 +515,7 @@ public class PlayField2D : Layer2D
                     var barrier = _barriers[k];
                     // Re-read each time: the previous barrier handler
                     // may have moved the sprite.
-                    if (!sprite.HitShape.TestHit(barrier.HitShape))
+                    if (!TryGetPosedShape(sprite, out var sShape) || !sShape.TestHit(barrier.HitShape))
                         continue;
 
                     // Barrier reacts first so any state change it

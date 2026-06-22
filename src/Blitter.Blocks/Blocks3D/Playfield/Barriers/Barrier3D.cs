@@ -4,10 +4,6 @@ namespace Blitter.Blocks3D;
 
 /// <summary>
 /// A static, non-sprite obstacle in a <see cref="PlayField3D"/>.
-/// Participates in the collision pass: when a sprite's
-/// <see cref="Sprite3D.HitSphere"/> overlaps the barrier's shape, the
-/// playfield dispatches <see cref="Sprite3D.OnHitBarrier"/>.
-/// Unlike sprites, barriers do not collide with other barriers.
 /// </summary>
 public abstract class Barrier3D : Entity, IDrawable3D
 {

@@ -1,7 +1,7 @@
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// Smoothly cycles the host sprite's <see cref="Sprite2D.Tint"/>
+/// Smoothly cycles the host's <see cref="Appearance2D.Tint"/>
 /// between <see cref="Low"/> and <see cref="High"/> on a sine wave
 /// with the given <see cref="Period"/>. Useful for radioactive /
 /// hazard markers, charged power-ups, and "hold to interact" prompts.
@@ -23,13 +23,15 @@ public sealed class PulseTint2D : Behavior
     /// </summary>
     public TimeSpan Period { get; init; } = TimeSpan.FromSeconds(1);
 
-    private Sprite2D _target = null!;
+    private Appearance2D _appearance = null!;
+
+    // Time accumulated since attach; drives the phase so each instance
+    // pulses independently from when it started (good for spawn variety).
+    private TimeSpan _elapsed;
 
     protected override void OnAttach(IEntity entity)
     {
-        if (entity is not Sprite2D sprite)
-            throw new InvalidOperationException($"PulseTint2D can only be attached to Sprite2D entities, but was attached to {entity}.");
-        _target = sprite;
+        _appearance = entity.GetOrAddTrait<Appearance2D>();
     }
 
     public override void Apply(in UpdateContext context)
@@ -38,11 +40,13 @@ public sealed class PulseTint2D : Behavior
         if (seconds <= 0)
             return;
 
-        // 0..1 triangle-shaped weight from a sine, driven by sprite age
-        // so each sprite pulses independently (good for spawn variety).
-        var phase = _target.Age.TotalSeconds / seconds;
+        _elapsed += context.ElapsedSinceLastUpdate;
+
+        // 0..1 triangle-shaped weight from a sine, driven by accumulated
+        // age so each instance pulses independently (good for spawn variety).
+        var phase = _elapsed.TotalSeconds / seconds;
         var t = 0.5f + 0.5f * MathF.Sin((float)(phase * Math.Tau));
-        _target.Tint = Color.Lerp(Low, High, t);
+        _appearance.Tint = Color.Lerp(Low, High, t);
     }
 
     /// <summary>

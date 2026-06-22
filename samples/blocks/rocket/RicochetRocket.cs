@@ -350,7 +350,7 @@ sealed class Rocket : Sprite2D
     /// <summary>
     /// The flame drawn behind the rocket while thrusting. A separate slot
     /// from <see cref="Sprite2D.Image"/> so it can be composited with its own
-    /// blend mode. Assign a path; read <see cref="ImageSource.Visual"/> to draw.
+    /// blend mode. Assign a path; call <see cref="ImageSource.GetComposedVisual"/> to draw.
     /// </summary>
     public ImageSource Flame { get; set; } = new();
 
@@ -436,9 +436,9 @@ sealed class Rocket : Sprite2D
         var pose = new Pose2D(Center, Rotation, Scale);
 
         if (IsFlameVisible)
-            Flame.Visual?.Draw(renderer, pose, Color.White, Age, Flipped);
+            Flame.GetComposedVisual()?.Draw(renderer, pose, Color.White, Age, Flipped);
 
-        Image.Visual?.Draw(renderer, pose, Tint, Age, Flipped);
+        Image.GetComposedVisual()?.Draw(renderer, pose, Tint, Age, Flipped);
 
         // Shield image drawn at the bounding circle size, rotated with the heading.
         if (IsShieldVisible)

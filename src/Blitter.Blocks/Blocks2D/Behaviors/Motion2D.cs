@@ -1,10 +1,7 @@
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// Integrates a sprite's <see cref="Sprite2D.Speed"/> /
-/// <see cref="Sprite2D.Heading"/> into <see cref="Sprite2D.Center"/>
-/// and its <see cref="Sprite2D.RotationSpeed"/>
-/// into <see cref="Sprite2D.Rotation"/> each tick.
+/// Moves an entity's position (<see cref="Transform2D"/>) based on its velocity (<see cref="Velocity2D"/>).
 /// </summary>
 public class Motion2D : Behavior
 {

@@ -13,10 +13,9 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
     {
     }
 
-    private ImageSource _image = new();
-
     private Transform2D? _transform = null;
     private Velocity2D? _velocity = null;
+    private Appearance2D? _appearance = null;
 
     /// <summary>
     /// The sprite's position, rotation and scale in world space.
@@ -28,10 +27,18 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
     /// </summary>
     public Velocity2D Velocity => _velocity ?? this.GetOrAddTrait<Velocity2D>();
 
+    /// <summary>
+    /// How the sprite presents itself: its visual inputs, tint, and flip.
+    /// </summary>
+    public Appearance2D Appearance => _appearance ?? this.GetOrAddTrait<Appearance2D>();
+
     protected override void OnAttach(IEntity entity)
     {
         _transform = this.GetOrAddTrait<Transform2D>();
         _velocity = this.GetOrAddTrait<Velocity2D>();
+        _appearance = this.GetOrAddTrait<Appearance2D>();
+        if (!this.TryGetBehavior<ColliderShape2D>(out _))
+            this.AddBehavior(new ColliderShape2D());
         _spawnedAt = TimeSpan.Zero;
         base.OnAttach(entity);
     }
@@ -42,17 +49,22 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
     public string? Name { get; set; }
 
     /// <summary>
-    /// The sprite's image. Always non-null; assign a path, an
-    /// <see cref="ImageSource"/>, or a configured source via object
-    /// initializer, then read <see cref="ImageSource.Visual"/> for the
-    /// materialised <see cref="Visual2D"/>. Setting this to <c>null</c>
-    /// installs a fresh empty source (which draws nothing).
+    /// The sprite's image: a declarative <see cref="ImageSource"/> describing
+    /// its look (a path, a texture, tiles, or named animation states). Always
+    /// non-null; assigning <c>null</c> installs a fresh empty source (which
+    /// draws nothing). Retains the authoring facts so the appearance is
+    /// serializable; read <see cref="Visual"/> for the materialised result.
     /// </summary>
     public ImageSource Image
     {
-        get => _image;
-        set => _image = value ?? new();
+        get => Appearance.Source;
+        set => Appearance.Source = value ?? new();
     }
+
+    /// <summary>
+    /// The sprite's materialised visual, built and cached from <see cref="Image"/>.
+    /// </summary>
+    public Visual2D? Visual => Appearance.Source.GetComposedVisual();
 
     /// <summary>The position of the center of the sprite.</summary>
     public Vector2 Center { get => Transform.Position; set => Transform.Position = value; }
@@ -77,12 +89,12 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
     /// hit shape when collisions are evaluated. Composes with any
     /// authoring flip on the visual's current animation frame.
     /// </summary>
-    public FlipMode Flipped = FlipMode.None;
+    public FlipMode Flipped { get => Appearance.Flipped; set => Appearance.Flipped = value; }
 
     /// <summary>
     /// Tint color applied to the visual.
     /// </summary>
-    public Color Tint { get; set; } = Color.White;
+    public Color Tint { get => Appearance.Tint; set => Appearance.Tint = value; }
 
     /// <summary>
     /// Whether this sprite participates in the playfield's hit-detection pass.
@@ -115,10 +127,14 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
             : TimeSpan.Zero;
 
     /// <summary>
-    /// The sprite's world-space collision shape
+    /// The sprite's world-space collision shape, provided by its
+    /// <see cref="ColliderShape2D"/> behavior. Empty when the sprite has no
+    /// collider (e.g. before it is attached to a playfield).
     /// </summary>
     public virtual PosedHitShape2D HitShape =>
-        new((Image.Visual?.HitShape ?? HitShape2D.None).Flipped(Flipped), new Pose2D(Center, Rotation, Scale));
+        this.TryGetBehavior<ColliderShape2D>(out var collider)
+            ? collider.GetShape()
+            : new(HitShape2D.None, Transform.Pose);
 
     /// <summary>
     /// Bounding circle of the sprite
@@ -137,7 +153,7 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer2D renderer)
     {
-        this.Image.Visual?.Draw(renderer, new Pose2D(Center, Rotation, Scale), this.Tint, this.Age, this.Flipped);
+        this.Visual?.Draw(renderer, new Pose2D(Center, Rotation, Scale), this.Tint, this.Age, this.Flipped);
     }
 
     /// <summary>

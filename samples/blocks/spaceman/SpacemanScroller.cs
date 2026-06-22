@@ -135,7 +135,7 @@ public class Spaceman : Sprite2D
     protected override void OnAttach(IEntity entity)
     {
         base.OnAttach(entity);
-        var standSize = ((ITextureRegion)((AnimatedVisual2D)Image.Visual!).Catalog["idle-right"].Frames[0].Texture).Region;
+        var standSize = ((ITextureRegion)((AnimatedVisual2D)Image.GetComposedVisual()!).Catalog["idle-right"].Frames[0].Texture).Region;
         FeetOffsetY = standSize.Height * 0.5f * Scale;
         ShadowWidth = standSize.Width * 0.9f * Scale;
         Center = new Vector2(0f, GroundY - FeetOffsetY);
@@ -207,7 +207,7 @@ public class SpacemanController : Behavior
             ? "jump"
             : (move != 0f ? "walk" : "idle");
 
-        self.Image.Visual!.State = motion + "-" + spaceman.Facing;
+        self.Image.GetComposedVisual()!.State = motion + "-" + spaceman.Facing;
     }
 }
 
