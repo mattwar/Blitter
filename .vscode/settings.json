@@ -1,0 +1,11 @@
+{
+    // Pin C# Dev Kit to the real solution so it doesn't auto-discover the
+    // loose file-based sample programs under samples/ (each `#:package
+    // Blitter@*-*` file) and fold them into an auto-created virtual solution.
+    // Restoring those floating-prerelease samples against the local feed --
+    // whose cache is purged on every Blitter.Package build -- is what causes
+    // the endless "failed to restore nuget packages for the solution" churn.
+    "dotnet.defaultSolution": "src/Blitter.sln",
+    // Don't let C# Dev Kit build a virtual solution from loose .cs files.
+    "dotnet.automaticallyCreateSolutionInWorkspace": false
+}

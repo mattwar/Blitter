@@ -1,5 +1,4 @@
 namespace Blitter.Blocks2D;
-using Blitter.Bits;
 
 /// <summary>
 /// Reflects a sprite's velocity when its center crosses the edge of the

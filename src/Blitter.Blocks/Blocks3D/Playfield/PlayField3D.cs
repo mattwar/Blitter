@@ -1,5 +1,4 @@
 namespace Blitter.Blocks3D;
-using Bits;
 
 /// <summary>
 /// The 3D "world" layer, containing a set of sprites and barriers

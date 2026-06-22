@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 
-using Blitter.Bits;
 
 namespace Blitter.Blocks2D;
 

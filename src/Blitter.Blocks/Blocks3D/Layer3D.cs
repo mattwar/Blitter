@@ -1,5 +1,4 @@
 namespace Blitter.Blocks3D;
-using Bits;
 
 /// <summary>
 /// A stacked drawable layer in a <see cref="Scene3D"/>. Scenes update

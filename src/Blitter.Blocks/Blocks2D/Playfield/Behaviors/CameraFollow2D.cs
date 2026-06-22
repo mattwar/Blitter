@@ -2,7 +2,6 @@ namespace Blitter.Blocks2D;
 
 using System.Numerics;
 
-using Blitter.Bits;
 
 /// <summary>
 /// Scrolls a <see cref="Camera2D"/> to keep a target sprite inside a

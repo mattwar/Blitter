@@ -1,7 +1,6 @@
 using System.Numerics;
 
 namespace Blitter.Blocks3D;
-using Bits;
 
 /// <summary>
 /// Applies an entity's <see cref="Velocity3D.Velocity"/> into <see cref="Transform3D.Position"/> 

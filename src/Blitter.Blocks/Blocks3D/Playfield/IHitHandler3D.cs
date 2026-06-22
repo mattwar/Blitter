@@ -1,5 +1,4 @@
 namespace Blitter.Blocks3D;
-using Bits;
 
 /// <summary>
 /// Capability for a <see cref="Behavior"/> that responds to collisions the

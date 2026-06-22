@@ -1,5 +1,4 @@
 namespace Blitter.Blocks2D;
-using Bits;
 
 /// <summary>
 /// Integrates a sprite's <see cref="Sprite2D.Speed"/> /

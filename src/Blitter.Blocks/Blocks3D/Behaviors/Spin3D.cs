@@ -1,7 +1,6 @@
 using System.Numerics;
 
 namespace Blitter.Blocks3D;
-using Bits;
 
 /// <summary>
 /// Rotates the entity continuously around its vertical axis (Y-axis). 

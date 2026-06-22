@@ -1,5 +1,4 @@
 namespace Blitter.Blocks2D;
-using Bits;
 
 /// <summary>
 /// Fades the host sprite's <see cref="Sprite2D.Tint"/> alpha to zero

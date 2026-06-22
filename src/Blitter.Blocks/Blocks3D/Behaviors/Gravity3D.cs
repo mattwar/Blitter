@@ -1,7 +1,6 @@
 using System.Numerics;
 
 namespace Blitter.Blocks3D;
-using Bits;
 
 /// <summary>
 /// Accelerates the sprite each frame by <see cref="Acceleration"/>.

@@ -1,7 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
 namespace Blitter.Blocks2D;
-using Bits;
 
 /// <summary>
 /// The 2D "world" layer: owns a set of <see cref="Sprite2D"/>s and

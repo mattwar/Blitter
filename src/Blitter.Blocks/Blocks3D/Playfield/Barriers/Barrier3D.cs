@@ -1,7 +1,6 @@
 using System.Numerics;
 
 namespace Blitter.Blocks3D;
-using Bits;
 
 /// <summary>
 /// A static, non-sprite obstacle in a <see cref="PlayField3D"/>.

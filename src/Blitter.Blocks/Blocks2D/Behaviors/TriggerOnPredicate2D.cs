@@ -1,5 +1,4 @@
 namespace Blitter.Blocks2D;
-using Bits;
 
 /// <summary>
 /// Rising-edge trigger: invokes <see cref="Action"/> once each time <see cref="Predicate"/> transitions from <c>false</c> to <c>true</c>.

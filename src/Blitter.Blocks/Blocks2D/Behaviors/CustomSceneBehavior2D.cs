@@ -1,5 +1,4 @@
 namespace Blitter.Blocks2D;
-using Bits;
 
 /// <summary>
 /// Per-frame callback for a <see cref="CustomSceneBehavior2D"/>.

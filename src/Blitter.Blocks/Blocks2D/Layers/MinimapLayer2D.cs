@@ -1,7 +1,6 @@
 using System.Numerics;
 
 namespace Blitter.Blocks2D;
-using Bits;
 
 /// <summary>
 /// Shapes a <see cref="MinimapLayer2D"/> can draw for a sprite marker.

@@ -1,7 +1,6 @@
 using System.Numerics;
 
 namespace Blitter.Blocks3D;
-using Bits;
 
 /// <summary>
 /// First-person walk controller for an entity. 

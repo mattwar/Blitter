@@ -1,7 +1,6 @@
 using System.Numerics;
 
 namespace Blitter.Blocks2D;
-using Bits;
 
 /// <summary>
 /// On contact with a <see cref="LineBarrier2D"/>, snaps the sprite out

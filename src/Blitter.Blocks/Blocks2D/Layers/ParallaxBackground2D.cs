@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Numerics;
 
-using Blitter.Bits;
 
 namespace Blitter.Blocks2D;
 

@@ -1,7 +1,6 @@
 namespace Blitter.Blocks2D;
 
 using System.Numerics;
-using Bits;
 
 /// <summary>
 /// Shakes a <see cref="Camera2D"/>'s position by an offset driven by a trauma value that decays each tick. 

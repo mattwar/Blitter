@@ -1,5 +1,4 @@
 namespace Blitter.Blocks2D;
-using Bits;
 
 /// <summary>
 /// Counts down each tick; invokes <see cref="OnExpired"/> when it reaches zero. 

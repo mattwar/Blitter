@@ -1,5 +1,3 @@
-using Blitter.Bits;
-
 namespace Blitter.Blocks3D;
 
 /// <summary>

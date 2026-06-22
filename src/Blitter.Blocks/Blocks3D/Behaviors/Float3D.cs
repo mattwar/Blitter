@@ -1,5 +1,4 @@
 namespace Blitter.Blocks3D;
-using Bits;
  
 /// <summary>
 /// Makes the sprite bob up and down over time, like a floating coin or 

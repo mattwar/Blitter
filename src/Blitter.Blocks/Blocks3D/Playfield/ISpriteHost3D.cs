@@ -1,5 +1,4 @@
 namespace Blitter.Blocks3D;
-using Bits;
 
 /// <summary>
 /// What a <see cref="Sprite3D"/> sees as its container: a small surface

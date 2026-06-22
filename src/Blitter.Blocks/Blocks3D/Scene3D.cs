@@ -1,5 +1,4 @@
 namespace Blitter.Blocks3D;
-using Bits;
 
 /// <summary>
 /// A 3D scene comprised of one or more layers. 
