@@ -11,8 +11,12 @@
 using System.Numerics;
 using Blitter;
 using Blitter.Bits;
+using Blitter.Blocks;
 using Blitter.Blocks2D;
 using SkiaSharp;
+
+// Resolve loose asset files next to this source file.
+Application.Current.SetCallerAssetFolder();
 
 // Fixed design surface. The renderer letterboxes this into whatever
 // the actual window size is, so the playfield stays a constant
@@ -33,9 +37,8 @@ var window = new Window2D(DesignW, DesignH)
     FullScreen = true,
     RelativeMouseMode = true, // hides mouse
     CloseKey = Key.Escape,
+    LogicalSize = (DesignW, DesignH),
 };
-
-window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
 // Font for floating score popups and HUD score readout.
 var scoreFont = new Font(["Consolas", "Menlo"], 48, bold: true);
@@ -68,15 +71,9 @@ var scoreboard = new ScoreLayer2D
 DateTime? gameOverAt = null;
 var gameOverDuration = TimeSpan.FromSeconds(3);
 
-// create rocket sprite
-var rocketImage = Bitmap.Load(Asset.GetPathRelativeToCaller("rocket.png"));
- // make rocket's background transparent
-rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0));
-var flameImage = Bitmap.Load(Asset.GetPathRelativeToCaller("flame.png"));
-flameImage.SetAlpha(0, flameImage.GetPixel(0, 0));
 
 // create meteor field - small static obstacles for the rocket to hit
-var asteroidImage = Bitmap.Load(Asset.GetPathRelativeToCaller("asteroid.png"));
+var asteroidImage = Bitmap.Load("asteroid.png");
 var asteroids = CreateAsteroidField(20, asteroidImage);
 
 // Debris bursts when the smallest asteroids are destroyed. Tinted
@@ -90,17 +87,17 @@ Asteroid.Particles = debrisParticles;
 
 var rocket = new Rocket
 {
-    Visual = rocketImage,
-    FlameVisual = flameImage,
+    Image = "rocket.png",
+    Flame = "flame.png",
     Center = new Vector2(WorldW / 2f, WorldH / 2f),
     Scale = 0.1f,
     Speed = 600f,
     Heading = 45f,
     Behaviors = 
-    { 
+    [ 
         new RocketController(window.Input),
         new AsteroidSmasher(scoreboard),
-    }
+    ]
 };
 
 // Camera scrolls the world to keep the rocket in view. Start it on
@@ -109,7 +106,7 @@ var camera = new Camera2D { Position = rocket.Center };
 window.Renderer.Camera = camera;
 
 var worldBounds = new Rect(0, 0, WorldW, WorldH);
-rocket.Behaviors.Add(new CameraFollow2D
+rocket.AddBehavior(new CameraFollow2D
 {
     Camera = camera,
     ViewportSize = new Vector2(DesignW, DesignH),
@@ -271,7 +268,7 @@ var hitDebug = new CustomLayer2D
 var scene = new Scene2D
 {
     Layers = 
-    { 
+    [ 
         starsFar, 
         starsMid, 
         playField,
@@ -281,9 +278,9 @@ var scene = new Scene2D
         scoreboard,
         hud,
         minimap,
-    },
+    ],
     Behaviors =
-    {
+    [
         new CustomSceneBehavior2D()
         {
             OnApply = (s, in ctx) =>
@@ -299,7 +296,7 @@ var scene = new Scene2D
                 }
             }
         }
-    },
+    ],
 };
 
 // Run the scene until done
@@ -334,7 +331,7 @@ static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
 
         var asteriod = new Asteroid
         {
-            Visual = image,
+            Image = "asteroid.png",
             Center = new Vector2(x, y),
             Scale = scale,
             Rotation = rotation,
@@ -350,7 +347,12 @@ static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
 
 sealed class Rocket : Sprite2D
 {
-    public Visual2D? FlameVisual { get; set; }
+    /// <summary>
+    /// The flame drawn behind the rocket while thrusting. A separate slot
+    /// from <see cref="Sprite2D.Image"/> so it can be composited with its own
+    /// blend mode. Assign a path; read <see cref="ImageSource.Visual"/> to draw.
+    /// </summary>
+    public ImageSource Flame { get; set; } = new();
 
     public TimeSpan FlameUntil { get; private set; }
     public bool IsFlameVisible => Age < FlameUntil;
@@ -373,7 +375,8 @@ sealed class Rocket : Sprite2D
 
     public Rocket()
     {
-        this.Behaviors.AddRange([
+        this.Behaviors =
+        [
             new Motion2D(),  // move with simple 2D physics
             // Face direction of travel, except while stunned — then
             // let RotationSpeed drive the spin freely.
@@ -388,13 +391,15 @@ sealed class Rocket : Sprite2D
             },
             new BounceInBounds2D  // bounce off the walls
             {
-                OnBounce = s =>
+                OnBounce = e =>
                 {
+                    if (e is not Sprite2D s)
+                        return;
                     s.Heading = (s.Heading + Random.Shared.Next(-10, 10) + 360f) % 360f;
                     Audio.Play(Sounds.Boing, volume: .2f);
                 },
             },
-        ]);
+        ];
     }
 
     public void Stun(TimeSpan duration)
@@ -431,9 +436,9 @@ sealed class Rocket : Sprite2D
         var pose = new Pose2D(Center, Rotation, Scale);
 
         if (IsFlameVisible)
-            FlameVisual?.Draw(renderer, pose, Color.White, Age, Flipped);
+            Flame.Visual?.Draw(renderer, pose, Color.White, Age, Flipped);
 
-        Visual?.Draw(renderer, pose, Tint, Age, Flipped);
+        Image.Visual?.Draw(renderer, pose, Tint, Age, Flipped);
 
         // Shield image drawn at the bounding circle size, rotated with the heading.
         if (IsShieldVisible)
@@ -574,7 +579,7 @@ sealed class Rocket : Sprite2D
     }
 }
 
-sealed class AsteroidSmasher : SpriteBehavior2D
+sealed class AsteroidSmasher : Behavior, IHitHandler2D
 {
     private readonly ScoreLayer2D _scoreboard;
 
@@ -598,7 +603,9 @@ sealed class AsteroidSmasher : SpriteBehavior2D
         _scoreboard = scoreboard;
     }
 
-    public override void OnHitSprite(Sprite2D self, Sprite2D other, in UpdateContext2D context)
+    public override void Apply(in UpdateContext context) { }
+
+    public void OnHitSprite(Sprite2D self, Sprite2D other, in UpdateContext context)
     {
         // Grace period: ignore freshly-spawned shards so they
         // can spread out before being hit again. Without this
@@ -666,7 +673,7 @@ sealed class AsteroidSmasher : SpriteBehavior2D
 
         // Mark the meteor for removal; the playfield reaps it
         // on its next update pass.
-        other.IsAlive = false;
+        other.PlayField.RemoveSprite(other);
         self.Heading = (self.Heading + Random.Shared.Next(-15, 15) + 360f) % 360f;
         Audio.Play(Sounds.Explosion, volume: .3f);
 
@@ -728,7 +735,7 @@ sealed class AsteroidSmasher : SpriteBehavior2D
 
         // split the asteroid into shards
         asteroid.Smash();
-        asteroid.IsAlive = false;
+        asteroid.PlayField.RemoveSprite(asteroid);
     }
 
     private static float NudgeToward(float current, float target, float fraction, float jitterDeg, float maxDeg)
@@ -779,11 +786,11 @@ sealed class Asteroid : Sprite2D
         else if (kind == AsteriodKind.Radioactive)
         {
             this.Tint = _radioactiveTint;
-            this.Behaviors.Add(PulseTint2D.FromBrightness(_radioactiveTint, amount: 0.5f, period: TimeSpan.FromSeconds(0.6)));
+            this.AddBehavior(PulseTint2D.FromBrightness(_radioactiveTint, amount: 0.5f, period: TimeSpan.FromSeconds(0.6)));
         }
 
-        this.Behaviors.Add(new Motion2D());
-        this.Behaviors.Add(new BounceInBounds2D());
+        this.AddBehavior(new Motion2D());
+        this.AddBehavior(new BounceInBounds2D());
     }
 
     public void Smash()
@@ -817,7 +824,7 @@ sealed class Asteroid : Sprite2D
 
                 var shard = new Asteroid(childKind)
                 {
-                    Visual = this.Visual,
+                    Image = this.Image,
                     Center = this.Center,
                     Scale = newScale,
                     Rotation = Random.Shared.Next(0, 360),
@@ -852,7 +859,7 @@ sealed class Asteroid : Sprite2D
     }
 }
 
-sealed class RocketController : SpriteBehavior2D
+sealed class RocketController : Behavior
 {
     private readonly FrameInput _input;
 
@@ -870,8 +877,14 @@ sealed class RocketController : SpriteBehavior2D
         _input = input;
     } 
 
-    public override void Apply(Sprite2D rocket, in UpdateContext2D context)
+    private Sprite2D _rocket = null!;
+
+    protected override void OnAttach(IEntity entity) => _rocket = (Sprite2D)entity;
+
+    public override void Apply(in UpdateContext context)
     {
+        var rocket = _rocket;
+
         // No control input during stun.
         if (rocket is Rocket { IsStunned: true })
         {

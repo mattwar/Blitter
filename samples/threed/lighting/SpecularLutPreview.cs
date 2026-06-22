@@ -33,9 +33,8 @@ var window = new Window2D
     Title = "Specular BRDF LUT preview",
     BackgroundColor = new Color(18, 20, 28),
     CloseKey = Key.Escape,
+    LogicalSize = (LutSize * 2 + Inset * 2, LutSize * 2 + Inset * 2),
 };
-window.Renderer.SetLogicalSize(LutSize * 2 + Inset * 2, LutSize * 2 + Inset * 2,
-    LogicalPresentation.Letterbox);
 
 // Cache the property reference -- the first access bakes the
 // 256x256 image (a few hundred ms of CPU work); we don't want to

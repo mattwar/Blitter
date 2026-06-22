@@ -23,6 +23,7 @@ public class Window2D : Window
     {
         _renderer = Window2DRenderer.Create(this);
         _renderer.BackgroundColor = base.BackgroundColor;
+        ApplyLogicalSize();
     }
 
     /// <inheritdoc/>
@@ -35,6 +36,55 @@ public class Window2D : Window
             if (_renderer is not null)
                 _renderer.BackgroundColor = value;
         }
+    }
+
+    private (int Width, int Height)? _logicalSize;
+    private LogicalPresentation _logicalPresentation = LogicalPresentation.Letterbox;
+
+    /// <summary>
+    /// The fixed logical drawing surface the renderer scales to fit the
+    /// window. When set, all draws use coordinates in this space and the
+    /// renderer handles scaling, centering, and letterbox/overscan bars
+    /// (see <see cref="LogicalPresentation"/>). Leave <c>null</c> (the
+    /// default) to draw in raw output pixels. Forwards to
+    /// <see cref="Renderer2D.SetLogicalSize"/>, so it can be assigned in the
+    /// window's object initializer instead of calling that method by hand.
+    /// </summary>
+    public (int Width, int Height)? LogicalSize
+    {
+        get => _logicalSize;
+        set
+        {
+            _logicalSize = value;
+            ApplyLogicalSize();
+        }
+    }
+
+    /// <summary>
+    /// How <see cref="LogicalSize"/> is mapped onto the window when their
+    /// aspect ratios differ. Defaults to
+    /// <see cref="LogicalPresentation.Letterbox"/>. Has no effect until
+    /// <see cref="LogicalSize"/> is set.
+    /// </summary>
+    public LogicalPresentation LogicalPresentation
+    {
+        get => _logicalPresentation;
+        set
+        {
+            _logicalPresentation = value;
+            ApplyLogicalSize();
+        }
+    }
+
+    // Pushes the buffered logical-size settings onto the renderer once it
+    // exists. The renderer keeps them until changed, so this runs only on
+    // creation and whenever LogicalSize/LogicalPresentation is assigned —
+    // not per frame.
+    private void ApplyLogicalSize()
+    {
+        if (_renderer is null || _logicalSize is not { } size)
+            return;
+        _renderer.SetLogicalSize(size.Width, size.Height, _logicalPresentation);
     }
 
     private WindowRenderingEventHandler<Window2D, Renderer2D>? _renderingHandler;

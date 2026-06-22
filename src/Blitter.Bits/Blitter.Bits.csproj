@@ -13,4 +13,8 @@
     <ProjectReference Include="..\Blitter\Blitter.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Blitter.Blocks" />
+  </ItemGroup>
+
 </Project>

@@ -14,6 +14,8 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
+using Blitter.Blocks;
 using Blitter.Blocks2D;
 
 const int W = 800, H = 600;
@@ -52,9 +54,9 @@ var hud = new CustomLayer2D
 
 var scene = new Scene2D
 {
-    Layers = { playField, hud },
+    Layers = [ playField, hud ],
     Behaviors =
-    {
+    [
         spawner,
         new CustomSceneBehavior2D
         {
@@ -64,7 +66,7 @@ var scene = new Scene2D
                     spawner.Paused = !spawner.Paused;
             }
         },
-    },
+    ],
 };
 
 await scene.RunAsync(window);
@@ -86,13 +88,14 @@ sealed class Block : Sprite2D
         Center = new Vector2(rng.Next((int)Size, worldWidth - (int)Size), -Size);
         Speed  = rng.Next(120, 320);
         Heading = 180f; // straight down (0 = up)
-        Behaviors.Add(new Motion2D());
-        Behaviors.Add(new CustomSpriteBehavior2D
+        AddBehavior(new Motion2D());
+        AddBehavior(new CustomSpriteBehavior2D
         {
             OnApply = (sprite, in ctx) =>
             {
-                if (sprite.Center.Y - Size > ctx.Bounds.Height)
-                    sprite.IsAlive = false;
+                if (sprite.TryFindTrait<Bounds2D>(out var bounds)
+                    && sprite.Center.Y - Size > bounds.Rect.Height)
+                    sprite.PlayField.RemoveSprite(sprite);
             }
         });
         CanBeHit = false;

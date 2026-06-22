@@ -1,5 +1,3 @@
-using System.Numerics;
-
 namespace Blitter.Tests;
 
 // Covers Image.Render3D's two readback paths:

@@ -23,10 +23,13 @@ var window = new Window2D
     BackgroundColor = new Color(18, 20, 28),
     FullScreen = true,
     CloseKey = Key.Escape,
+    LogicalSize = (DesignW, DesignH),
 };
-window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
-using var source = Bitmap.Load(Asset.GetPathRelativeToCaller("blitter.png"));
+// Resolve loose asset files next to this source file.
+Application.Current.SetCallerAssetFolder();
+
+using var source = Bitmap.Load("blitter.png");
 
 // pixels; remember to dispose them (the `using` declarations do).
 using var blurred    = source.Blur(6f);

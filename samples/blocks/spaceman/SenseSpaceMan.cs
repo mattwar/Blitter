@@ -25,17 +25,17 @@ const int DesignH = 720;
 // gutter detection work. JPEG halos around sprite edges still leave
 // stray almost-background pixels; the minRegion thresholds on Sense
 // then drop tiny noise runs.
-var sheet = Bitmap.Load(Asset.GetPathRelativeToCaller("space-man-sprites.png"));
+Application.Current.SetCallerAssetFolder();
+var sheet = Bitmap.Load("space-man-sprites.png");
 //sheet.SetAlpha(0, sheet.GetPixel(0, 0), tolerance: 30);
-//sheet.Save(Asset.GetPathRelativeToCaller("space-man-sprites.png"));
+//sheet.Save("space-man-sprites.png");
 
-using var atlas = TextureCatalog.Sense(
+var atlas = TextureCatalog.Sense(
     sheet,
     minRegionWidth: 8,
     minRegionHeight: 8,
     minRowGutter: 4,
-    minColumnGutter: 4,
-    ownsImage: false
+    minColumnGutter: 4
     );
 
 var window = new Window2D(DesignW, DesignH)
@@ -43,9 +43,8 @@ var window = new Window2D(DesignW, DesignH)
     Title = $"Sense: {atlas.Count} regions detected",
     BackgroundColor = new Color(100, 100, 120),
     CloseKey = Key.Escape,
+    LogicalSize = (DesignW, DesignH),
 };
-
-window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
 // Fit the sheet to the design surface preserving aspect.
 var (sw, sh) = sheet.Size;

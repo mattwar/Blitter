@@ -11,9 +11,9 @@ public class VoxelHitShape3DTests
 
     private static ArrayVoxelWorld MakeWorld(int w, int h, int d)
     {
-        var palette = new VoxelPalette();
-        palette.Add(new VoxelType { Id = 1, Name = "stone" });
-        return new ArrayVoxelWorld(w, h, d, palette);
+        var catalog = new VoxelCatalog();
+        catalog.Add(new VoxelType { Name = "stone" });
+        return new ArrayVoxelWorld(w, h, d, catalog);
     }
 
     [Fact]
@@ -39,9 +39,10 @@ public class VoxelHitShape3DTests
     public void Visit_EmitsOneBoxPerSolidCell()
     {
         var world = MakeWorld(4, 4, 4);
-        world.SetVoxel(0, 0, 0, 1);
-        world.SetVoxel(1, 0, 0, 1);
-        world.SetVoxel(3, 3, 3, 1);
+        var stone = world.Catalog["stone"];
+        world.SetVoxel(0, 0, 0, stone);
+        world.SetVoxel(1, 0, 0, stone);
+        world.SetVoxel(3, 3, 3, stone);
         var shape = new VoxelHitShape3D(MakeGrid(world, Vector3.One));
 
         var count = 0;

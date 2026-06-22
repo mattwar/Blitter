@@ -440,7 +440,8 @@ internal abstract class TextureRenderer2D : Renderer2D, IDisposable
     /// </summary>
     protected override void RenderOnApplicationThread()
     {
-        ThrowIfDisposed();
+        if (IsDisposed)
+            return;
         // Snapshot the frame clock at the START of the render so the next
         // handler's ElapsedSinceLastRender reflects the full frame interval
         // (including this render's own work), not just the gap between

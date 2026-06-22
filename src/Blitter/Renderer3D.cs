@@ -264,12 +264,12 @@ public abstract class Renderer3D
     protected virtual (int Width, int Height) GetTargetSize() => (1920, 1080);
 
     /// <summary>
-    /// Builds a per-frame <see cref="UpdateContext3D"/> snapshotting this
+    /// Builds a per-frame <see cref="UpdateContext"/> snapshotting this
     /// renderer's clock. Convenience for the common case where one loop
     /// drives both update and render; standalone simulations should
     /// build their own context from their own clock.
     /// </summary>
-    public UpdateContext3D GetUpdateContext() => new()
+    public UpdateContext GetUpdateContext() => new()
     {
         ElapsedSinceStart = ElapsedSinceStart,
         ElapsedSinceLastUpdate = ElapsedSinceLastRender,

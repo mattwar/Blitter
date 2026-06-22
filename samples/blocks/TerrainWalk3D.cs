@@ -58,7 +58,7 @@ var window = new Window3D
 
 window.Renderer.AmbientLight = new Color(95, 110, 130);
 window.Renderer.DirectionalLight = new DirectionalLight(
-    Vector3.Normalize(new Vector3(-0.4f, -0.8f, -0.5f)),
+    Vector3.Normalize(new Vector3(0.4f, 0.8f, 0.5f)),
     new Color(255, 246, 230));
 
 var camera = new PerspectiveCamera
@@ -94,7 +94,7 @@ var player = new Sprite3D
     // surface via gravity + bounce.
     Position = new Vector3(0f, HeightAt(0f, 0f) + 4f, 0f),
     Behaviors =
-    {
+    [
         walkController,
         new Gravity3D
         {
@@ -110,7 +110,7 @@ var player = new Sprite3D
             TangentialDamping = 1f,
         },
         new Motion3D(),
-    },
+    ]
 };
 
 playField.AddSprite(player);
@@ -130,7 +130,7 @@ var hud = new CustomLayer3D
 
 var scene = new Scene3D
 {
-    Layers = { playField, hud },
+    Layers = [ playField, hud ]
 };
 
 await scene.RunAsync(window);

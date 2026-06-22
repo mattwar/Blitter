@@ -1,4 +1,2 @@
-global using System.Collections.Immutable;
-global using Blitter;
-global using Blitter.Blocks2D;
+global using Blitter.Blocks;
 global using Xunit;

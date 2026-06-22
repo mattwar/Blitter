@@ -2,208 +2,151 @@
 
 // Run this file directly with .NET 10 or later:
 //
-//     dotnet run MoonScroller.cs
-//
-// While Blitter is unpublished, build a local copy first:
-//
-//     dotnet build src/Blitter.Package/Blitter.Package.csproj
+//     dotnet run SpacemanScroller.cs
 
-// Parallax side-scroller proof-of-concept: a stack of six tileable
-// background plates scrolls past at different speeds while the
-// space man walks across them. Exercises Scene2D + Layer2D
-// composition, the new RepeatingImageLayer2D block, and
-// CameraFollow2D for horizontal tracking with no world bounds (the
-// world scrolls forever).
+// Parallax side-scroller proof-of-concept:
+// A spaceman walks on a planet surface; left or right and jumps.
+// The background moves as the spaceman moves.
 
 using System.Numerics;
 
 using Blitter;
 using Blitter.Bits;
+using Blitter.Blocks;
 using Blitter.Blocks2D;
 
+// Resolve asset files relative to this source file.
+Application.Current.SetCallerAssetFolder();
+
 // Logical surface matches the artwork (1920x1080). 
-// Window is half that size and letterboxes so it scales cleanly.
 const int LogicalW = 1920;
 const int LogicalH = 1080;
-const int WindowW = 1280;
-const int WindowH = 720;
 
 // World Y of the bottom edge of every background plate.
-// LogicalH/2 anchors the plates so they exactly fill the viewport
-// vertically when the camera Y is 0.
 const float ImageBottomY = LogicalH / 2f;
 
 // Y coordinate the space man's feet land at.
 const float GroundY = 450f;
 const float WalkSpeed = 240f;          // world px / sec
 const float SpriteScale = 0.5f;
+const double WalkFrameSeconds = 0.08;
+const double IdleFrameSeconds = 0.25;
 
-
-var window = new Window2D(WindowW, WindowH)
+// the window to render into
+var window = new Window2D
 {
     Title = "Moon Scroller — ← → walk, Space jump, Esc quit",
     BackgroundColor = new Color(8, 8, 20),
     CloseKey = Key.Escape,
+    //RelativeMouseMode = true,
+    FullScreen = true,
+    LogicalSize = (LogicalW, LogicalH),
+    LogicalPresentation = LogicalPresentation.Letterbox,
 };
 
-window.Renderer.SetLogicalSize(LogicalW, LogicalH, LogicalPresentation.Letterbox);
-
-// --- Background plates --------------------------------------------
-// Loaded in back-to-front order. ParallaxFactor controls how fast
-// each layer scrolls relative to the camera: 0 = locked, 1 = matches
-// the playfield, anything in between drifts behind.
-var skyImage      = Bitmap.Load(Asset.GetPathRelativeToCaller("01_sky_planet.png"));
-var farMountains  = Bitmap.Load(Asset.GetPathRelativeToCaller("02_mountains_far.png"));
-var midMountains  = Bitmap.Load(Asset.GetPathRelativeToCaller("03_mountains_mid.png"));
-var nearMountains = Bitmap.Load(Asset.GetPathRelativeToCaller("04_mountains_near.png"));
-var crystals      = Bitmap.Load(Asset.GetPathRelativeToCaller("05_crystals_big.png"));
-var groundFg      = Bitmap.Load(Asset.GetPathRelativeToCaller("06_ground_fg.png"));
-
-// spaceman sprite sheet
-var sheet = Bitmap.Load(Asset.GetPathRelativeToCaller("space-man-sprites.png"));
-using var atlas = TextureCatalog.Sense(
-    sheet,
-    minRegionWidth: 8,
-    minRegionHeight: 8,
-    minRowGutter: 4,
-    minColumnGutter: 4,
-    ownsImage: true
-    );
-
-const double WalkFrameSeconds = 0.08;
-const double IdleFrameSeconds = 0.25;
-// Pace the 5-frame [7,4,5,6,7] jump (squat → up → mid → down →
-// squat) to span the full airtime so the landing pose lands with the
-// feet, not above the peak.
-var jumpFrameDuration = TimeSpan.FromSeconds(SpacemanController.JumpAirtime / 5.0);
-var anims = atlas.ToAnimationCatalog([
-    new("idle-right", [0, 1, 2, 3], TimeSpan.FromSeconds(IdleFrameSeconds)),
-    new("idle-left",  [0, 1, 2, 3], TimeSpan.FromSeconds(IdleFrameSeconds), Flip: FlipMode.Horizontal),
-    new("walk-right", [9, 10, 11, 12, 13, 14, 15, 16], TimeSpan.FromSeconds(WalkFrameSeconds)),
-    new("walk-left",  [9, 10, 11, 12, 13, 14, 15, 16], TimeSpan.FromSeconds(WalkFrameSeconds), Flip: FlipMode.Horizontal),
-    new("jump-right", [7, 4, 5, 6, 7], jumpFrameDuration, AnimationLoop.Once),
-    new("jump-left",  [7, 4, 5, 6, 7], jumpFrameDuration, AnimationLoop.Once, FlipMode.Horizontal),
-]);
-
-var visual = new AnimatedVisual2D(anims, initialState: "idle-right");
-var standSize = ((ITextureRegion)atlas[0]).Region;
-float feetOffset = standSize.Height * 0.5f * SpriteScale;
-
-var spaceman = new Spaceman
-{
-    Visual = visual,
-    Center = new Vector2(0f, GroundY - feetOffset),
-    Scale = SpriteScale,
-    WalkSpeed = WalkSpeed,
-    FeetOffsetY = feetOffset,
-    GroundY = GroundY,
-};
-
-spaceman.Behaviors.Add(
-    new SpacemanController(window.Input)
-    );
-
-// Camera follows the space man horizontally; no world bounds means
-// the level scrolls forever in either direction. Y stays at 0 so
-// the background plates (anchored to image-bottom = world Y 540)
-// always fill the viewport regardless of where the man stands.
-var camera = new Camera2D { Position = new Vector2(spaceman.Center.X, 0f) };
-window.Renderer.Camera = camera;
-
-spaceman.Behaviors.Add(
-    new CameraFollow2D
-    {
-        Camera = camera,
-        ViewportSize = new Vector2(LogicalW, LogicalH),
-        MarginFraction = 0.35f,
-        FollowY = false, // side-scroller: only track horizontal motion
-    });
-
-var playfield = new PlayField2D();
-playfield.AddSprite(spaceman);
-
-// Drop-shadow layer drawn just before the playfield (so the sprite
-// renders on top). Anchored at GroundY, not the sprite's Y, so it
-// stays on the ground while the man arcs through the air; shrinks
-// and fades as altitude grows to sell the jump height.
-float shadowBaseWidth = standSize.Width * SpriteScale * 0.9f;
-var shadowLayer = new CustomLayer2D
-{
-    ParallaxFactor = Vector2.One,
-    OnRender = rd =>
-    {
-        float airFraction = Math.Min(1f, - spaceman.JumpOffsetY / 120f);
-        float shadowScale = 1f - 0.55f * airFraction;
-        byte shadowAlpha = (byte)(110 - 70 * airFraction);
-        DrawShadowEllipse(
-            rd, spaceman.Center.X, GroundY + 1f,
-            shadowBaseWidth * 0.5f * shadowScale,
-            4f * shadowScale,
-            new Color(0, 0, 0, shadowAlpha)
-            );
-    }
-};
-
-// compose scene with background layers with parallax so they scroll at different speeds
-
-var skyLayer = new RepeatingImageLayer2D(skyImage)
-{
-    BottomY = ImageBottomY,
-    OffsetX = -skyImage.Width / 2f,
-    RepeatX = false,
-    ParallaxFactor = Vector2.Zero,
-};
-
-RepeatingImageLayer2D TiledLayer(Texture2D img, float parallax) =>
-    new(img)
-    {
-        BottomY = ImageBottomY,
-        ParallaxFactor = new Vector2(parallax, 0f),
-    };
-
+// the scene to run 
 var scene = new Scene2D
 {
     Layers =
-    {
-        skyLayer,
-        TiledLayer(farMountains,  0.15f),
-        TiledLayer(midMountains,  0.30f),
-        TiledLayer(nearMountains, 0.60f),
-        TiledLayer(crystals,      1.00f),
-        TiledLayer(groundFg,      1.00f),
-        shadowLayer,
-        playfield,
-    }
+    [
+        // camera layer responsible for giving the scene/renderer a camera.
+        new CameraLayer2D(),
+
+        // The background with parallax plates.
+        new ParallaxBackground2D
+        {
+            BottomY = ImageBottomY,
+            Plates =
+            {
+                new() { Image = "01_sky_planet.png", Parallax = Vector2.Zero, RepeatX = false },
+                { "02_mountains_far.png",  0.15f },
+                { "03_mountains_mid.png",  0.30f },
+                { "04_mountains_near.png", 0.60f },
+                { "05_crystals_big.png",   1.00f },
+                { "06_ground_fg.png",      1.00f },
+            },
+        },
+
+        // The shadow below the spaceman
+        new SpacemanShadowLayer 
+        { 
+            GroundY = GroundY 
+        },
+
+        // The playfield contains any sprites
+        new PlayField2D
+        {
+            Sprites =
+            [
+                // the walking, jumping spacemen
+                new Spaceman
+                {
+                    Image =
+                    {
+                        FilePath = "space-man-sprites.png",
+                        ["idle-right"] = { Frames = { 0, 1, 2, 3 }, FrameDuration = TimeSpan.FromSeconds(IdleFrameSeconds) },
+                        ["idle-left"]  = { Frames = { 0, 1, 2, 3 }, FrameDuration = TimeSpan.FromSeconds(IdleFrameSeconds), Flip = FlipMode.Horizontal },
+                        ["walk-right"] = { Frames = { 9, 10, 11, 12, 13, 14, 15, 16 }, FrameDuration = TimeSpan.FromSeconds(WalkFrameSeconds) },
+                        ["walk-left"]  = { Frames = { 9, 10, 11, 12, 13, 14, 15, 16 }, FrameDuration = TimeSpan.FromSeconds(WalkFrameSeconds), Flip = FlipMode.Horizontal },
+                        ["jump-right"] = { Frames = { 7, 4, 5, 6, 7 }, Duration = TimeSpan.FromSeconds(SpacemanController.JumpAirtime), Loop = AnimationLoop.Once },
+                        ["jump-left"]  = { Frames = { 7, 4, 5, 6, 7 }, Duration = TimeSpan.FromSeconds(SpacemanController.JumpAirtime), Loop = AnimationLoop.Once, Flip = FlipMode.Horizontal },
+                    },
+                    Scale = SpriteScale,
+                    WalkSpeed = WalkSpeed,
+                    GroundY = GroundY,
+                    Behaviors =
+                    [
+                        // walks and jumps the spaceman using player input
+                        new SpacemanController(window.Input),
+
+                        // keeps the camera following along with the spaceman
+                        new CameraFollow2D
+                        {
+                            ViewportSize = new Vector2(LogicalW, LogicalH),
+                            MarginFraction = 0.35f,
+                            FollowY = false, // side-scroller: only track horizontal motion
+                        },
+                    ],
+                },
+            ],
+        },
+    ]
 };
 
+// runs the scene until window close (or other exit condition)
 await scene.RunAsync(window);
 
-// Filled ellipse approximated as horizontal strips — no native
-// ellipse primitive on Renderer2D today.
-static void DrawShadowEllipse(Renderer2D rd, float cx, float cy, float rx, float ry, Color color)
-{
-    if (rx <= 0f || ry <= 0f) return;
-    rd.DrawColor = color;
-    int steps = Math.Max(1, (int)MathF.Ceiling(ry));
-    for (int i = -steps; i <= steps; i++)
-    {
-        float t = i / (float)steps;
-        float w = rx * MathF.Sqrt(Math.Max(0f, 1f - t * t));
-        rd.DrawFillRect(new Rect(cx - w, cy + i, 2f * w, 1f));
-    }
-}
 
+// ---------------------------- Sprites & Layers ----------------------------
+
+/// <summary>
+/// The spaceman sprite.
+/// </summary>
 public class Spaceman : Sprite2D
 {
     public string Facing { get; set; } = "right";
     public TimeSpan? JumpStartedAt { get; set; } = null;
     public float GroundY { get; set; }
-    public float FeetOffsetY { get; set; }
+    public float FeetOffsetY { get; private set; }
     public float JumpOffsetY { get; set; } = 0f;
     public float WalkSpeed { get; set; }
+    public float ShadowWidth { get; private set; }
+
+    protected override void OnAttach(IEntity entity)
+    {
+        base.OnAttach(entity);
+        var standSize = ((ITextureRegion)((AnimatedVisual2D)Image.Visual!).Catalog["idle-right"].Frames[0].Texture).Region;
+        FeetOffsetY = standSize.Height * 0.5f * Scale;
+        ShadowWidth = standSize.Width * 0.9f * Scale;
+        Center = new Vector2(0f, GroundY - FeetOffsetY);
+    }
 }
 
-public class SpacemanController : SpriteBehavior2D
+/// <summary>
+/// The spaceman movement controller.
+/// This handles all the spaceman's motion and gravity.
+/// </summary>
+public class SpacemanController : Behavior
 {
     private readonly FrameInput input;
 
@@ -221,8 +164,9 @@ public class SpacemanController : SpriteBehavior2D
         this.input = input;
     }
 
-    public override void Apply(Sprite2D self, in UpdateContext2D ctx)
+    public override void Apply(in UpdateContext ctx)
     {
+        var self = (Sprite2D)this.Entity;
         if (self is not Spaceman spaceman) 
             return;
 
@@ -263,6 +207,55 @@ public class SpacemanController : SpriteBehavior2D
             ? "jump"
             : (move != 0f ? "walk" : "idle");
 
-        self.Visual!.State = motion + "-" + spaceman.Facing;
+        self.Image.Visual!.State = motion + "-" + spaceman.Facing;
+    }
+}
+
+/// <summary>
+/// The shadow layer for the spaceman.
+/// Draws a drop-shadow below the spaceman.
+/// </summary>
+public class SpacemanShadowLayer : Layer2D
+{
+    private Spaceman _spaceman = null!;
+
+    /// <summary>World Y the shadow is pinned to (the ground line).</summary>
+    public float GroundY { get; set; }
+
+    protected override void OnAttach(IEntity entity)
+    {
+        base.OnAttach(entity);
+        _spaceman = Scene.GetLayer<PlayField2D>().GetSprite<Spaceman>();
+    }
+
+    public override void Update(in UpdateContext context) { }
+
+    protected override void DrawContent(Renderer2D rd)
+    {
+        float airFraction = Math.Min(1f, -_spaceman.JumpOffsetY / 120f);
+        float shadowScale = 1f - 0.55f * airFraction;
+        byte shadowAlpha = (byte)(110 - 70 * airFraction);
+        DrawShadowEllipse(
+            rd, 
+            _spaceman.Center.X, GroundY + 1f,
+            _spaceman.ShadowWidth * 0.5f * shadowScale,
+            4f * shadowScale,
+            new Color(0, 0, 0, shadowAlpha)
+            );
+    }
+
+    // Filled ellipse approximated as horizontal strips — 
+    // no native ellipse primitive on Renderer2D today.
+    private static void DrawShadowEllipse(Renderer2D rd, float cx, float cy, float rx, float ry, Color color)
+    {
+        if (rx <= 0f || ry <= 0f) return;
+        rd.DrawColor = color;
+        int steps = Math.Max(1, (int)MathF.Ceiling(ry));
+        for (int i = -steps; i <= steps; i++)
+        {
+            float t = i / (float)steps;
+            float w = rx * MathF.Sqrt(Math.Max(0f, 1f - t * t));
+            rd.DrawFillRect(new Rect(cx - w, cy + i, 2f * w, 1f));
+        }
     }
 }

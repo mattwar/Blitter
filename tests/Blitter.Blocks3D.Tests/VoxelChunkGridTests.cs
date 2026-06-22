@@ -4,11 +4,11 @@ namespace Blitter.Tests;
 
 public class VoxelChunkGridTests
 {
-    private static (ArrayVoxelWorld world, VoxelPalette palette) MakeWorld(int w = 32, int h = 32, int d = 32)
+    private static (ArrayVoxelWorld world, VoxelCatalog catalog) MakeWorld(int w = 32, int h = 32, int d = 32)
     {
-        var palette = new VoxelPalette();
-        palette.Add(new VoxelType { Id = 1, Name = "stone" });
-        return (new ArrayVoxelWorld(w, h, d, palette), palette);
+        var catalog = new VoxelCatalog();
+        catalog.Add(new VoxelType { Name = "stone" });
+        return (new ArrayVoxelWorld(w, h, d, catalog), catalog);
     }
 
     [Fact]
@@ -51,20 +51,20 @@ public class VoxelChunkGridTests
     [Fact]
     public void GetVoxel_ForwardsToWorldWithOriginOffset()
     {
-        var (world, _) = MakeWorld();
-        world.SetVoxel(17, 1, 1, 1); // world coord
+        var (world, catalog) = MakeWorld();
+        world.SetVoxel(17, 1, 1, catalog["stone"]); // world coord
         var grid = new VoxelChunkGrid(world, new ChunkCoord(1, 0, 0), 16, 16, 16, Vector3.One);
 
         // Local (1,1,1) maps to world (16+1, 1, 1) = (17,1,1).
-        Assert.Equal(1, grid.GetVoxel(1, 1, 1));
-        Assert.Equal(0, grid.GetVoxel(0, 1, 1));
+        Assert.Same(catalog["stone"], grid.GetVoxel(1, 1, 1).Type);
+        Assert.True(grid.GetVoxel(0, 1, 1).IsAir);
     }
 
     [Fact]
-    public void Palette_ForwardsFromWorld()
+    public void Catalog_ForwardsFromWorld()
     {
-        var (world, palette) = MakeWorld();
+        var (world, catalog) = MakeWorld();
         var grid = new VoxelChunkGrid(world, default, 16, 16, 16, Vector3.One);
-        Assert.Same(palette, grid.Palette);
+        Assert.Same(catalog, grid.Catalog);
     }
 }

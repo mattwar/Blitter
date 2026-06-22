@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Numerics;
 
 namespace Blitter.Bits;
 

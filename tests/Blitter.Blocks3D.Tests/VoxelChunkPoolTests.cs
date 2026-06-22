@@ -1,7 +1,5 @@
 using System.Numerics;
 
-using Blitter.Bits;
-
 namespace Blitter.Tests;
 
 /// <summary>
@@ -12,15 +10,15 @@ namespace Blitter.Tests;
 /// </summary>
 public class VoxelChunkPoolTests
 {
-    private static VoxelPalette MakePalette()
+    private static VoxelCatalog MakeCatalog()
     {
-        var palette = new VoxelPalette();
-        palette.Add(new VoxelType { Id = 1, Name = "stone" });
-        return palette;
+        var catalog = new VoxelCatalog();
+        catalog.Add(new VoxelType { Name = "stone" });
+        return catalog;
     }
 
     private static VoxelChunkSource3D MakeSource() =>
-        new(new ArrayVoxelWorld(32, 32, 32, MakePalette()), Vector3.One, 4, 4, 4);
+        new(new ArrayVoxelWorld(32, 32, 32, MakeCatalog()), Vector3.One, 4, 4, 4);
 
     // Evicts every loaded chunk by trimming to a far-away single-chunk box.
     private static void EvictAll(VoxelChunkSource3D source) =>

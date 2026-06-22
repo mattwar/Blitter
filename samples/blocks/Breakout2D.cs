@@ -23,6 +23,7 @@ using System.Numerics;
 
 using Blitter;
 using Blitter.Bits;
+using Blitter.Blocks;
 using Blitter.Blocks2D;
 
 const int W = 960;
@@ -62,11 +63,10 @@ var window = new Window2D(W, H)
     FullScreen = true,
     RelativeMouseMode = true,  // hide mouse
     CloseKey = Key.Escape,
+    // Render at a fixed 960x720 logical surface; SDL letterboxes it onto
+    // whatever the physical fullscreen resolution turns out to be.
+    LogicalSize = (W, H),
 };
-
-// Render at a fixed 960x720 logical surface; SDL letterboxes it onto
-// whatever the physical fullscreen resolution turns out to be.
-window.Renderer.SetLogicalSize(W, H, LogicalPresentation.Letterbox);
 
 Application.Current.SuppressAccessibilityShortcuts = true;
 
@@ -141,7 +141,7 @@ var ball = new BreakoutBall(BallRadius)
 {
     Center = BallRestPosition(paddle),
     Behaviors =
-    {
+    [
         new Motion2D(),
         new BarrierBounce2D
         {
@@ -150,7 +150,7 @@ var ball = new BreakoutBall(BallRadius)
             OnBounce = (s, _, _) => Audio.Play(Sounds.Bounce, 0.35f),
         },
         new SpeedClamp2D { Min = 240f, Max = BallMaxSpeed },
-    },
+    ],
 };
 playField.AddSprite(ball);
 
@@ -189,8 +189,8 @@ var hud = new CustomLayer2D
 
 var scene = new Scene2D
 {
-    Layers  = { playField, popups, scoreboard, hud },
-    Behaviors = { controller },
+    Layers  = [ playField, popups, scoreboard, hud ],
+    Behaviors = [ controller ],
 };
 
 await scene.RunAsync(window);
@@ -227,13 +227,18 @@ sealed class BreakoutBall : Sprite2D
 
 // Optional ball-side behavior that clamps Speed each tick.
 // Keeps the ball lively even when bricks/paddle introduce damping.
-sealed class SpeedClamp2D : SpriteBehavior2D
+sealed class SpeedClamp2D : Behavior
 {
     public float Min { get; set; }
     public float Max { get; set; }
 
-    public override void Apply(Sprite2D target, in UpdateContext2D context)
+    private Sprite2D _target = null!;
+
+    protected override void OnAttach(IEntity entity) => _target = (Sprite2D)entity;
+
+    public override void Apply(in UpdateContext context)
     {
+        var target = _target;
         if (target.Speed > 0f && target.Speed < Min)
             target.Speed = Min;
         else if (target.Speed > Max)
@@ -266,7 +271,7 @@ sealed class Paddle : Barrier2D
         HalfHeight = halfHeight;
     }
 
-    public void MoveTo(float x, in UpdateContext2D context)
+    public void MoveTo(float x, in UpdateContext context)
     {
         var clamped = Math.Clamp(x, XMin, XMax);
         _previousCenter = Center;
@@ -283,7 +288,7 @@ sealed class Paddle : Barrier2D
                 HalfHeight),
             new Pose2D(Center, 0f, 1f));
 
-    public override void OnHitSprite(Sprite2D hitter, in UpdateContext2D context)
+    public override void OnHitSprite(Sprite2D hitter, in UpdateContext context)
     {
         if (hitter is not BreakoutBall ball)
             return;
@@ -370,7 +375,7 @@ sealed class Brick : Barrier2D
                   new Pose2D(Center, 0f, 1f))
             : new(HitShape2D.None, Pose2D.Identity);
 
-    public override void OnHitSprite(Sprite2D hitter, in UpdateContext2D context)
+    public override void OnHitSprite(Sprite2D hitter, in UpdateContext context)
     {
         if (!IsAlive) return;
         if (hitter is not BreakoutBall ball) return;
@@ -456,7 +461,7 @@ sealed class Brick : Barrier2D
 
 // Scene-wide game loop: input, paddle motion, launch flow, lives,
 // drain detection, win/lose state, level reset.
-sealed class BreakoutController : SceneBehavior2D
+sealed class BreakoutController : Behavior
 {
     private readonly FrameInput _input;
     private readonly Renderer2D _renderer;
@@ -495,8 +500,10 @@ sealed class BreakoutController : SceneBehavior2D
         _launchSpeed = launchSpeed;
     }
 
-    public override void Apply(Scene2D scene, in UpdateContext2D context)
+    public override void Apply(in UpdateContext context)
     {
+        var scene = (Scene2D)this.Entity;
+
         // --- Paddle: mouse delta drives the target; arrows nudge it.
         // RelativeMouseMode hides the cursor and pins it, so absolute
         // MousePosition is useless here. We accumulate MouseDelta and

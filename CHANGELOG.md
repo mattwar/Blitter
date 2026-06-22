@@ -5,6 +5,117 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Declarative `ImageSource` (Blitter.Bits): describe a sprite's image as
+  `new ImageSource { FilePath = "blocks.png", Tile = (4, 4), TileSize = (16, 16) }`
+  and read its `Visual` property for the materialised `Visual2D` — the
+  source bitmap loads once (shared through an internal per-path cache) and
+  the named tile is sliced from it. Setting `Tile` declares a grid of
+  fixed-size cells, so `TileSize` is required alongside it; omit both for
+  the whole image. An optional `Hit` hint (`Auto` opaque-pixel default,
+  `Circle`, `Box`, or `None`) picks the collision `HitShape2D`. A bare
+  path string converts implicitly (`ImageSource src = "hero.png"`). The
+  cache pins bitmaps for the application lifetime and never disposes them;
+  `ImageSource.Evict(path)` / `ImageSource.Clear()` drop cached mappings so
+  the next load re-reads the file. `TextureVisual2D` gained a constructor
+  taking an explicit `HitShape2D`.
+- Named states on `ImageSource`: a string indexer declares several named
+  looks in one descriptor, e.g.
+  `new ImageSource { FilePath = "hero.png", TileSize = (16, 16), ["idle"] = { Tile = (0, 0) }, ["walk"] = { Frames = { (1, 0), (2, 0), (3, 0) } } }`.
+  The descriptor has three declarative levels — `ImageSource` (the whole
+  visual), `ImageSourceState` (one named look), and `ImageSourceFrame` (one
+  picture). A state is either a single `Tile` or an ordered list of
+  animation `Frames` (with `FrameDuration`, `Loop`, and a state-level `Flip`
+  composed onto every frame); `(Column, Row)` tuples and path strings
+  convert implicitly so `Frames = { (1, 0), (2, 0) }` is enough. Each level
+  inherits `FilePath`/`TileSize` from the level above, so a shared sheet is
+  declared once at the top and each state/frame just picks its cell; brace
+  initializers work without `new` because the indexer auto-creates states. A
+  source with states materialises into an `AnimatedVisual2D` whose `State`
+  selects the named look.
+- Frame selection by `Index` on `ImageSource`/`ImageSourceState`/`ImageSourceFrame`:
+  a 1D alternative to the `(Column, Row)` `Tile`. With a fixed `TileSize` set,
+  `Index` is the Nth grid cell in row-major order (wrapping across rows);
+  with no `TileSize`, the sheet is auto-sensed (`TextureCatalog.Sense` with
+  default settings) and `Index` is the Nth detected region — so irregular
+  sheets need no grid and no configuration. Bare integers convert implicitly,
+  so `Frames = { 0, 1, 2 }` lists frames by index; sensed catalogs are cached
+  per file.
+- Direct assignment of already-built visuals on the `ImageSource` tree, for
+  when you have the exact item in hand (e.g. slices from a `TextureCatalog`
+  you sensed yourself): `ImageSource.Texture` / `ImageSourceFrame.Texture`
+  take a `Texture2D`, `ImageSourceState.Texture` a single static frame,
+  `ImageSourceState.Sequence` a whole `AnimationSequence`. `Texture2D`,
+  `AnimationFrame`, and `AnimationSequence` convert implicitly at the
+  appropriate level (so `Frames = { texA, texB }` and `["walk"] = sequence`
+  work), composing the level's `Flip` where applicable.
+- `ImageSource.Visual`: the materialised `Visual2D`, lazily built from the
+  descriptor on first read and locked in, or assigned explicitly to
+  override. An empty source yields `null`. This lets a single
+  `ImageSource`-typed slot replace the previous paired image/visual
+  properties — read `slot.Visual` to draw. `Sprite2D.Image` is now a
+  single non-null `ImageSource` slot (drawn via `Image.Visual`); the
+  separate `Sprite2D.Visual` property was removed.
+- `ParallaxBackground2D` (Blitter.Blocks2D): a single `Layer2D` that draws a
+  back-to-front stack of parallax background plates declared as data, instead
+  of composing one `RepeatingImageLayer2D` per plate. Each `ParallaxPlate2D`
+  lists an image (an `ImageSource`, so a bare file path converts implicitly)
+  and its parallax factor; the `Plates` collection initializer supports the
+  terse `{ "image.png", parallaxX }` form alongside full plate objects for
+  per-plate `BottomY`/`OffsetX`/`RepeatX`/`Tint` overrides. Plates draw in
+  declaration order (first = farthest back); a non-repeating plate is centred
+  on the camera, the rest tile horizontally.
+- `CameraLayer2D` (Blitter.Blocks2D): a non-visual layer whose sole job is to
+  install its `Camera2D` onto the renderer when it draws. Placing it first in
+  `Scene2D.Layers` makes the camera a declarative scene node instead of an
+  imperative `renderer.Camera = …` call, so it can be positioned, named, and
+  resolved like any other node.
+- Scene-node naming and an attach lifecycle (Blitter.Blocks2D): `Layer2D` and
+  `Sprite2D` gained an optional `Name`, a `Scene` back-reference (and
+  `Sprite2D.PlayField`/`Scene`), and an `OnAttach` hook called once after the
+  scene tree is built but before the first frame. Nodes resolve a dependency
+  by navigating from themselves: a layer or sprite reads `Scene`, a
+  `SpriteBehavior2D.OnAttach(Sprite2D self)` reads `self.Scene`, a
+  `SceneBehavior2D.OnAttach(Scene2D scene)` is handed the scene. Lookups live
+  on their natural owners — `Scene2D.GetLayer<T>()`/`GetLayer<T>(name)` for
+  layers and `PlayField2D.GetSprite<T>(name)` for sprites (a sprite's owner
+  is its playfield, not the scene), each with a `TryGet…(out …)` companion —
+  so cross-references can be wired by lookup at attach time instead of
+  hoisting shared local variables through every constructor. Duplicate names
+  and wrong-type or ambiguous lookups throw a descriptive error.
+- `CameraFollow2D` can now resolve the camera it drives from a
+  `CameraLayer2D` at attach time instead of requiring a shared `Camera2D`
+  reference: leave `Camera` unset and it binds to the scene's single
+  `CameraLayer2D`, or to the one named by `CameraName`. An explicitly
+  assigned `Camera` still wins.
+- `Application.AssetFolder`: base folder that relative asset paths resolve
+  against, defaulting to `AppContext.BaseDirectory` so shipped apps need no
+  configuration. Honored by `Bitmap.Load`, `Sound.Load`, `Model.Load`,
+  `Font.Load`, `FragmentShader.Load`, and `VertexShader.Load`.
+  `Application.Current.SetCallerAssetFolder()`
+  sets it to the calling source file's folder via `[CallerFilePath]`, so a
+  sample or single-file app can call it once at startup and then load assets
+  by bare relative name. Absolute paths bypass resolution.
+- See-through voxels via a `TransparencyMode` on `CubeVoxelShape`
+  (`Opaque`, `Cutout`, `Blend`):
+  - `Cutout` discards texels below 0.5 alpha for crisp holes (foliage,
+    grates) that still write depth and need no sorting.
+  - `Blend` alpha-composites the surface over the scene behind it for
+    tinted glass, drawn after the opaque pass with depth writes off.
+  Pair either with `VoxelType.IsOpaque = false` so neighbors keep the
+  faces they share with the voxel. Two adjacent non-opaque voxels of
+  the *same* type now cull the doubled face between them (so a wall of
+  glass reads as a single surface). Backed by a new
+  `LitTextureMaterial.Transparency` property, a `Shaders.LitTextureCutout`
+  shader (an alpha-tested twin of `Shaders.LitTexture`), and a third
+  blend draw pass in the chunk visual. The `VoxelWalkInfinite3D` sample
+  grows alpha-cutout trees and a spawn hut with blended-glass windows.
+- Convenience `CubeVoxelShape` constructors that build the matching
+  `VoxelTexture` for you, covering the common per-face layouts without
+  naming a texture type: a single `Texture2D` (all faces, via the
+  existing implicit conversion); `(topBottom, sides)` for logs and
+  pillars; `(top, sides, bottom)` for grass-style blocks; and the full
+  six-face `(−X, +X, −Y, +Y, −Z, +Z)` set. Each also takes an optional
+  `TransparencyMode`.
 - `SparseVoxelWorld` + `IVoxelGenerator`: dictionary-backed
   `IVoxelWorld` that lazily generates chunks on first read. Streaming is
   driven through the cell-based `IVoxelWorld.EnsureVoxels(range)` /
@@ -33,11 +144,23 @@ All notable changes to this project will be documented in this file.
   `Nearest` for crisp pixel-art / Minecraft-style atlases). Linear
   keeps the existing mipmapped + anisotropic sampler; nearest is
   point-sampled with no mip blending and no anisotropy.
-- `VoxelType` per-face textures: `TopTexture`, `BottomTexture`,
-  `SideTexture` (in addition to `Texture`). When only one is set every
-  face resolves to it; for variation set each side explicitly.
-  `VoxelMesher` now resolves the UV rect per face via
-  `VoxelType.GetFaceTexture(int face)`.
+- `VoxelShape`: a voxel's geometry is now an open class hierarchy
+  instead of an enum. `CubeVoxelShape` is the full unit cube (and the
+  default for `VoxelType.Shape`); `EmptyVoxelShape.Instance` is the
+  no-geometry cell used by air. The mesher walks the grid and defers
+  each cell's face emission to its shape, so new shapes can be added
+  without touching `VoxelMesher`. `VoxelType.Shape.FillsVoxel` replaces
+  the old `VoxelShape.FullBlock` check used by collision.
+- A voxel's face textures now live on `CubeVoxelShape` rather than
+  `VoxelType`. Assign `Shape = new CubeVoxelShape(texture)` where
+  `texture` is any `VoxelTexture`. The `VoxelTexture` abstraction (in
+  `Blitter.Blocks3D`) addresses faces by the local `VoxelFace` enum
+  (`NegativeX`..`PositiveZ`). Three variants: `UniformVoxelTexture`
+  (one picture on all six faces; a bare `Texture2D` implicitly
+  converts to this), `TopSideBottomVoxelTexture` (the grass-block
+  layout), and `SixFaceVoxelTexture` (every face declared separately).
+  Replaces the former `VoxelType.Texture` /
+  `TopTexture` / `BottomTexture` / `SideTexture` properties.
 - `WalkController3D` (`Blitter.Blocks3D`): first-person walk + jump +
   mouse-look behavior with a coyote-window jump grace, configurable
   key bindings, and an optional `Camera3D` it slaves to the sprite's
@@ -184,6 +307,30 @@ All notable changes to this project will be documented in this file.
   *into* the ground when gravity nudges it past the surface.
 
 ### Changed
+- **Breaking:** the voxel model no longer exposes integer ids.
+  `VoxelPalette` is renamed to `VoxelCatalog` — a name↔`VoxelType`
+  map that is also an ordered collection (`this[int]`, `this[string]`,
+  `IndexOf`, `TryGet`, `TryGetIndex`, `Contains`, `Names`, collection
+  initializers). `Add` stamps each type's storage slot itself, so
+  `VoxelType` no longer carries a public `Id`; author a type with just
+  its `Name` and appearance. `IVoxelWorld.GetVoxel` now returns a
+  `VoxelInfo` (an air-safe wrapper exposing `Type`, `IsAir`, `IsOpaque`)
+  and `SetVoxel` takes a `VoxelInfo` (a `VoxelType` converts implicitly).
+  `IVoxelWorld.Palette` becomes `Catalog`. `IVoxelGenerator.Generate`
+  takes a single `VoxelBuffer` (a
+  `ref struct` 3D view over a region of voxel storage) instead of an
+  `int[]`, so generators write voxel types and never see how the world
+  packs them. The buffer is constructed from a `VoxelBox` and exposes
+  that inclusive region as `Bounds`; its bounds-checked
+  `this[x, y, z]` indexer (and a `VoxelCoord` overload) addresses voxels
+  by their voxel coordinate — generators iterate `Bounds` and assign
+  `voxels[x, y, z] = type` in one coordinate space, with the buffer
+  mapping coordinates onto local storage. The buffer is no longer tied
+  to chunks and exposes no `Coord` or `Size`. Chunk dimensions are a
+  `ChunkSize` (with `VoxelCount` and a row-major `IndexOf`), which
+  `SparseVoxelWorld` also takes in its constructor in place of three ints.
+  `VoxelWorldExtensions.GetVoxelType` is dropped in favor of
+  `GetVoxel(...).Type`.
 - **Breaking:** the `Blitter.Blocks` project and namespace are renamed
   to `Blitter.Blocks2D` (assembly `Blitter.Blocks2D.dll`). Update any
   `using Blitter.Blocks;` to `using Blitter.Blocks2D;`. A future

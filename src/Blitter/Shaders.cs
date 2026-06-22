@@ -506,6 +506,71 @@ public static class Shaders
         }
         """;
 
+    // Identical to LitTextureFrag but discards fragments whose texture
+    // alpha falls below a fixed 0.5 cutoff. Gives clean "opaque with
+    // holes" surfaces (foliage, grates, chain-link) that write depth and
+    // need no back-to-front sorting, unlike true alpha blending.
+    private const string LitTextureCutoutFragHlsl = """
+        struct PointLight
+        {
+            float4 PositionRange;
+            float4 ColorIntensity;
+        };
+
+        Texture2D<float4> diffuseTex : register(t0, space2);
+        SamplerState      diffuseSmp : register(s0, space2);
+        StructuredBuffer<PointLight> pointLights : register(t1, space2);
+
+        cbuffer Ambient    : register(b0, space3) { float4 ambient;         };
+        cbuffer LightDir   : register(b1, space3) { float4 dirLightDir;     };
+        cbuffer LightCol   : register(b2, space3) { float4 dirLightColor;   };
+        cbuffer LightCount : register(b3, space3) { float4 pointLightCount; };
+
+        struct Input
+        {
+            float3 WorldPos  : TEXCOORD0;
+            float3 WorldNorm : TEXCOORD1;
+            float2 TexCoord  : TEXCOORD2;
+            float4 Color     : TEXCOORD3;
+        };
+
+        float4 main(Input input) : SV_Target0
+        {
+            float3 N = normalize(input.WorldNorm);
+            float4 baseColor = diffuseTex.Sample(diffuseSmp, input.TexCoord) * input.Color;
+
+            clip(baseColor.a - 0.5f);
+
+            float3 lit = ambient.rgb;
+
+            float dirLen = length(dirLightDir.xyz);
+            if (dirLen > 0.0001f)
+            {
+                float3 L = dirLightDir.xyz / dirLen;
+                float NdotL = saturate(dot(N, L));
+                lit += dirLightColor.rgb * NdotL;
+            }
+
+            int count = (int)pointLightCount.x;
+            for (int i = 0; i < count; i++)
+            {
+                PointLight pl = pointLights[i];
+                float3 toLight = pl.PositionRange.xyz - input.WorldPos;
+                float dist = length(toLight);
+                float range = pl.PositionRange.w;
+                if (range <= 0.0001f || dist >= range)
+                    continue;
+                float3 L = toLight / dist;
+                float NdotL = saturate(dot(N, L));
+                float t = saturate(1.0f - dist / range);
+                float atten = t * t;
+                lit += pl.ColorIntensity.rgb * pl.ColorIntensity.a * NdotL * atten;
+            }
+
+            return float4(baseColor.rgb * lit, 1.0f);
+        }
+        """;
+
     // ---- Instanced Shaders. Per-vertex inputs take the same TEXCOORDn
     // slots as the non-instanced variants. Per-instance inputs follow on
     // higher slots: a float4x4 transform consumes four consecutive
@@ -718,6 +783,9 @@ public static class Shaders
     private static readonly FragmentShader LitTextureFrag =
         new(LitTextureFragHlsl);
 
+    private static readonly FragmentShader LitTextureCutoutFrag =
+        new(LitTextureCutoutFragHlsl);
+
     private static readonly VertexShader PositionInstancedVert =
         new(PositionInstancedVertHlsl);
 
@@ -879,6 +947,17 @@ public static class Shaders
     /// </remarks>
     public static Shader<LitTextureVertex3D, LitArgs> LitTexture { get; } =
         new(LitTextureVert, LitTextureFrag, LitTextureVertex3D.ShaderVertexLayout, LightingArgsLayout, ShaderTextureLayout.SingleTexture2D);
+
+    /// <summary>
+    /// Alpha-cutout variant of <see cref="LitTexture"/>: identical lighting,
+    /// but fragments whose diffuse-texture alpha is below 0.5 are discarded
+    /// instead of blended. Produces crisp see-through holes (foliage, grates)
+    /// that still write depth, so no back-to-front sorting is required.
+    /// Pair with <see cref="LitTextureVertex3D"/> and <see cref="LitArgs"/>
+    /// exactly like <see cref="LitTexture"/>.
+    /// </summary>
+    public static Shader<LitTextureVertex3D, LitArgs> LitTextureCutout { get; } =
+        new(LitTextureVert, LitTextureCutoutFrag, LitTextureVertex3D.ShaderVertexLayout, LightingArgsLayout, ShaderTextureLayout.SingleTexture2D);
 
     /// <summary>
     /// Skybox shader: samples the bound <see cref="Cubemap"/> by the

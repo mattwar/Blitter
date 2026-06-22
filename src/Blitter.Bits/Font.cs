@@ -71,10 +71,12 @@ public sealed class Font : IDisposable
 
     /// <summary>
     /// Loads a typeface from a <c>.ttf</c> / <c>.otf</c> file on disk.
+    /// Relative paths are resolved against <see cref="Application.AssetFolder"/>.
     /// </summary>
     public static Font Load(string filePath, float pixelSize, string? charset = null)
     {
         ArgumentNullException.ThrowIfNull(filePath);
+        filePath = Application.Current.ResolveAssetPath(filePath);
         var typeface = SKTypeface.FromFile(filePath)
             ?? throw new InvalidOperationException($"Failed to load typeface from '{filePath}'.");
         return new Font(typeface, pixelSize, charset, ownsTypeface: true);
@@ -199,11 +201,11 @@ public sealed class Font : IDisposable
             // Build the atlas image by driving a Skia canvas over a
             // transparent SKBitmap, then snapshotting the pixels into a
             // Blitter Image. Build the codepoint->slot map and the
-            // TextureCatalog name map ("A" -> 0, "?" -> 95, ...) in the same pass.
+            // TextureCatalog name list (slot 0 -> "A", slot 95 -> "?", ...) in the same pass.
             var info = new SKImageInfo(atlasW, atlasH, SKColorType.Rgba8888, SKAlphaType.Unpremul);
             using var bmp = new SKBitmap(info);
             _runeToSlot = new Dictionary<int, int>(n);
-            var nameMap = new Dictionary<string, int>(n, StringComparer.Ordinal);
+            var names = new string[n];
             var rects = new Rect[n];
 
             using (var canvas = new SKCanvas(bmp))
@@ -242,13 +244,13 @@ public sealed class Font : IDisposable
                         col * _cellPixelW, row * _cellPixelH,
                         _cellPixelW, _cellPixelH);
                     _runeToSlot[rune.Value] = slot;
-                    nameMap[glyphString] = slot;
+                    names[slot] = glyphString;
                 }
             }
 
             var image = bmp.ToImage();
             _image = image;
-            _atlas = TextureCatalog.FromRegions(image, rects, nameMap);
+            _atlas = TextureCatalog.FromRegions(image, rects, names);
         }
         finally
         {
@@ -377,6 +379,6 @@ public sealed class Font : IDisposable
         return Mesh.Create<TextureVertex3D>(CollectionsMarshal.AsSpan(verts));
     }
 
-    /// <summary>Disposes the backing atlas (and its image).</summary>
-    public void Dispose() => _atlas.Dispose();
+    /// <summary>Disposes the backing glyph atlas image.</summary>
+    public void Dispose() => _image.Dispose();
 }

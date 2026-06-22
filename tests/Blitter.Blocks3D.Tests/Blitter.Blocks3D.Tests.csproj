@@ -17,7 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Blitter\Blitter.csproj" />
     <ProjectReference Include="..\..\src\Blitter.Bits\Blitter.Bits.csproj" />
-    <ProjectReference Include="..\..\src\Blitter.Blocks3D\Blitter.Blocks3D.csproj" />
+    <ProjectReference Include="..\..\src\Blitter.Blocks\Blitter.Blocks.csproj" />
   </ItemGroup>
 
 </Project>

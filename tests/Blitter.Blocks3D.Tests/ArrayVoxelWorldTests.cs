@@ -4,10 +4,12 @@ public class ArrayVoxelWorldTests
 {
     private static ArrayVoxelWorld MakeWorld(int w = 4, int h = 4, int d = 4)
     {
-        var palette = new VoxelPalette();
-        palette.Add(new VoxelType { Id = 1, Name = "stone" });
-        return new ArrayVoxelWorld(w, h, d, palette);
+        var catalog = new VoxelCatalog();
+        catalog.Add(new VoxelType { Name = "stone" });
+        return new ArrayVoxelWorld(w, h, d, catalog);
     }
+
+    private static VoxelType Stone(ArrayVoxelWorld world) => world.Catalog["stone"];
 
     [Theory]
     [InlineData(0, 1, 1)]
@@ -15,41 +17,41 @@ public class ArrayVoxelWorldTests
     [InlineData(1, 1, 0)]
     public void Constructor_RejectsNonPositiveDimensions(int w, int h, int d)
     {
-        var palette = new VoxelPalette();
-        Assert.Throws<ArgumentOutOfRangeException>(() => new ArrayVoxelWorld(w, h, d, palette));
+        var catalog = new VoxelCatalog();
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ArrayVoxelWorld(w, h, d, catalog));
     }
 
     [Fact]
     public void GetVoxel_DefaultsToAir()
     {
         var world = MakeWorld();
-        Assert.Equal(0, world.GetVoxel(2, 2, 2));
+        Assert.True(world.GetVoxel(2, 2, 2).IsAir);
     }
 
     [Fact]
     public void SetVoxel_StoresAndReportsChange()
     {
         var world = MakeWorld();
-        Assert.True(world.SetVoxel(1, 1, 1, 1));
-        Assert.Equal(1, world.GetVoxel(1, 1, 1));
+        Assert.True(world.SetVoxel(1, 1, 1, Stone(world)));
+        Assert.Same(Stone(world), world.GetVoxel(1, 1, 1).Type);
     }
 
     [Fact]
     public void SetVoxel_SameValue_ReturnsFalse()
     {
         var world = MakeWorld();
-        world.SetVoxel(1, 1, 1, 1);
-        Assert.False(world.SetVoxel(1, 1, 1, 1));
+        world.SetVoxel(1, 1, 1, Stone(world));
+        Assert.False(world.SetVoxel(1, 1, 1, Stone(world)));
     }
 
     [Fact]
     public void OutOfBounds_GetReturnsAir_SetReturnsFalse()
     {
         var world = MakeWorld();
-        Assert.Equal(0, world.GetVoxel(-1, 0, 0));
-        Assert.Equal(0, world.GetVoxel(100, 0, 0));
-        Assert.False(world.SetVoxel(-1, 0, 0, 1));
-        Assert.False(world.SetVoxel(100, 0, 0, 1));
+        Assert.True(world.GetVoxel(-1, 0, 0).IsAir);
+        Assert.True(world.GetVoxel(100, 0, 0).IsAir);
+        Assert.False(world.SetVoxel(-1, 0, 0, Stone(world)));
+        Assert.False(world.SetVoxel(100, 0, 0, Stone(world)));
     }
 
     [Fact]
@@ -59,7 +61,7 @@ public class ArrayVoxelWorldTests
         VoxelBox? seen = null;
         world.VoxelsChanged += (IVoxelWorld _, in VoxelBox e) => seen = e;
 
-        world.SetVoxel(2, 3, 1, 1);
+        world.SetVoxel(2, 3, 1, Stone(world));
 
         Assert.NotNull(seen);
         Assert.Equal(new VoxelCoord(2, 3, 1), seen!.Value.Min);
@@ -70,19 +72,19 @@ public class ArrayVoxelWorldTests
     public void Fill_WritesRangeAndCountsCells()
     {
         var world = MakeWorld();
-        var written = world.Fill(0, 0, 0, 1, 1, 1, 1);
+        var written = world.Fill(0, 0, 0, 1, 1, 1, Stone(world));
 
         Assert.Equal(8, written); // 2*2*2
-        Assert.Equal(1, world.GetVoxel(0, 0, 0));
-        Assert.Equal(1, world.GetVoxel(1, 1, 1));
-        Assert.Equal(0, world.GetVoxel(2, 2, 2));
+        Assert.Same(Stone(world), world.GetVoxel(0, 0, 0).Type);
+        Assert.Same(Stone(world), world.GetVoxel(1, 1, 1).Type);
+        Assert.True(world.GetVoxel(2, 2, 2).IsAir);
     }
 
     [Fact]
     public void Fill_ClipsToBounds()
     {
         var world = MakeWorld(4, 4, 4);
-        var written = world.Fill(-5, -5, -5, 100, 100, 100, 1);
+        var written = world.Fill(-5, -5, -5, 100, 100, 100, Stone(world));
         Assert.Equal(64, written); // entire 4*4*4 world
     }
 
@@ -94,7 +96,7 @@ public class ArrayVoxelWorldTests
         var count = 0;
         world.VoxelsChanged += (IVoxelWorld _, in VoxelBox e) => { seen = e; count++; };
 
-        world.Fill(0, 0, 0, 2, 2, 2, 1);
+        world.Fill(0, 0, 0, 2, 2, 2, Stone(world));
 
         Assert.Equal(1, count);
         Assert.Equal(new VoxelCoord(0, 0, 0), seen!.Value.Min);
@@ -108,7 +110,7 @@ public class ArrayVoxelWorldTests
         var raised = false;
         world.VoxelsChanged += (IVoxelWorld _, in VoxelBox _) => raised = true;
 
-        var written = world.Fill(0, 0, 0, 1, 1, 1, 0); // already all air
+        var written = world.Fill(0, 0, 0, 1, 1, 1, VoxelType.Air); // already all air
 
         Assert.Equal(0, written);
         Assert.False(raised);

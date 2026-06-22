@@ -30,6 +30,15 @@ public sealed class LitTextureMaterial : Material
     public Texture2D? DiffuseTexture { get; init; }
 
     /// <summary>
+    /// How this surface's alpha is composited. <see cref="TransparencyMode.Opaque"/>
+    /// (default) ignores alpha; <see cref="TransparencyMode.Cutout"/>
+    /// discards texels below 0.5 alpha for crisp see-through holes; and
+    /// <see cref="TransparencyMode.Blend"/> alpha-blends the surface over
+    /// the scene behind it for tinted glass and the like.
+    /// </summary>
+    public TransparencyMode Transparency { get; init; } = TransparencyMode.Opaque;
+
+    /// <summary>
     /// A featureless white material. Useful as a default.
     /// </summary>
     public static LitTextureMaterial Default { get; } = new();

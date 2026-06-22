@@ -24,9 +24,8 @@ var window = new Window2D(W, H)
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = false,
     CloseKey = Key.Escape,
+    LogicalSize = (W, H),
 };
-
-window.Renderer.SetLogicalSize(W, H, LogicalPresentation.Letterbox);
 
 (Key Key, string Label, Sound Sound)[] entries =
 [

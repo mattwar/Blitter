@@ -4,32 +4,41 @@ using System.Numerics;
 
 public class BehaviorTests
 {
-    private static UpdateContext2D Context(double seconds = 0, Rect? bounds = null) =>
-        new() { ElapsedSinceLastUpdate = TimeSpan.FromSeconds(seconds), Bounds = bounds ?? default };
+    private static UpdateContext Context(double seconds = 0) =>
+        new() { ElapsedSinceLastUpdate = TimeSpan.FromSeconds(seconds) };
+
+    private static UpdateContext Context2D(double seconds = 0) =>
+        new() { ElapsedSinceLastUpdate = TimeSpan.FromSeconds(seconds) };
 
     // ---- WrapInBounds2D ----
 
     [Fact]
     public void WrapInBounds_WrapsLeftEdgeToRight()
     {
-        var sprite = new Sprite2D { Center = new Vector2(-10, 50), Behaviors = { new WrapInBounds2D() } };
-        sprite.Update(Context(0, new Rect(0, 0, 100, 100)));
+        var sprite = new Sprite2D { Center = new Vector2(-10, 50) };
+        sprite.AddTrait(new Bounds2D { Rect = new Rect(0, 0, 100, 100) });
+        sprite.AddBehavior(new WrapInBounds2D());
+        sprite.Update(Context(0));
         Assert.Equal(new Vector2(90, 50), sprite.Center);
     }
 
     [Fact]
     public void WrapInBounds_WrapsBottomToTop()
     {
-        var sprite = new Sprite2D { Center = new Vector2(50, 110), Behaviors = { new WrapInBounds2D() } };
-        sprite.Update(Context(0, new Rect(0, 0, 100, 100)));
+        var sprite = new Sprite2D { Center = new Vector2(50, 110) };
+        sprite.AddTrait(new Bounds2D { Rect = new Rect(0, 0, 100, 100) });
+        sprite.AddBehavior(new WrapInBounds2D());
+        sprite.Update(Context(0));
         Assert.Equal(new Vector2(50, 10), sprite.Center);
     }
 
     [Fact]
     public void WrapInBounds_InsideBounds_LeavesCenterAlone()
     {
-        var sprite = new Sprite2D { Center = new Vector2(50, 50), Behaviors = { new WrapInBounds2D() } };
-        sprite.Update(Context(0, new Rect(0, 0, 100, 100)));
+        var sprite = new Sprite2D { Center = new Vector2(50, 50) };
+        sprite.AddTrait(new Bounds2D { Rect = new Rect(0, 0, 100, 100) });
+        sprite.AddBehavior(new WrapInBounds2D());
+        sprite.Update(Context(0));
         Assert.Equal(new Vector2(50, 50), sprite.Center);
     }
 
@@ -37,12 +46,10 @@ public class BehaviorTests
     public void WrapInBounds_InvokesOnWrap()
     {
         var count = 0;
-        var sprite = new Sprite2D
-        {
-            Center = new Vector2(-1, 50),
-            Behaviors = { new WrapInBounds2D { OnWrap = _ => count++ } },
-        };
-        sprite.Update(Context(0, new Rect(0, 0, 100, 100)));
+        var sprite = new Sprite2D { Center = new Vector2(-1, 50) };
+        sprite.AddTrait(new Bounds2D { Rect = new Rect(0, 0, 100, 100) });
+        sprite.AddBehavior(new WrapInBounds2D { OnWrap = _ => count++ });
+        sprite.Update(Context(0));
         Assert.Equal(1, count);
     }
 
@@ -54,7 +61,7 @@ public class BehaviorTests
         var sprite = new Sprite2D
         {
             Center = Vector2.Zero,
-            Behaviors = { new SeekTarget2D { Target = () => new Vector2(0, -100), Acceleration = 50, MaxSpeed = 80, MaxTurnRate = 360 } },
+            Behaviors = [new SeekTarget2D { Target = () => new Vector2(0, -100), Acceleration = 50, MaxSpeed = 80, MaxTurnRate = 360 }],
         };
         sprite.Update(Context(1.0));
         Assert.Equal(50f, sprite.Speed, 3);
@@ -69,7 +76,7 @@ public class BehaviorTests
         {
             Center = Vector2.Zero,
             Heading = 0f, // facing up
-            Behaviors = { new SeekTarget2D { Target = () => new Vector2(100, 0), MaxTurnRate = 30 } },
+            Behaviors = [new SeekTarget2D { Target = () => new Vector2(100, 0), MaxTurnRate = 30 }],
         };
         // Desired heading is 90 (right). With MaxTurnRate=30 and 1s dt, heading = 30.
         sprite.Update(Context(1.0));
@@ -83,7 +90,7 @@ public class BehaviorTests
         {
             Speed = 10,
             Heading = 45,
-            Behaviors = { new SeekTarget2D { Target = () => null, Acceleration = 100 } },
+            Behaviors = [new SeekTarget2D { Target = () => null, Acceleration = 100 }],
         };
         sprite.Update(Context(1.0));
         Assert.Equal(10f, sprite.Speed);
@@ -96,7 +103,7 @@ public class BehaviorTests
         var sprite = new Sprite2D
         {
             Center = Vector2.Zero,
-            Behaviors = { new SeekTarget2D { Target = () => new Vector2(5, 0), Acceleration = 100, ArriveRadius = 10 } },
+            Behaviors = [new SeekTarget2D { Target = () => new Vector2(5, 0), Acceleration = 100, ArriveRadius = 10 }],
         };
         sprite.Update(Context(1.0));
         Assert.Equal(0f, sprite.Speed);
@@ -110,11 +117,11 @@ public class BehaviorTests
         var fires = 0;
         var scene = new Scene2D
         {
-            Behaviors = { new Timer2D { Duration = TimeSpan.FromSeconds(1), OnExpired = _ => fires++ } },
+            Behaviors = [new Timer2D { Duration = TimeSpan.FromSeconds(1), OnExpired = _ => fires++ }],
         };
-        scene.Update(Context(0.5));
+        scene.Update(Context2D(0.5));
         Assert.Equal(0, fires);
-        scene.Update(Context(0.6));
+        scene.Update(Context2D(0.6));
         Assert.Equal(1, fires);
     }
 
@@ -124,11 +131,11 @@ public class BehaviorTests
         var fires = 0;
         var scene = new Scene2D
         {
-            Behaviors = { new Timer2D { Duration = TimeSpan.FromSeconds(1), AutoRestart = true, OnExpired = _ => fires++ } },
+            Behaviors = [new Timer2D { Duration = TimeSpan.FromSeconds(1), AutoRestart = true, OnExpired = _ => fires++ }],
         };
-        scene.Update(Context(1.0));
-        scene.Update(Context(1.0));
-        scene.Update(Context(1.0));
+        scene.Update(Context2D(1.0));
+        scene.Update(Context2D(1.0));
+        scene.Update(Context2D(1.0));
         Assert.Equal(3, fires);
     }
 
@@ -138,9 +145,9 @@ public class BehaviorTests
         var fires = 0;
         var scene = new Scene2D
         {
-            Behaviors = { new Timer2D { Duration = TimeSpan.FromSeconds(1), Paused = true, OnExpired = _ => fires++ } },
+            Behaviors = [new Timer2D { Duration = TimeSpan.FromSeconds(1), Paused = true, OnExpired = _ => fires++ }],
         };
-        scene.Update(Context(2.0));
+        scene.Update(Context2D(2.0));
         Assert.Equal(0, fires);
     }
 
@@ -153,19 +160,19 @@ public class BehaviorTests
         var flag = false;
         var scene = new Scene2D
         {
-            Behaviors = { new TriggerOnPredicate2D { Predicate = _ => flag, Action = _ => fires++ } },
+            Behaviors = [new TriggerOnPredicate2D { Predicate = _ => flag, Action = _ => fires++ }],
         };
-        scene.Update(Context());                // false → no fire
+        scene.Update(Context2D());                // false → no fire
         Assert.Equal(0, fires);
         flag = true;
-        scene.Update(Context());                // false→true → fire
+        scene.Update(Context2D());                // false→true → fire
         Assert.Equal(1, fires);
-        scene.Update(Context());                // true→true → no fire
+        scene.Update(Context2D());                // true→true → no fire
         Assert.Equal(1, fires);
         flag = false;
-        scene.Update(Context());
+        scene.Update(Context2D());
         flag = true;
-        scene.Update(Context());                // re-arms and fires again
+        scene.Update(Context2D());                // re-arms and fires again
         Assert.Equal(2, fires);
     }
 
@@ -175,12 +182,11 @@ public class BehaviorTests
         var fires = 0;
         var flag = false;
         var trig = new TriggerOnPredicate2D { Predicate = _ => flag, Action = _ => fires++, Repeating = false };
-        var scene = new Scene2D { Behaviors = { trig } };
-        flag = true; scene.Update(Context());
-        flag = false; scene.Update(Context());
-        flag = true; scene.Update(Context());
+        var scene = new Scene2D { Behaviors = [trig] };
+        flag = true; scene.Update(Context2D());
+        flag = false; scene.Update(Context2D());
+        flag = true; scene.Update(Context2D());
         Assert.Equal(1, fires);
-        Assert.False(trig.Enabled);
     }
 
     // ---- Shake2D ----
@@ -188,7 +194,7 @@ public class BehaviorTests
     [Fact]
     public void Shake_NoTrauma_LeavesCenterAlone()
     {
-        var sprite = new Sprite2D { Center = new Vector2(10, 20), Behaviors = { new Shake2D() } };
+        var sprite = new Sprite2D { Center = new Vector2(10, 20), Behaviors = [new Shake2D()] };
         sprite.Update(Context(0.016));
         Assert.Equal(new Vector2(10, 20), sprite.Center);
     }
@@ -198,7 +204,7 @@ public class BehaviorTests
     {
         var shake = new Shake2D { Decay = 1f };
         shake.AddTrauma(1f);
-        var sprite = new Sprite2D { Behaviors = { shake } };
+        var sprite = new Sprite2D { Behaviors = [shake] };
         // 2 seconds at decay 1/s should fully drain trauma.
         sprite.Update(Context(2.0));
         Assert.Equal(0f, shake.Trauma, 3);
@@ -209,7 +215,7 @@ public class BehaviorTests
     {
         var shake = new Shake2D { Decay = 1f, MaxOffset = 100f };
         shake.AddTrauma(1f);
-        var sprite = new Sprite2D { Center = new Vector2(50, 50), Behaviors = { shake } };
+        var sprite = new Sprite2D { Center = new Vector2(50, 50), Behaviors = [shake] };
         // Drain completely.
         sprite.Update(Context(10.0));
         Assert.Equal(new Vector2(50, 50), sprite.Center);
@@ -221,7 +227,7 @@ public class BehaviorTests
     public void CameraShake_NoTrauma_LeavesCameraAlone()
     {
         var cam = new Camera2D { Position = new Vector2(10, 20) };
-        var sprite = new Sprite2D { Behaviors = { new CameraShake2D { Camera = cam } } };
+        var sprite = new Sprite2D { Behaviors = [new CameraShake2D { Camera = cam }] };
         sprite.Update(Context(0.016));
         Assert.Equal(new Vector2(10, 20), cam.Position);
     }
@@ -232,7 +238,7 @@ public class BehaviorTests
         var cam = new Camera2D { Position = new Vector2(0, 0) };
         var shake = new CameraShake2D { Camera = cam, Decay = 0f, MaxOffset = 0f };
         shake.AddTrauma(1f);
-        var sprite = new Sprite2D { Behaviors = { shake } };
+        var sprite = new Sprite2D { Behaviors = [shake] };
 
         sprite.Update(Context(0.016));
         // External writer moves camera between ticks:

@@ -6,7 +6,7 @@ namespace Blitter.Tests;
 
 public class CameraFollowerTests
 {
-    private static UpdateContext3D Ctx(double dtSeconds, double totalSeconds = 0) =>
+    private static UpdateContext Ctx(double dtSeconds, double totalSeconds = 0) =>
         new()
         {
             ElapsedSinceStart = TimeSpan.FromSeconds(totalSeconds),

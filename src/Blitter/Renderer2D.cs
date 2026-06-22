@@ -99,26 +99,34 @@ public abstract class Renderer2D
     }
 
     /// <summary>
-    /// Builds a per-frame <see cref="UpdateContext2D"/> snapshotting this
-    /// renderer's clock and target bounds. Convenience for the common
-    /// case where one loop drives both update and render; standalone
-    /// simulations should build their own context from their own clock.
+    /// Builds a per-frame <see cref="UpdateContext"/> snapshotting this
+    /// renderer's clock. Convenience for the common case where one loop
+    /// drives both update and render; standalone simulations should build
+    /// their own context from their own clock.
     /// </summary>
-    public UpdateContext2D GetUpdateContext()
+    public UpdateContext GetUpdateContext() => new()
     {
-        // Prefer the logical surface size so update logic that consults
-        // Bounds (layout, edge-bounce, hit tests) stays in the same
-        // coordinate space the renderer is drawing in.
-        var (w, h) = LogicalSize;
-        if (w == 0 || h == 0)
-            (w, h) = OutputSize;
+        ElapsedSinceStart = ElapsedSinceStart,
+        ElapsedSinceLastUpdate = ElapsedSinceLastRender,
+    };
 
-        return new UpdateContext2D
+    /// <summary>
+    /// The logical drawing surface as a rectangle at the origin:
+    /// <c>(0, 0, width, height)</c>. Prefers <see cref="LogicalSize"/>,
+    /// falling back to <see cref="OutputSize"/> when no logical size is set,
+    /// so update logic that needs the drawable region stays in the same
+    /// coordinate space the renderer is drawing in.
+    /// </summary>
+    public Rect LogicalBounds
+    {
+        get
         {
-            ElapsedSinceStart = ElapsedSinceStart,
-            ElapsedSinceLastUpdate = ElapsedSinceLastRender,
-            Bounds = new Rect(0, 0, w, h),
-        };
+            var (w, h) = LogicalSize;
+            if (w == 0 || h == 0)
+                (w, h) = OutputSize;
+
+            return new Rect(0, 0, w, h);
+        }
     }
 
     #region State

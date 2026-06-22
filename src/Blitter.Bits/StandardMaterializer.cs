@@ -82,8 +82,26 @@ public class StandardMaterializer : Materializer
         if (vt == typeof(LitTextureVertex3D))
         {
             var texture = lit.DiffuseTexture ?? Textures.White;
+            // Cutout swaps in the alpha-test shader; blend keeps the
+            // normal shader but composites over the scene with depth
+            // writes off (so it must be drawn after the opaque pass).
+            if (lit.Transparency == TransparencyMode.Blend)
+            {
+                using (renderer.PushState())
+                {
+                    renderer.BlendMode = BlendMode.Alpha;
+                    renderer.DepthMode = DepthMode.Transparent;
+                    MeshDispatcher.For(mesh).DrawTextured(
+                        renderer, mesh, texture, Shaders.LitTexture, in args);
+                }
+                return;
+            }
+
+            var shader = lit.Transparency == TransparencyMode.Cutout
+                ? Shaders.LitTextureCutout
+                : Shaders.LitTexture;
             MeshDispatcher.For(mesh).DrawTextured(
-                renderer, mesh, texture, Shaders.LitTexture, in args);
+                renderer, mesh, texture, shader, in args);
             return;
         }
         if (vt == typeof(LitVertex3D))

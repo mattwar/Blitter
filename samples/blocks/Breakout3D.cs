@@ -28,6 +28,7 @@ using System.Numerics;
 
 using Blitter;
 using Blitter.Bits;
+using Blitter.Blocks;
 using Blitter.Blocks3D;
 
 // Arena layout (right-handed, Y up, looking down -Z).
@@ -79,7 +80,7 @@ var window = new Window3D
 window.Renderer.DebugDrawEnabled = true;
 window.Renderer.AmbientLight = new Color(70, 75, 110);
 window.Renderer.DirectionalLight = new DirectionalLight(
-    Vector3.Normalize(new Vector3(-0.35f, -0.9f, -0.4f)),
+    Vector3.Normalize(new Vector3(0.35f, 0.9f, 0.4f)),
     new Color(255, 246, 220));
 
 var camera = new PerspectiveCamera
@@ -154,8 +155,8 @@ var ball = new Sprite3D
 {
     Visual = MeshVisual3D.Sphere(new Color(245, 250, 255), radius: BallRadius, latitudeSegments: 12, longitudeSegments: 16),
     Position = BallRestPosition(paddle),
-    Behaviors =
-    {
+    Behaviors = 
+    [
         new Motion3D(),
         new BarrierBounce3D
         {
@@ -173,20 +174,22 @@ var ball = new Sprite3D
             MinForwardRatio = 0.5f,
         },
         new SpeedClamp3D { Min = BallLaunchSpeed * 0.85f, Max = BallMaxSpeed },
-    },
+    ]
 };
 
 playField.AddSprite(ball);
 
 // ---- Controller drives input, game state, paddle position, ball flow.
-var controller = new Breakout3DController(window.Input, playField, ball, paddle, bricks,
+var controller = new Breakout3DController(
+    window.Input, playField, ball, paddle, bricks,
     camera: camera,
     cameraTarget: new Vector3(0f, 0f, BackZ),
     cameraOffsetZ: 2.4f,
     drainZ: DrainZ,
     launchSpeed: BallLaunchSpeed,
     paddleSpeed: PaddleSpeed,
-    ballRadius: BallRadius);
+    ballRadius: BallRadius
+    );
 
 // ---- HUD: debug-text overlay for score / lives / banner, plus a
 // wireframe outline so the player has a visible reticle on the paddle.
@@ -248,8 +251,8 @@ var brickRenderer = new CustomLayer3D
 
 var scene = new Scene3D
 {
-    Layers = { playField, brickRenderer, hud },
-    Behaviors = { controller },
+    Layers = [ playField, brickRenderer, hud ],
+    Behaviors = [ controller ],
 };
 
 await scene.RunAsync(window);
@@ -344,7 +347,7 @@ sealed class Paddle3D : Barrier3D
         _previousCenter = Center;
     }
 
-    public void MoveTo(float x, float y, in UpdateContext3D context)
+    public void MoveTo(float x, float y, in UpdateContext context)
     {
         x = Math.Clamp(x, XRange.Min, XRange.Max);
         y = Math.Clamp(y, YRange.Min, YRange.Max);
@@ -373,7 +376,7 @@ sealed class Paddle3D : Barrier3D
         return english + _velocity;
     }
 
-    public override void OnHitSprite(Sprite3D hitter, in UpdateContext3D context)
+    public override void OnHitSprite(Sprite3D hitter, in UpdateContext context)
     {
         Audio.Play(Sounds.Bounce);
     }
@@ -413,7 +416,7 @@ sealed class BrickBarrier3D : Barrier3D
         _visual.Draw(renderer, new Pose3D(Center, Quaternion.Identity, 1f), Color.White, TimeSpan.Zero);
     }
 
-    public override void OnHitSprite(Sprite3D hitter, in UpdateContext3D context)
+    public override void OnHitSprite(Sprite3D hitter, in UpdateContext context)
     {
         // First contact kills the brick. Score and removal from the
         // playfield are handled by the controller's per-frame sweep.
@@ -427,14 +430,19 @@ sealed class BrickBarrier3D : Barrier3D
 // english from off-center paddle hits can compound into a near-flat
 // X/Y trajectory that ping-pongs between the side walls indefinitely
 // without ever returning to the bricks or to the paddle.
-sealed class ForwardKickFromPaddle3D : SpriteBehavior3D
+sealed class ForwardKickFromPaddle3D : Behavior, IHitHandler3D
 {
     public Paddle3D? Paddle { get; set; }
 
     /// <summary>0..1. Minimum |Vz| / |V| immediately after a paddle hit. 0.5 = Z must hold at least half the speed.</summary>
     public float MinForwardRatio { get; set; } = 0.5f;
 
-    public override void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext3D context)
+    public override void Apply(in UpdateContext context)
+    {
+        // do nothing.. work happens in OnHitBarrier
+    }
+
+    public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
     {
         if (Paddle is null || !ReferenceEquals(barrier, Paddle))
             return;
@@ -470,7 +478,7 @@ sealed class ForwardKickFromPaddle3D : SpriteBehavior3D
 
 // Top-level game state: input → paddle, ball launch / drain flow,
 // brick clean-up + scoring, win/lose banner.
-sealed class Breakout3DController : SceneBehavior3D
+sealed class Breakout3DController : Behavior
 {
     private readonly FrameInput _input;
     private readonly PlayField3D _playField;
@@ -513,7 +521,7 @@ sealed class Breakout3DController : SceneBehavior3D
         SyncCameraToPaddle();
     }
 
-    public override void Apply(Scene3D scene, in UpdateContext3D context)
+    public override void Apply(in UpdateContext context)
     {
         // --- Paddle input: arrows + WASD.
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;

@@ -16,6 +16,7 @@ using System.Numerics;
 
 using Blitter;
 using Blitter.Bits;
+using Blitter.Blocks;
 using Blitter.Blocks2D;
 
 using SkiaSharp;
@@ -39,9 +40,8 @@ var window = new Window2D(W, H)
     FullScreen = true,
     RelativeMouseMode = true, // hides the mouse
     CloseKey = Key.Escape,
+    LogicalSize = (W, H),
 };
-
-window.Renderer.SetLogicalSize(W, H, LogicalPresentation.Letterbox);
 
 // Stop Shift×5 / right-Shift-hold from triggering the Windows
 // Sticky/Filter Keys prompt while we're playing.
@@ -94,9 +94,12 @@ playField.AddBarriers(
     new Wall(new Vector2(W - WallInset, 820f), new Vector2(W / 2f + CenterGapOffset, 860f)), // bottom right
 ]);
 
-var bumperSound = Sound.Load(Asset.GetPathRelativeToCaller("bumper.wav"));
-var flipperSound = Sound.Load(Asset.GetPathRelativeToCaller("flipper.wav"));
-var slingshotSound = Sound.Load(Asset.GetPathRelativeToCaller("slingshot.wav"));
+// Resolve loose asset files next to this source file.
+Application.Current.SetCallerAssetFolder();
+
+var bumperSound = Sound.Load("bumper.wav");
+var flipperSound = Sound.Load("flipper.wav");
+var slingshotSound = Sound.Load("slingshot.wav");
 
 // circular bumpers
 playField.AddBarriers(
@@ -155,11 +158,11 @@ playField.AddBarriers([flipperLeft, flipperRight]);
 // The "ball"
 var ball = new Pinball
 {
-    Visual = ballImage,
+    Image = ballImage,
     Center = plungerSpawn,
     Scale = (BallRadius * 2f) / ballImage.Width,
     Behaviors = 
-    {
+    [
         new Gravity2D { Acceleration = new Vector2(0f, 1400f), MaxFallSpeed = 1600f },
         new Motion2D(),
         new BarrierBounce2D
@@ -168,7 +171,7 @@ var ball = new Pinball
             TangentialDamping = 0.985f,
         },
         shaker
-    }
+    ]
 };
 
 playField.AddSprite(ball);
@@ -210,17 +213,17 @@ var hud = new CustomLayer2D
 var scene = new Scene2D
 {
     Layers = 
-    { 
+    [ 
         drainBand, 
         playField, 
         popups, 
         scoreboard, 
         hud 
-    },
+    ],
     Behaviors =
-    {
+    [
         gameController,
-    },
+    ],
 };
 
 // Run the scene (makes the game run within the window)
@@ -352,7 +355,7 @@ sealed class Bumper : CircleBarrier2D
         renderer.DrawDisc(Center, Radius, Tint);
     }
 
-    public override void OnHitSprite(Sprite2D hitter, in UpdateContext2D context)
+    public override void OnHitSprite(Sprite2D hitter, in UpdateContext context)
     {
         if (this.Scoreboard != null)
         {
@@ -390,7 +393,7 @@ sealed class Slingshot : LineBarrier2D
         renderer.DrawThickLine(Start, End, new Color(255, 150, 80), 5f);
     }
 
-    public override void OnHitSprite(Sprite2D hitter, in UpdateContext2D context)
+    public override void OnHitSprite(Sprite2D hitter, in UpdateContext context)
     {
         if (this.HitSound is {} hs)
         {
@@ -415,7 +418,7 @@ sealed class Flipper : SwingArmBarrier2D
 {
     public Sound? HitSound { get; set;}
 
-    protected override void OnPressed(in UpdateContext2D context)
+    protected override void OnPressed(in UpdateContext context)
     {
         if (this.HitSound is {} sound)
             Audio.Play(sound, 0.5f);
@@ -432,7 +435,7 @@ sealed class Flipper : SwingArmBarrier2D
 }
 
 // Coordinates pinball gameplay controls and ball lifecycle at scene scope.
-sealed class PinballGameController : SceneBehavior2D
+sealed class PinballGameController : Behavior
 {
     private readonly FrameInput _input;
     private readonly Pinball _ball;
@@ -471,8 +474,10 @@ sealed class PinballGameController : SceneBehavior2D
 
     private readonly Random _rng = new();
 
-    public override void Apply(Scene2D scene, in UpdateContext2D context)
+    public override void Apply(in UpdateContext context)
     {
+        var scene = (Scene2D)this.Entity;
+
         // Flippers: each frame, drive Pressed off the shift keys.
         // The barriers handle slewing and surface velocity.
         _flipperLeft.Pressed = _input.IsDown(Key.LShift);

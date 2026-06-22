@@ -113,10 +113,9 @@ var window = new Window2D(960, 540)
     Title = "Skia Bitmap (atlas blitting)",
     BackgroundColor = new Color(14, 16, 24),
     CloseKey = Key.Escape,
+    // Treat the surface as a fixed DesignW x DesignH logical size.
+    LogicalSize = (DesignW, DesignH),
 };
-
-// Tell the renderer to treat the surface as a fixed DesignW x DesignH
-window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
 await window.RunAsync(rd =>
 {

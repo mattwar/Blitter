@@ -7,7 +7,7 @@ public class SceneTests
         public int UpdateCount { get; private set; }
         public int RenderCount { get; private set; }
 
-        public override void Update(in UpdateContext2D context)
+        public override void Update(in UpdateContext context)
         {
             UpdateCount++;
         }
@@ -23,9 +23,9 @@ public class SceneTests
     {
         var a = new FakeLayer();
         var b = new FakeLayer();
-        var scene = new Scene2D { Layers = { a, b } };
+        var scene = new Scene2D { Layers = [a, b] };
 
-        scene.Update(new UpdateContext2D());
+        scene.Update(new UpdateContext());
 
         Assert.Equal(1, a.UpdateCount);
         Assert.Equal(1, b.UpdateCount);
@@ -36,9 +36,9 @@ public class SceneTests
     {
         var a = new FakeLayer { Enabled = false };
         var b = new FakeLayer();
-        var scene = new Scene2D { Layers = { a, b } };
+        var scene = new Scene2D { Layers = [a, b] };
 
-        scene.Update(new UpdateContext2D());
+        scene.Update(new UpdateContext());
 
         Assert.Equal(0, a.UpdateCount);
         Assert.Equal(1, b.UpdateCount);
@@ -48,12 +48,12 @@ public class SceneTests
     public void Layers_AddAfterConstructionTicksTheLayer()
     {
         var initial = new FakeLayer();
-        var scene = new Scene2D { Layers = { initial } };
+        var scene = new Scene2D { Layers = [initial] };
 
         var added = new FakeLayer();
-        scene.Layers.Add(added);
+        scene.AddLayer(added);
 
-        scene.Update(new UpdateContext2D());
+        scene.Update(new UpdateContext());
 
         Assert.Equal(1, initial.UpdateCount);
         Assert.Equal(1, added.UpdateCount);
@@ -64,10 +64,10 @@ public class SceneTests
     {
         var a = new FakeLayer();
         var b = new FakeLayer();
-        var scene = new Scene2D { Layers = { a, b } };
+        var scene = new Scene2D { Layers = [a, b] };
 
-        Assert.True(scene.Layers.Remove(a));
-        scene.Update(new UpdateContext2D());
+        Assert.True(scene.RemoveLayer(a));
+        scene.Update(new UpdateContext());
 
         Assert.Equal(0, a.UpdateCount);
         Assert.Equal(1, b.UpdateCount);

@@ -1,5 +1,3 @@
-using SkiaSharp;
-
 namespace Blitter;
 
 /// <summary>
@@ -201,13 +199,15 @@ public sealed partial class Bitmap : ReadableTexture2D
     /// <summary>
     /// Loads an image from disk.
     /// </summary>
-    /// <param name="filePath">Path to the image file.</param>
+    /// <param name="filePath">Path to the image file. 
+    /// Relative paths are resolved against <see cref="Application.AssetFolder"/>.</param>
     /// <param name="mipmaps">Hint to GPU to auto-create mipmaps for the image.</param>
     public static Bitmap Load(string filePath, bool mipmaps = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
 
-        var bytes = File.ReadAllBytes(filePath);
+        var resolved = Application.Current.ResolveAssetPath(filePath);
+        var bytes = File.ReadAllBytes(resolved);
         return Decode(bytes, mipmaps);
     }
 

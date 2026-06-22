@@ -46,7 +46,7 @@ public sealed class CameraFlyer : CameraController
         _window = window;
     }
 
-    public override void Update(in UpdateContext3D context)
+    public override void Update(in UpdateContext context)
     {
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
 
