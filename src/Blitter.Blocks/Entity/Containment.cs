@@ -1,4 +1,4 @@
-namespace Blitter.Bits;
+namespace Blitter.Blocks;
 
 /// <summary>
 /// The membership state of an entity within a container, as reported by

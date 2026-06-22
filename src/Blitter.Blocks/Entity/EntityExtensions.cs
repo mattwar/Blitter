@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace Blitter.Bits;
+namespace Blitter.Blocks;
 
 /// <summary>
 /// Convenience lookups over the <see cref="IEntity"/> primitives. Extension

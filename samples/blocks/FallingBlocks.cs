@@ -15,6 +15,7 @@
 using System.Numerics;
 using Blitter;
 using Blitter.Bits;
+using Blitter.Blocks;
 using Blitter.Blocks2D;
 
 const int W = 800, H = 600;

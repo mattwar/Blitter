@@ -1,4 +1,4 @@
-namespace Blitter.Bits;
+namespace Blitter.Blocks;
 
 /// <summary>
 /// A collection of <see cref="Trait"/>'s and <see cref="Behavior"/>'s.

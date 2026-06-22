@@ -14,8 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Blitter.Blocks2D" />
-    <InternalsVisibleTo Include="Blitter.Blocks3D" />
+    <InternalsVisibleTo Include="Blitter.Blocks" />
   </ItemGroup>
 
 </Project>

@@ -6,11 +6,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="3.119.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Blitter\Blitter.csproj" />
     <ProjectReference Include="..\Blitter.Bits\Blitter.Bits.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Blitter.Blocks2D.Tests" />
     <InternalsVisibleTo Include="Blitter.Blocks3D.Tests" />
   </ItemGroup>
 

@@ -1,4 +1,4 @@
-namespace Blitter.Bits;
+namespace Blitter.Blocks;
 
 /// <summary>
 /// A unit logic attached to an <see cref="IEntity"/>.

@@ -1,4 +1,4 @@
-namespace Blitter.Bits;
+namespace Blitter.Blocks;
 
 /// <summary>
 /// A collection of traits and behaviors.

@@ -28,6 +28,7 @@ using System.Numerics;
 
 using Blitter;
 using Blitter.Bits;
+using Blitter.Blocks;
 using Blitter.Blocks3D;
 
 // Arena layout (right-handed, Y up, looking down -Z).

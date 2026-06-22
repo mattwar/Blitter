@@ -1,4 +1,4 @@
-namespace Blitter.Bits;
+namespace Blitter.Blocks;
 
 /// <summary>
 /// A piece of data attached to an <see cref="IEntity"/>.
