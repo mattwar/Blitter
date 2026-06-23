@@ -29,7 +29,7 @@ public abstract class Barrier2D : Entity
     /// Subclasses whose geometry doesn't fit a posed local shape may override
     /// this directly.
     /// </summary>
-    public virtual PosedHitShape2D HitShape =>
+    public PosedHitShape2D HitShape =>
         this.TryGetBehavior<ColliderShape2D>(out var collider)
             ? collider.GetShape()
             : new(HitShape2D.None, Transform.Pose);

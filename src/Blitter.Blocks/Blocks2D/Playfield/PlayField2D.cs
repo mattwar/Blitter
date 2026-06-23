@@ -29,20 +29,25 @@ public class PlayField2D : Layer2D
     // viewport. Resolved by sprite behaviors via TryFindTrait.
     private readonly Bounds2D _bounds = new();
 
+    // Detects and dispatches collisions; entity-agnostic, shapes sourced
+    // from each entity's ColliderShape2D behavior.
+    private readonly Collider2D _collider;
+
     public PlayField2D()
     {
         AddTrait(_bounds);
+        _collider = new Collider2D(e => e is not Sprite2D s || IsLive(s));
     }
 
     public PlayField2D(IEnumerable<Sprite2D> sprites)
+        : this()
     {
-        AddTrait(_bounds);
         AdoptSprites(sprites);
     }
 
     public PlayField2D(IEnumerable<Sprite2D> sprites, IEnumerable<Barrier2D> barriers)
+        : this()
     {
-        AddTrait(_bounds);
         AdoptSprites(sprites);
         foreach (var b in barriers)
         {
@@ -352,21 +357,6 @@ public class PlayField2D : Layer2D
         ApplyPendingChanges();
     }
 
-    // World-space collision shape for a sprite, pulled from its
-    // ColliderShape2D provider. Returns false when the sprite has no
-    // collider behavior (then it takes no part in hit detection).
-    private static bool TryGetPosedShape(Sprite2D sprite, out PosedHitShape2D shape)
-    {
-        if (sprite.TryGetBehavior<ColliderShape2D>(out var collider))
-        {
-            shape = collider.GetShape();
-            return true;
-        }
-
-        shape = default;
-        return false;
-    }
-
     // Estimate the substep count needed to keep the fastest sprite's
     // per-substep displacement under half the smallest hit radius.
     // Uses the sprite's current Speed as the velocity proxy — that's
@@ -383,7 +373,7 @@ public class PlayField2D : Layer2D
             var s = _sprites[i];
             if (!IsLive(s))
                 continue;
-            if (!TryGetPosedShape(s, out var posed))
+            if (!Collider2D.TryGetHitShape(s, out var posed))
                 continue;
             var r = posed.BoundingCircle.Radius;
             if (r <= 0f)
@@ -420,90 +410,7 @@ public class PlayField2D : Layer2D
             sprite.Update(spriteContext);
         }
 
-        // sprite-vs-sprite collision
-        for (int i = 0; i < _sprites.Count; i++)
-        {
-            var a = _sprites[i];
-            if (!IsLive(a))
-                continue;
-            if (!TryGetPosedShape(a, out var aShape) || aShape.BoundingCircle.Radius <= 0f)
-                continue;
-
-            for (int j = i + 1; j < _sprites.Count; j++)
-            {
-                if (!IsLive(a))
-                    break;
-
-                var b = _sprites[j];
-                if (!IsLive(b))
-                    continue;
-                if (!TryGetPosedShape(b, out var bShape) || bShape.BoundingCircle.Radius <= 0f)
-                    continue;
-                if (!aShape.TestHit(bShape))
-                    continue;
-
-                // Manifold normal points from b's surface toward a.
-                var hasContact = aShape.TryGetContact(bShape, out var contact);
-                var hitForA = new Hit2D(b, contact, hasContact);
-                HitDispatch2D.Dispatch(a, in hitForA);
-                if (IsLive(a) && IsLive(b))
-                {
-                    var hitForB = new Hit2D(a, hasContact ? contact.Flipped() : default, hasContact);
-                    HitDispatch2D.Dispatch(b, in hitForB);
-                }
-            }
-        }
-
-        // sprite-vs-barrier collision
-        if (_barriers.Count > 0)
-        {
-            for (int s = 0; s < _sprites.Count; s++)
-            {
-                var sprite = _sprites[s];
-                if (!IsLive(sprite))
-                    continue;
-                if (!TryGetPosedShape(sprite, out var spriteShape) || spriteShape.BoundingCircle.IsEmpty)
-                    continue;
-
-                for (int k = 0; k < _barriers.Count; k++)
-                {
-                    if (!IsLive(sprite))
-                        break;
-                    var barrier = _barriers[k];
-                    // Re-read each time: the previous barrier handler
-                    // may have moved the sprite.
-                    if (!TryGetPosedShape(sprite, out var sShape) || !sShape.TestHit(barrier.HitShape))
-                        continue;
-
-                    // Barrier reacts first so any state change it
-                    // makes (re-arming, lowering a drop target,
-                    // swapping its Material) is visible to the
-                    // sprite's bounce resolution on the same frame.
-                    // Manifold here is oriented for the barrier: normal
-                    // points from the sprite toward the barrier surface.
-                    var barrierHas = sShape.TryGetContact(barrier.HitShape, out var barrierContact);
-                    var barrierHit = new Hit2D(
-                        sprite,
-                        barrierHas ? barrierContact.Flipped() : default,
-                        barrierHas);
-                    HitDispatch2D.Dispatch(barrier, in barrierHit);
-                    if (!IsLive(sprite))
-                        continue;
-
-                    // Recompute fresh for the sprite: the barrier handler
-                    // may have moved it, so the bounce sees post-reaction
-                    // geometry (a paddle that shoved the ball clear now
-                    // reports no contact -> no spurious second bounce).
-                    // Normal points from the barrier surface toward the
-                    // sprite — the "out of the surface" direction.
-                    if (!TryGetPosedShape(sprite, out var sShapeNow))
-                        continue;
-                    var spriteHas = sShapeNow.TryGetContact(barrier.HitShape, out var spriteContact);
-                    var spriteHit = new Hit2D(barrier, spriteContact, spriteHas);
-                    HitDispatch2D.Dispatch(sprite, in spriteHit);
-                }
-            }
-        }
+        _collider.Collide(_sprites, _barriers);
     }
 
     // Folds dead sprites, pending removes, and pending adds into the

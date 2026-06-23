@@ -281,7 +281,7 @@ sealed class SpeedClamp2D : Behavior
 // classic "the spot on the paddle controls the bounce" trick).
 sealed class Paddle : Barrier2D
 {
-    public Vector2 Center { get; set; }
+    public Vector2 Center { get => Transform.Position; set => Transform.Position = value; }
     public float HalfWidth { get; }
     public float HalfHeight { get; }
 
@@ -299,6 +299,10 @@ sealed class Paddle : Barrier2D
     {
         HalfWidth = halfWidth;
         HalfHeight = halfHeight;
+        this.GetOrAddTrait<CollisionShape2D>().Shape = new CapsuleHitShape2D(
+            new Vector2(-HalfWidth, 0f),
+            new Vector2(HalfWidth, 0f),
+            HalfHeight);
         AddBehavior(new CustomHitBehavior2D { OnHit = OnHit });
     }
 
@@ -311,13 +315,6 @@ sealed class Paddle : Barrier2D
         var dt = (float)_lastDt.TotalSeconds;
         VelocityX = dt > 0f ? (Center.X - _previousCenter.X) / dt : 0f;
     }
-
-    public override PosedHitShape2D HitShape =>
-        new(new CapsuleHitShape2D(
-                new Vector2(-HalfWidth, 0f),
-                new Vector2( HalfWidth, 0f),
-                HalfHeight),
-            new Pose2D(Center, 0f, 1f));
 
     private void OnHit(IEntity self, IEntity other)
     {
@@ -374,7 +371,7 @@ sealed class Paddle : Barrier2D
 // pop, spawns a "+points" popup, and removes itself from the playfield.
 sealed class Brick : Barrier2D
 {
-    public Vector2 Center { get; }
+    public Vector2 Center => Transform.Position;
     public float HalfWidth { get; }
     public float HalfHeight { get; }
     public Color Color { get; }
@@ -388,24 +385,22 @@ sealed class Brick : Barrier2D
     {
         if (IsAlive) return;
         IsAlive = true;
+        this.GetOrAddTrait<CollisionShape2D>().Shape =
+            new BoxHitShape2D(Vector2.Zero, new Vector2(HalfWidth, HalfHeight));
         playField.AddBarrier(this);
     }
 
     public Brick(Vector2 center, float width, float height, Color color, long points)
     {
-        Center = center;
+        Transform.Position = center;
         HalfWidth = width * 0.5f;
         HalfHeight = height * 0.5f;
         Color = color;
         Points = points;
+        this.GetOrAddTrait<CollisionShape2D>().Shape =
+            new BoxHitShape2D(Vector2.Zero, new Vector2(HalfWidth, HalfHeight));
         AddBehavior(new CustomHitBehavior2D { OnHit = OnHit });
     }
-
-    public override PosedHitShape2D HitShape =>
-        IsAlive
-            ? new(new BoxHitShape2D(Vector2.Zero, new Vector2(HalfWidth, HalfHeight)),
-                  new Pose2D(Center, 0f, 1f))
-            : new(HitShape2D.None, Pose2D.Identity);
 
     private void OnHit(IEntity self, IEntity other)
     {
@@ -450,6 +445,10 @@ sealed class Brick : Barrier2D
         Audio.Play(Sounds.Coin, 0.35f);
 
         IsAlive = false;
+        // Drop our collision geometry so the same-frame sprite-direction
+        // dispatch (the ball's BarrierBounce2D) sees no contact and can't
+        // bounce off a brick we just cleared.
+        this.GetOrAddTrait<CollisionShape2D>().Shape = HitShape2D.None;
         // Remove on next safe boundary so the collision pass doesn't
         // see this barrier again this frame.
         ball.PlayField.RemoveBarrier(this);
