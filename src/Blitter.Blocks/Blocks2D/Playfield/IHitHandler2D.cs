@@ -42,4 +42,12 @@ internal static class HitDispatch2D
             if (behaviors[i] is IHitHandler2D handler)
                 handler.OnHitBarrier(self, barrier, in context);
     }
+
+    public static void SpriteHitBarrier(Barrier2D barrier, Sprite2D sprite, in UpdateContext context)
+    {
+        var behaviors = barrier.Behaviors;
+        for (int i = 0; i < behaviors.Count; i++)
+            if (behaviors[i] is IBarrierHitHandler2D handler)
+                handler.OnHitSprite(barrier, sprite, in context);
+    }
 }

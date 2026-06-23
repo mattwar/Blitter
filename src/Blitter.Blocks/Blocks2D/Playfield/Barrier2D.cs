@@ -41,11 +41,6 @@ public abstract class Barrier2D : Entity
     public virtual void Draw(Renderer2D renderer) { }
 
     /// <summary>
-    /// Called when the <paramref name="hitter"/> collided with this barrier.
-    /// </summary>
-    public virtual void OnHitSprite(Sprite2D hitter, in UpdateContext context) { }
-
-    /// <summary>
     /// Physical characteristics of this barrier, backed by a
     /// <see cref="Surface2D"/> trait. Absent trait means
     /// <see cref="PhysicsMaterial.Ideal"/>.

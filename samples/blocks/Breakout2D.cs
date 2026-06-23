@@ -299,6 +299,7 @@ sealed class Paddle : Barrier2D
     {
         HalfWidth = halfWidth;
         HalfHeight = halfHeight;
+        AddBehavior(new CustomBarrierBehavior2D { OnSpriteHit = OnHitSprite });
     }
 
     public void MoveTo(float x, in UpdateContext context)
@@ -318,7 +319,7 @@ sealed class Paddle : Barrier2D
                 HalfHeight),
             new Pose2D(Center, 0f, 1f));
 
-    public override void OnHitSprite(Sprite2D hitter, in UpdateContext context)
+    private void OnHitSprite(Barrier2D self, Sprite2D hitter)
     {
         if (hitter is not BreakoutBall ball)
             return;
@@ -397,6 +398,7 @@ sealed class Brick : Barrier2D
         HalfHeight = height * 0.5f;
         Color = color;
         Points = points;
+        AddBehavior(new CustomBarrierBehavior2D { OnSpriteHit = OnHitSprite });
     }
 
     public override PosedHitShape2D HitShape =>
@@ -405,7 +407,7 @@ sealed class Brick : Barrier2D
                   new Pose2D(Center, 0f, 1f))
             : new(HitShape2D.None, Pose2D.Identity);
 
-    public override void OnHitSprite(Sprite2D hitter, in UpdateContext context)
+    private void OnHitSprite(Barrier2D self, Sprite2D hitter)
     {
         if (!IsAlive) return;
         if (hitter is not BreakoutBall ball) return;

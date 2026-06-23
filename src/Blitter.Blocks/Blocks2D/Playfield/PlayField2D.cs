@@ -473,7 +473,7 @@ public class PlayField2D : Layer2D
                     // makes (re-arming, lowering a drop target,
                     // swapping its Material) is visible to the
                     // sprite's bounce resolution on the same frame.
-                    barrier.OnHitSprite(sprite, spriteContext);
+                    HitDispatch2D.SpriteHitBarrier(barrier, sprite, in spriteContext);
                     if (IsLive(sprite))
                         HitDispatch2D.BarrierHit(sprite, barrier, in spriteContext);
                 }
