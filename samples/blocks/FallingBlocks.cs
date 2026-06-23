@@ -89,7 +89,7 @@ sealed class Block : Sprite2D
         Speed  = rng.Next(120, 320);
         Heading = 180f; // straight down (0 = up)
         AddBehavior(new Motion2D());
-        AddBehavior(new CustomSpriteBehavior2D
+        AddBehavior(new CustomHitBehavior2D
         {
             OnApply = (sprite, in ctx) =>
             {

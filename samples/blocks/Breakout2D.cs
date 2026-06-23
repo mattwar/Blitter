@@ -299,7 +299,7 @@ sealed class Paddle : Barrier2D
     {
         HalfWidth = halfWidth;
         HalfHeight = halfHeight;
-        AddBehavior(new CustomBarrierBehavior2D { OnSpriteHit = OnHitSprite });
+        AddBehavior(new CustomHitBehavior2D { OnHit = OnHit });
     }
 
     public void MoveTo(float x, in UpdateContext context)
@@ -319,9 +319,9 @@ sealed class Paddle : Barrier2D
                 HalfHeight),
             new Pose2D(Center, 0f, 1f));
 
-    private void OnHitSprite(Barrier2D self, Sprite2D hitter)
+    private void OnHit(IEntity self, IEntity other)
     {
-        if (hitter is not BreakoutBall ball)
+        if (other is not BreakoutBall ball)
             return;
 
         // Only act when the ball is heading downward. Avoids
@@ -398,7 +398,7 @@ sealed class Brick : Barrier2D
         HalfHeight = height * 0.5f;
         Color = color;
         Points = points;
-        AddBehavior(new CustomBarrierBehavior2D { OnSpriteHit = OnHitSprite });
+        AddBehavior(new CustomHitBehavior2D { OnHit = OnHit });
     }
 
     public override PosedHitShape2D HitShape =>
@@ -407,10 +407,10 @@ sealed class Brick : Barrier2D
                   new Pose2D(Center, 0f, 1f))
             : new(HitShape2D.None, Pose2D.Identity);
 
-    private void OnHitSprite(Barrier2D self, Sprite2D hitter)
+    private void OnHit(IEntity self, IEntity other)
     {
         if (!IsAlive) return;
-        if (hitter is not BreakoutBall ball) return;
+        if (other is not BreakoutBall ball) return;
 
         // Determine which face the ball came in through, using its
         // current center relative to the brick. Reflect just that axis.

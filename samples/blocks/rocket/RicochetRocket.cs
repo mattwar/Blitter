@@ -380,7 +380,7 @@ sealed class Rocket : Sprite2D
             new Motion2D(),  // move with simple 2D physics
             // Face direction of travel, except while stunned — then
             // let RotationSpeed drive the spin freely.
-            new CustomSpriteBehavior2D
+            new CustomHitBehavior2D
             {
                 OnApply = (s, in _) =>
                 {
@@ -605,8 +605,11 @@ sealed class AsteroidSmasher : Behavior, IHitHandler2D
 
     public override void Apply(in UpdateContext context) { }
 
-    public void OnHitSprite(Sprite2D self, Sprite2D other, in UpdateContext context)
+    public void OnHitEntity(in Hit2D hit)
     {
+        if (this.Entity is not Sprite2D self || hit.Other is not Sprite2D other)
+            return;
+
         // Grace period: ignore freshly-spawned shards so they
         // can spread out before being hit again. Without this
         // the rocket sits inside the impact zone and devours

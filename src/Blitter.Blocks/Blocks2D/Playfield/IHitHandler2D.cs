@@ -2,52 +2,35 @@ namespace Blitter.Blocks2D;
 
 /// <summary>
 /// Capability for a <see cref="Behavior"/> that responds to collisions the
-/// <see cref="PlayField2D"/> detects. The playfield invokes these on each
-/// behavior of a sprite involved in a hit; the sprite itself exposes no
-/// collision API. Implement only the method you need — both default to no-ops.
+/// <see cref="PlayField2D"/> detects. The playfield invokes this on each
+/// behavior of an entity involved in a hit; the entity itself exposes no
+/// collision API. The same callback fires whether the host is a sprite or a
+/// barrier and whether the other party is a sprite or a barrier — the receiver
+/// inspects the other entity (e.g. <c>other is Barrier2D</c>) to decide how to
+/// react. The hosting entity is available as <see cref="Behavior.Entity"/>.
 /// </summary>
 public interface IHitHandler2D
 {
     /// <summary>
-    /// Invoked when <paramref name="self"/>'s <see cref="Sprite2D.HitCircle"/>
-    /// overlaps another sprite's during the playfield's collision detection.
+    /// Invoked when the hosting entity's hit shape overlaps another entity's
+    /// during the playfield's collision detection. <paramref name="hit"/>
+    /// carries the other party and the contact manifold (oriented for this
+    /// receiver), so handlers need not recompute it.
     /// </summary>
-    void OnHitSprite(Sprite2D self, Sprite2D other, in UpdateContext context) { }
-
-    /// <summary>
-    /// Invoked when <paramref name="self"/>'s <see cref="Sprite2D.HitCircle"/>
-    /// overlaps a <see cref="Barrier2D"/> during the playfield's collision detection.
-    /// </summary>
-    void OnHitBarrier(Sprite2D self, Barrier2D barrier, in UpdateContext context) { }
+    void OnHitEntity(in Hit2D hit);
 }
 
 /// <summary>
-/// Forwards playfield-detected hits to a sprite's <see cref="IHitHandler2D"/>
-/// behaviors. Collision dispatch lives with the playfield, not on the sprite.
+/// Forwards playfield-detected hits to an entity's <see cref="IHitHandler2D"/>
+/// behaviors. Collision dispatch lives with the playfield, not on the entity.
 /// </summary>
 internal static class HitDispatch2D
 {
-    public static void SpriteHit(Sprite2D self, Sprite2D other, in UpdateContext context)
+    public static void Dispatch(IEntity self, in Hit2D hit)
     {
         var behaviors = self.Behaviors;
         for (int i = 0; i < behaviors.Count; i++)
             if (behaviors[i] is IHitHandler2D handler)
-                handler.OnHitSprite(self, other, in context);
-    }
-
-    public static void BarrierHit(Sprite2D self, Barrier2D barrier, in UpdateContext context)
-    {
-        var behaviors = self.Behaviors;
-        for (int i = 0; i < behaviors.Count; i++)
-            if (behaviors[i] is IHitHandler2D handler)
-                handler.OnHitBarrier(self, barrier, in context);
-    }
-
-    public static void SpriteHitBarrier(Barrier2D barrier, Sprite2D sprite, in UpdateContext context)
-    {
-        var behaviors = barrier.Behaviors;
-        for (int i = 0; i < behaviors.Count; i++)
-            if (behaviors[i] is IBarrierHitHandler2D handler)
-                handler.OnHitSprite(barrier, sprite, in context);
+                handler.OnHitEntity(in hit);
     }
 }

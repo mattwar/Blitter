@@ -30,46 +30,21 @@ public sealed class BarrierStop2D : Behavior, IHitHandler2D
         _floorContactSeen = false;
     }
 
-    public void OnHitBarrier(Sprite2D self, Barrier2D barrier, in UpdateContext context)
+    public void OnHitEntity(in Hit2D hit)
     {
-        if (barrier is not LineBarrier2D line)
+        if (this.Entity is not Sprite2D self || hit.Other is not LineBarrier2D)
             return;
 
-        var center = self.Center;
+        // The playfield supplies the manifold, oriented for us: the
+        // normal points from the surface toward the sprite, so it pushes
+        // out correctly from either side of a two-sided segment.
+        if (!hit.HasContact)
+            return;
+        var normal = hit.Contact.Normal;
 
-        // Closest point on segment to circle center -> penetration depth.
-        var ab = line.End - line.Start;
-        var lenSq = Vector2.Dot(ab, ab);
-        Vector2 closest;
-        if (lenSq <= float.Epsilon)
-        {
-            closest = line.Start;
-        }
-        else
-        {
-            var t = Vector2.Dot(center - line.Start, ab) / lenSq;
-            if (t < 0f) t = 0f;
-            else if (t > 1f) t = 1f;
-            closest = line.Start + ab * t;
-        }
-
-        var radius = self.HitCircle.Radius;
-        var delta = center - closest;
-        var distSq = Vector2.Dot(delta, delta);
-        var dist = MathF.Sqrt(distSq);
-
-        // Contact normal points from the surface toward the sprite so
-        // two-sided segments push out correctly from either side. When
-        // the sprite center sits exactly on the segment, fall back to
-        // the winding-derived normal.
-        Vector2 normal = distSq > float.Epsilon
-            ? delta / dist
-            : line.Normal;
-
-        if (dist < radius)
-        {
-            self.Center = center + normal * (radius - dist);
-        }
+        // Snap out of penetration along the contact normal.
+        if (hit.Contact.Penetration > 0f)
+            self.Center += normal * hit.Contact.Penetration;
 
         // Zero the component of velocity heading INTO the surface.
         // Tangential motion is preserved.

@@ -442,9 +442,15 @@ public class PlayField2D : Layer2D
                 if (!aShape.TestHit(bShape))
                     continue;
 
-                HitDispatch2D.SpriteHit(a, b, in spriteContext);
+                // Manifold normal points from b's surface toward a.
+                var hasContact = aShape.TryGetContact(bShape, out var contact);
+                var hitForA = new Hit2D(b, contact, hasContact);
+                HitDispatch2D.Dispatch(a, in hitForA);
                 if (IsLive(a) && IsLive(b))
-                    HitDispatch2D.SpriteHit(b, a, in spriteContext);
+                {
+                    var hitForB = new Hit2D(a, hasContact ? contact.Flipped() : default, hasContact);
+                    HitDispatch2D.Dispatch(b, in hitForB);
+                }
             }
         }
 
@@ -473,9 +479,28 @@ public class PlayField2D : Layer2D
                     // makes (re-arming, lowering a drop target,
                     // swapping its Material) is visible to the
                     // sprite's bounce resolution on the same frame.
-                    HitDispatch2D.SpriteHitBarrier(barrier, sprite, in spriteContext);
-                    if (IsLive(sprite))
-                        HitDispatch2D.BarrierHit(sprite, barrier, in spriteContext);
+                    // Manifold here is oriented for the barrier: normal
+                    // points from the sprite toward the barrier surface.
+                    var barrierHas = sShape.TryGetContact(barrier.HitShape, out var barrierContact);
+                    var barrierHit = new Hit2D(
+                        sprite,
+                        barrierHas ? barrierContact.Flipped() : default,
+                        barrierHas);
+                    HitDispatch2D.Dispatch(barrier, in barrierHit);
+                    if (!IsLive(sprite))
+                        continue;
+
+                    // Recompute fresh for the sprite: the barrier handler
+                    // may have moved it, so the bounce sees post-reaction
+                    // geometry (a paddle that shoved the ball clear now
+                    // reports no contact -> no spurious second bounce).
+                    // Normal points from the barrier surface toward the
+                    // sprite — the "out of the surface" direction.
+                    if (!TryGetPosedShape(sprite, out var sShapeNow))
+                        continue;
+                    var spriteHas = sShapeNow.TryGetContact(barrier.HitShape, out var spriteContact);
+                    var spriteHit = new Hit2D(barrier, spriteContact, spriteHas);
+                    HitDispatch2D.Dispatch(sprite, in spriteHit);
                 }
             }
         }

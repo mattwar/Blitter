@@ -348,7 +348,7 @@ sealed class Bumper : CircleBarrier2D
         : base(x, y, radius)
     {
         PhysicsMaterial = new PhysicsMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 320f);
-        AddBehavior(new CustomBarrierBehavior2D { OnSpriteHit = OnHitSprite });
+        AddBehavior(new CustomHitBehavior2D { OnHit = OnHit });
     }
 
     public override void Draw(Renderer2D renderer)
@@ -356,8 +356,10 @@ sealed class Bumper : CircleBarrier2D
         renderer.DrawDisc(Center, Radius, Tint);
     }
 
-    private void OnHitSprite(Barrier2D self, Sprite2D hitter)
+    private void OnHit(IEntity self, IEntity other)
     {
+        if (other is not Sprite2D hitter) return;
+
         if (this.Scoreboard != null)
         {
             this.Scoreboard.PositivePopupColor = this.Tint;
@@ -387,7 +389,7 @@ sealed class Slingshot : LineBarrier2D
     {
         OneSided = true;
         PhysicsMaterial = new PhysicsMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 180f);
-        AddBehavior(new CustomBarrierBehavior2D { OnSpriteHit = OnHitSprite });
+        AddBehavior(new CustomHitBehavior2D { OnHit = OnHit });
     }
 
     public override void Draw(Renderer2D renderer)
@@ -395,8 +397,10 @@ sealed class Slingshot : LineBarrier2D
         renderer.DrawThickLine(Start, End, new Color(255, 150, 80), 5f);
     }
 
-    private void OnHitSprite(Barrier2D self, Sprite2D hitter)
+    private void OnHit(IEntity self, IEntity other)
     {
+        if (other is not Sprite2D hitter) return;
+
         if (this.HitSound is {} hs)
         {
             Audio.Play(hs, 0.7f);

@@ -20,21 +20,26 @@ public sealed class BarrierBounce2D : Behavior, IHitHandler2D
     /// <summary>Ball-side tangent velocity retention. Multiplied with <c>(1 - barrier.PhysicsMaterial.Friction)</c>. 1 = frictionless ball, &lt; 1 = ball-side surface drag.</summary>
     public float TangentialDamping { get; set; } = 1f;
 
-    /// <summary>Called after a successful bounce. Args: sprite, barrier, contact normal.</summary>
-    public Action<Sprite2D, Barrier2D, Vector2>? OnBounce { get; set; }
+    /// <summary>Called after a successful bounce. Args: the bouncing entity, the barrier entity, contact normal.</summary>
+    public Action<IEntity, IEntity, Vector2>? OnBounce { get; set; }
 
     public override void Apply(in UpdateContext context)
     {
-        // No per-tick logic; bounce happens in OnHitBarrier.
+        // No per-tick logic; bounce happens in OnHitEntity.
     }
     
-    public void OnHitBarrier(Sprite2D self, Barrier2D barrier, in UpdateContext context)
+    public void OnHitEntity(in Hit2D hit)
     {
-        // Normal convention: TryGetContact returns normal from b → a;
-        // here a = self.HitShape, b = barrier.HitShape, so `contact.Normal`
-        // points from the barrier surface toward the sprite.
-        if (!self.HitShape.TryGetContact(barrier.HitShape, out var contact))
+        if (this.Entity is not Sprite2D self || hit.Other is not Barrier2D barrier)
             return;
+
+        // The playfield supplies the manifold, oriented for us: the
+        // normal points from the barrier surface toward the sprite. No
+        // contact means the sprite was already cleared of the surface
+        // (e.g. a paddle that shoved it out) — nothing to bounce.
+        if (!hit.HasContact)
+            return;
+        var contact = hit.Contact;
 
         var normal = contact.Normal;
         if (contact.Penetration > 0f)
