@@ -56,28 +56,6 @@ public class SceneLookupTests
     }
 
     [Fact]
-    public void PlayField_GetSprite_ResolvesLocally()
-    {
-        var sprite = new Sprite2D { Name = "hero" };
-        var playfield = new PlayField2D();
-        playfield.AddSprite(sprite);
-
-        Assert.Same(sprite, playfield.GetSprite("hero"));
-        Assert.False(playfield.TryGetSprite("ghost", out var ghost));
-        Assert.Null(ghost);
-    }
-
-    [Fact]
-    public void PlayField_GetSprite_WrongTypeThrows()
-    {
-        var sprite = new Sprite2D { Name = "hero" };
-        var playfield = new PlayField2D();
-        playfield.AddSprite(sprite);
-
-        Assert.Throws<InvalidOperationException>(() => playfield.GetSprite<NamedSprite>("hero"));
-    }
-
-    [Fact]
     public void CameraFollow2D_ResolvesCameraByType()
     {
         var cameraLayer = new CameraLayer2D();
@@ -125,9 +103,5 @@ public class SceneLookupTests
         sprite.Update(new UpdateContext());
 
         Assert.Same(explicitCamera, follow.Camera);
-    }
-
-    private sealed class NamedSprite : Sprite2D
-    {
     }
 }

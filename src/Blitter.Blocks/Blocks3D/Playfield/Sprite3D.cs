@@ -53,13 +53,6 @@ public class Sprite3D : Entity, IDrawable3D
     public Color Tint { get; set; } = Color.White;
 
     /// <summary>
-    /// Whether this sprite participates in the playfield's hit-detection pass.
-    /// Set to <c>false</c> for purely decorative sprites that should move
-    /// and render but never trigger collision callbacks.
-    /// </summary>
-    public bool CanBeHit { get; set; } = true;
-
-    /// <summary>
     /// Whether <see cref="Draw"/> renders the <see cref="Visual"/>.
     /// Set to <c>false</c> to keep the visual purely as a collision
     /// proxy (e.g. an invisible first-person body shape) — the hit

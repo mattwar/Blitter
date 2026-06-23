@@ -98,7 +98,6 @@ sealed class Block : Sprite2D
                     sprite.PlayField.RemoveSprite(sprite);
             }
         });
-        CanBeHit = false;
     }
 
     public override void Draw(Renderer2D renderer)

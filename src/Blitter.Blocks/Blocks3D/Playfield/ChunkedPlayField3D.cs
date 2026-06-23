@@ -146,7 +146,7 @@ public class ChunkedPlayField3D : Layer3D
         for (int i = 0; i < _frameSprites.Count; i++)
         {
             var sprite = _frameSprites[i].Sprite;
-            if (!IsLive(sprite) || !sprite.CanBeHit)
+            if (!IsLive(sprite))
                 continue;
 
             var shape = sprite.HitShape;
@@ -180,7 +180,7 @@ public class ChunkedPlayField3D : Layer3D
                 for (int k = 0; k < qSprites.Count && IsLive(sprite); k++)
                 {
                     var other = qSprites[k];
-                    if (other == sprite || !IsLive(other) || !other.CanBeHit)
+                    if (other == sprite || !IsLive(other))
                         continue;
                     if (!_frameSpriteIndex.TryGetValue(other, out var j) || j <= i)
                         continue;

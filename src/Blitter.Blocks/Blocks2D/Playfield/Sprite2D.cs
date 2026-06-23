@@ -44,11 +44,6 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
     }
 
     /// <summary>
-    /// Optional scene-unique name.
-    /// </summary>
-    public string? Name { get; set; }
-
-    /// <summary>
     /// The sprite's image: a declarative <see cref="ImageSource"/> describing
     /// its look (a path, a texture, tiles, or named animation states). Always
     /// non-null; assigning <c>null</c> installs a fresh empty source (which
@@ -95,11 +90,6 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
     /// Tint color applied to the visual.
     /// </summary>
     public Color Tint { get => Appearance.Tint; set => Appearance.Tint = value; }
-
-    /// <summary>
-    /// Whether this sprite participates in the playfield's hit-detection pass.
-    /// </summary>
-    public bool CanBeHit { get; set; } = true;
 
     /// <summary>
     /// The <see cref="PlayField2D"/> this sprite belongs to.

@@ -76,8 +76,7 @@ public class PlayField2D : Layer2D
     /// <summary>
     /// Tries to resolve the single sprite assignable to <typeparamref name="T"/>
     /// in this playfield. Returns <c>false</c> if none. Throws if more than one
-    /// matches (name it and use <see cref="TryGetSprite{T}(string, out T)"/> to
-    /// disambiguate).
+    /// matches.
     /// </summary>
     public bool TryGetSprite<T>([NotNullWhen(true)] out T? sprite) where T : Sprite2D
     {
@@ -87,7 +86,7 @@ public class PlayField2D : Layer2D
             if (candidate is not T typed)
                 continue;
             if (match is not null)
-                throw new InvalidOperationException($"More than one sprite is a {typeof(T).Name}; resolve it by name instead.");
+                throw new InvalidOperationException($"More than one sprite is a {typeof(T).Name}.");
             match = typed;
         }
         sprite = match;
@@ -100,54 +99,6 @@ public class PlayField2D : Layer2D
     /// </summary>
     public T GetSprite<T>() where T : Sprite2D =>
         TryGetSprite<T>(out var sprite) ? sprite : throw new InvalidOperationException($"No sprite of type {typeof(T).Name}.");
-
-    /// <summary>
-    /// Tries to resolve the sprite named <paramref name="name"/> in this
-    /// playfield as a <typeparamref name="T"/>. Returns <c>false</c> if none
-    /// has that name. Throws if the name is duplicated or the named sprite is
-    /// a different type.
-    /// </summary>
-    public bool TryGetSprite<T>(string name, [NotNullWhen(true)] out T? sprite) where T : Sprite2D
-    {
-        ArgumentNullException.ThrowIfNull(name);
-        Sprite2D? named = null;
-        foreach (var candidate in _sprites)
-        {
-            if (candidate.Name != name)
-                continue;
-            if (named is not null)
-                throw new InvalidOperationException($"More than one sprite is named '{name}'.");
-            named = candidate;
-        }
-        if (named is null)
-        {
-            sprite = null;
-            return false;
-        }
-        if (named is T typed)
-        {
-            sprite = typed;
-            return true;
-        }
-        throw new InvalidOperationException($"Sprite '{name}' is a {named.GetType().Name}, not a {typeof(T).Name}.");
-    }
-
-    /// <summary>
-    /// Resolves the sprite named <paramref name="name"/> in this playfield
-    /// as a <typeparamref name="T"/>. Throws if no such sprite exists or it
-    /// is a different type.
-    /// </summary>
-    public T GetSprite<T>(string name) where T : Sprite2D =>
-        TryGetSprite<T>(name, out var sprite) ? sprite : throw new InvalidOperationException($"No sprite named '{name}'.");
-
-    /// <summary>Tries to resolve the sprite named <paramref name="name"/> in
-    /// this playfield. Returns <c>false</c> if none has that name.</summary>
-    public bool TryGetSprite(string name, [NotNullWhen(true)] out Sprite2D? sprite) =>
-        TryGetSprite<Sprite2D>(name, out sprite);
-
-    /// <summary>Resolves the sprite named <paramref name="name"/> in this
-    /// playfield. Throws if none has that name.</summary>
-    public Sprite2D GetSprite(string name) => GetSprite<Sprite2D>(name);
 
     /// <summary>
     /// Static, non-sprite obstacles in this playfield. 
@@ -430,7 +381,7 @@ public class PlayField2D : Layer2D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var s = _sprites[i];
-            if (!IsLive(s) || !s.CanBeHit)
+            if (!IsLive(s))
                 continue;
             if (!TryGetPosedShape(s, out var posed))
                 continue;
@@ -473,7 +424,7 @@ public class PlayField2D : Layer2D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var a = _sprites[i];
-            if (!IsLive(a) || !a.CanBeHit)
+            if (!IsLive(a))
                 continue;
             if (!TryGetPosedShape(a, out var aShape) || aShape.BoundingCircle.Radius <= 0f)
                 continue;
@@ -484,7 +435,7 @@ public class PlayField2D : Layer2D
                     break;
 
                 var b = _sprites[j];
-                if (!IsLive(b) || !b.CanBeHit)
+                if (!IsLive(b))
                     continue;
                 if (!TryGetPosedShape(b, out var bShape) || bShape.BoundingCircle.Radius <= 0f)
                     continue;
@@ -503,7 +454,7 @@ public class PlayField2D : Layer2D
             for (int s = 0; s < _sprites.Count; s++)
             {
                 var sprite = _sprites[s];
-                if (!IsLive(sprite) || !sprite.CanBeHit)
+                if (!IsLive(sprite))
                     continue;
                 if (!TryGetPosedShape(sprite, out var spriteShape) || spriteShape.BoundingCircle.IsEmpty)
                     continue;

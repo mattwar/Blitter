@@ -228,7 +228,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var a = _sprites[i];
-            if (!IsLive(a) || !a.CanBeHit)
+            if (!IsLive(a))
                 continue;
             var aShape = a.HitShape;
             if (aShape.BoundingSphere.Radius <= 0f)
@@ -240,7 +240,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
                     break;
 
                 var b = _sprites[j];
-                if (!IsLive(b) || !b.CanBeHit)
+                if (!IsLive(b))
                     continue;
                 var bShape = b.HitShape;
                 if (bShape.BoundingSphere.Radius <= 0f)
@@ -258,7 +258,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var sprite = _sprites[i];
-            if (!IsLive(sprite) || !sprite.CanBeHit)
+            if (!IsLive(sprite))
                 continue;
             var spriteShape = sprite.HitShape;
             if (spriteShape.BoundingSphere.IsEmpty)

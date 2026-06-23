@@ -218,7 +218,6 @@ sealed class BreakoutBall : Sprite2D
     public BreakoutBall(float radius)
     {
         Radius = radius;
-        CanBeHit = true;
 
         var image = MakeBall(32);
         Image = new ImageSource { Texture = image, Hit = HitShapeHint.Circle };
