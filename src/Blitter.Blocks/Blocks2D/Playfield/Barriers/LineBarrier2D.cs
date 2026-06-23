@@ -11,9 +11,6 @@ namespace Blitter.Blocks2D;
 /// </summary>
 public class LineBarrier2D : Barrier2D
 {
-    public Vector2 Start { get; }
-    public Vector2 End { get; }
-
     /// <summary>
     /// Unit vector perpendicular to the segment, derived from the
     /// winding (<see cref="Start"/> → <see cref="End"/>). Walk the
@@ -25,6 +22,8 @@ public class LineBarrier2D : Barrier2D
     /// </summary>
     public Vector2 Normal { get; init; }
 
+    private bool _oneSided;
+
     /// <summary>
     /// When true, sprites only collide when their center is on the
     /// <see cref="Normal"/> side of the segment. The bouncing side
@@ -32,7 +31,31 @@ public class LineBarrier2D : Barrier2D
     /// <see cref="End"/>, sprites collide on your left. If a one-sided
     /// barrier bounces from the wrong side, swap the endpoints.
     /// </summary>
-    public bool OneSided { get; set; }
+    public bool OneSided
+    {
+        get => _oneSided;
+        set
+        {
+            if (_oneSided == value)
+                return;
+            _oneSided = value;
+            // Rebuild the local segment so its one-sided flag stays in sync.
+            SetEndpoints(Start, End);
+        }
+    }
+
+    /// <summary>
+    /// World-space first endpoint, derived from the local
+    /// <see cref="CollisionShape2D"/> segment posed by
+    /// <see cref="Barrier2D.Transform"/>.
+    /// </summary>
+    public Vector2 Start => Transform.Pose.Transform(Segment.LocalEndA);
+
+    /// <summary>World-space second endpoint.</summary>
+    public Vector2 End => Transform.Pose.Transform(Segment.LocalEndB);
+
+    private SegmentHitShape2D Segment =>
+        (SegmentHitShape2D)this.GetOrAddTrait<CollisionShape2D>().Shape;
 
     /// <summary>
     /// Creates a two-sided segment between <paramref name="start"/>
@@ -40,14 +63,27 @@ public class LineBarrier2D : Barrier2D
     /// </summary>
     public LineBarrier2D(Vector2 start, Vector2 end)
     {
-        Start = start;
-        End = end;
         Normal = DefaultNormal(start, end);
+        SetEndpoints(start, end);
     }
 
     public LineBarrier2D(float x1, float y1, float x2, float y2)
         : this(new Vector2(x1, y1), new Vector2(x2, y2))
     {
+    }
+
+    // Translate the world-space endpoints into a local segment centered on
+    // the midpoint, then place that midpoint via the Transform — so a line is
+    // authored in world space but stored like every other barrier: a local
+    // CollisionShape2D posed by a Transform2D.
+    private void SetEndpoints(Vector2 worldStart, Vector2 worldEnd)
+    {
+        var center = (worldStart + worldEnd) * 0.5f;
+        Transform.Position = center;
+        Transform.Rotation = 0f;
+        Transform.Scale = 1f;
+        this.GetOrAddTrait<CollisionShape2D>().Shape =
+            new SegmentHitShape2D(worldStart - center, worldEnd - center, _oneSided);
     }
 
     // Perpendicular of (End-Start) rotated so that, walking from start
@@ -109,8 +145,5 @@ public class LineBarrier2D : Barrier2D
             new LineBarrier2D(new Vector2(x,  y2), new Vector2(x,  y )),
         ];
     }
-
-    public override PosedHitShape2D HitShape =>
-        new(new SegmentHitShape2D(Start, End, OneSided), Pose2D.Identity);
 }
 

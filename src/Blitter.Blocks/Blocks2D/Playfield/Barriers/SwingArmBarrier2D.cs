@@ -57,6 +57,18 @@ public class SwingArmBarrier2D : Barrier2D
         }
     }
 
+    /// <inheritdoc/>
+    protected override void OnAttach(IEntity entity)
+    {
+        base.OnAttach(entity);
+        // Collision geometry is a static capsule along the local +X axis from
+        // the pivot; the Transform's rotation (driven each Update) swings it.
+        this.GetOrAddTrait<CollisionShape2D>().Shape =
+            new CapsuleHitShape2D(Vector2.Zero, new Vector2(Length, 0f), Radius);
+        Transform.Position = Pivot;
+        Transform.Rotation = float.IsNaN(CurrentAngleDeg) ? RestAngleDeg : CurrentAngleDeg;
+    }
+
     public override void Update(in UpdateContext context)
     {
         // NaN doubles as a "first frame" flag: on initial Update we
@@ -90,6 +102,10 @@ public class SwingArmBarrier2D : Barrier2D
 
         CurrentAngleDeg += step;
         AngularVelRadPerSec = dt > 0f ? (step * MathF.PI / 180f) / dt : 0f;
+
+        // Publish the swing to the collider: the capsule rides the Transform.
+        Transform.Position = Pivot;
+        Transform.Rotation = CurrentAngleDeg;
     }
 
     /// <summary>
@@ -118,9 +134,6 @@ public class SwingArmBarrier2D : Barrier2D
         // and scale by signed angular velocity.
         return AngularVelRadPerSec * new Vector2(-offset.Y, offset.X);
     }
-
-    public override PosedHitShape2D HitShape =>
-        new(new CapsuleHitShape2D(Pivot, Tip, Radius), Pose2D.Identity);
 
     internal static (Vector2 point, float t) ClosestPointOnSegment(Vector2 a, Vector2 b, Vector2 p)
     {

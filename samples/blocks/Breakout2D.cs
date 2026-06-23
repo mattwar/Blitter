@@ -26,6 +26,8 @@ using Blitter.Bits;
 using Blitter.Blocks;
 using Blitter.Blocks2D;
 
+using SkiaSharp;
+
 const int W = 960;
 const int H = 720;
 
@@ -205,7 +207,10 @@ static Vector2 BallRestPosition(Paddle paddle) =>
 
 // ---- sprites, barriers, behaviors -------------------------------------
 
-// The ball: a small white disc with a real collision radius.
+// The ball: a small shaded disc. Its image supplies both the look and
+// the (circular) collision shape, so there's no Draw override and no
+// explicit CollisionShape2D — the collider derives the hit circle from
+// the visual, scaled by the sprite's Transform.
 sealed class BreakoutBall : Sprite2D
 {
     public float Radius { get; }
@@ -214,14 +219,40 @@ sealed class BreakoutBall : Sprite2D
     {
         Radius = radius;
         CanBeHit = true;
+
+        var image = MakeBall(32);
+        Image = new ImageSource { Texture = image, Hit = HitShapeHint.Circle };
+        Scale = (radius * 2f) / image.Width;
     }
 
-    public override PosedHitShape2D HitShape =>
-        new(new CircleHitShape2D(Vector2.Zero, Radius), new Pose2D(Center, 0f, 1f));
-
-    public override void Draw(Renderer2D renderer)
+    // A white, anti-aliased ball with a soft top-left highlight.
+    private static Bitmap MakeBall(int size)
     {
-        renderer.DrawDisc(Center, Radius, new Color(245, 248, 255));
+        var image = Bitmap.Create(size, size);
+        image.DrawCanvas(canvas =>
+        {
+            canvas.Clear(SKColors.Transparent);
+
+            var c = size / 2f;
+            var r = size / 2f - 1f;
+            using var paint = new SKPaint
+            {
+                IsAntialias = true,
+                Shader = SKShader.CreateRadialGradient(
+                    center: new SKPoint(c - r * 0.3f, c - r * 0.3f),
+                    radius: r * 1.4f,
+                    colors:
+                    [
+                        new SKColor(255, 255, 255),
+                        new SKColor(228, 234, 246),
+                        new SKColor(170, 182, 205),
+                    ],
+                    colorPos: [0f, 0.55f, 1f],
+                    mode: SKShaderTileMode.Clamp),
+            };
+            canvas.DrawCircle(c, c, r, paint);
+        });
+        return image;
     }
 }
 

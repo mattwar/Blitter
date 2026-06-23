@@ -129,9 +129,11 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
     /// <summary>
     /// The sprite's world-space collision shape, provided by its
     /// <see cref="ColliderShape2D"/> behavior. Empty when the sprite has no
-    /// collider (e.g. before it is attached to a playfield).
+    /// collider (e.g. before it is attached to a playfield). Not overridable:
+    /// to give a sprite custom geometry, set a <see cref="CollisionShape2D"/>
+    /// trait (the collider reads it in preference to the visual's shape).
     /// </summary>
-    public virtual PosedHitShape2D HitShape =>
+    public PosedHitShape2D HitShape =>
         this.TryGetBehavior<ColliderShape2D>(out var collider)
             ? collider.GetShape()
             : new(HitShape2D.None, Transform.Pose);
