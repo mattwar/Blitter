@@ -67,6 +67,10 @@ public class SwingArmBarrier2D : Barrier2D
             new CapsuleHitShape2D(Vector2.Zero, new Vector2(Length, 0f), Radius);
         Transform.Position = Pivot;
         Transform.Rotation = float.IsNaN(CurrentAngleDeg) ? RestAngleDeg : CurrentAngleDeg;
+        // Expose the swing's surface velocity to BarrierBounce2D via a
+        // capability behavior instead of a barrier-template method.
+        if (!this.TryGetBehavior<ISurfaceVelocity2D>(out _))
+            this.AddBehavior(new SurfaceVelocityProvider());
     }
 
     public override void Update(in UpdateContext context)
@@ -122,17 +126,25 @@ public class SwingArmBarrier2D : Barrier2D
     protected virtual void OnReleased(in UpdateContext context) { }
 
     /// <summary>
-    /// Velocity of the point on the rotating segment at world-space
-    /// position <paramref name="point"/>. Used by
-    /// <see cref="BarrierBounce2D"/> so a moving flipper transfers
-    /// energy to the ball.
+    /// Provider behavior that exposes the swinging capsule's surface velocity
+    /// (the 2D analog of ω × r about the pivot) to <see cref="BarrierBounce2D"/>
+    /// so a moving flipper transfers energy to the ball.
     /// </summary>
-    public override Vector2 SurfaceVelocityAt(Vector2 point)
+    private sealed class SurfaceVelocityProvider : Behavior, ISurfaceVelocity2D
     {
-        var offset = point - Pivot;
-        // 2D analog of ω × r: rotate offset 90° CCW (in math frame)
-        // and scale by signed angular velocity.
-        return AngularVelRadPerSec * new Vector2(-offset.Y, offset.X);
+        private SwingArmBarrier2D _arm = null!;
+
+        protected override void OnAttach(IEntity entity) => _arm = (SwingArmBarrier2D)entity;
+
+        public override void Apply(in UpdateContext context) { }
+
+        public Vector2 SurfaceVelocityAt(Vector2 point)
+        {
+            var offset = point - _arm.Pivot;
+            // 2D analog of ω × r: rotate offset 90° CCW (in math frame)
+            // and scale by signed angular velocity.
+            return _arm.AngularVelRadPerSec * new Vector2(-offset.Y, offset.X);
+        }
     }
 
     internal static (Vector2 point, float t) ClosestPointOnSegment(Vector2 a, Vector2 b, Vector2 p)

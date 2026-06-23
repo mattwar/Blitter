@@ -42,9 +42,12 @@ public sealed class BarrierBounce2D : Behavior, IHitHandler2D
 
         // Surface velocity at the contact point. Stationary barriers
         // report zero so this collapses to the textbook reflection;
-        // moving barriers (flippers, etc.) contribute their motion.
-        var vSurface = barrier.SurfaceVelocityAt(contact.Point);
-        var mat = barrier.PhysicsMaterial;
+        // moving barriers (flippers, etc.) supply an ISurfaceVelocity2D
+        // provider behavior that contributes their motion.
+        var vSurface = barrier.TryGetBehavior<ISurfaceVelocity2D>(out var surface)
+            ? surface.SurfaceVelocityAt(contact.Point)
+            : Vector2.Zero;
+        var mat = barrier.TryGetTrait<Surface2D>(out var pm) ? pm.Material : PhysicsMaterial.Ideal;
 
         var vBall = Sprite2D.GetVelocity(self.Speed, self.Heading);
         var vRel = vBall - vSurface;

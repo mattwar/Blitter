@@ -59,9 +59,11 @@ public static class EntityExtensions
 
     /// <summary>
     /// Finds the behavior of type <typeparamref name="T"/>, returning
-    /// <c>false</c> (and <c>null</c>) if the entity has none.
+    /// <c>false</c> (and <c>null</c>) if the entity has none. <typeparamref
+    /// name="T"/> may be a concrete <see cref="Behavior"/> type or a capability
+    /// interface a behavior implements.
     /// </summary>
-    public static bool TryGetBehavior<T>(this IEntity entity, [NotNullWhen(true)] out T? behavior) where T : Behavior
+    public static bool TryGetBehavior<T>(this IEntity entity, [NotNullWhen(true)] out T? behavior) where T : class
     {
         for (int i = 0; i < entity.Behaviors.Count; i++)
         {
@@ -78,9 +80,11 @@ public static class EntityExtensions
 
     /// <summary>
     /// Returns the behavior of type <typeparamref name="T"/>, throwing if the
-    /// entity has none.
+    /// entity has none. <typeparamref name="T"/> may be a concrete
+    /// <see cref="Behavior"/> type or a capability interface a behavior
+    /// implements.
     /// </summary>
-    public static T GetBehavior<T>(this IEntity entity) where T : Behavior =>
+    public static T GetBehavior<T>(this IEntity entity) where T : class =>
         entity.TryGetBehavior<T>(out var behavior)
             ? behavior
             : throw new InvalidOperationException(

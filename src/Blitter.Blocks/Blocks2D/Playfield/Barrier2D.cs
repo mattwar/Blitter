@@ -4,14 +4,6 @@ namespace Blitter.Blocks2D;
 /// An obstacle in a <see cref="PlayField2D"/>.
 /// Barriers collide with sprites, but not each other.
 /// </summary>
-/// <remarks>
-/// Like <see cref="Sprite2D"/>, a barrier is a convenience template that wires
-/// up the traits and behaviors that make it collidable: a
-/// <see cref="Transform2D"/> for placement plus a <see cref="ColliderShape2D"/>
-/// behavior that poses an optional <see cref="CollisionShape2D"/> trait into the
-/// world-space <see cref="HitShape"/>. Subclasses populate those traits rather
-/// than re-implementing collision geometry.
-/// </remarks>
 public abstract class Barrier2D : Entity
 {
     private Transform2D? _transform;
@@ -54,13 +46,13 @@ public abstract class Barrier2D : Entity
     public virtual void OnHitSprite(Sprite2D hitter, in UpdateContext context) { }
 
     /// <summary>
-    /// Physical characteristics of this barrier.
+    /// Physical characteristics of this barrier, backed by a
+    /// <see cref="Surface2D"/> trait. Absent trait means
+    /// <see cref="PhysicsMaterial.Ideal"/>.
     /// </summary>
-    public virtual PhysicsMaterial PhysicsMaterial { get; set; } = PhysicsMaterial.Ideal;
-
-    /// <summary>
-    /// Surface velocity at <paramref name="point"/> in world units per second. 
-    /// </summary>
-    public virtual System.Numerics.Vector2 SurfaceVelocityAt(System.Numerics.Vector2 point)
-        => System.Numerics.Vector2.Zero;
+    public PhysicsMaterial PhysicsMaterial
+    {
+        get => this.GetOrAddTrait<Surface2D>().Material;
+        set => this.GetOrAddTrait<Surface2D>().Material = value;
+    }
 }
