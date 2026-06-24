@@ -16,7 +16,7 @@ public enum MinimapShape
 }
 
 /// <summary>
-/// Per-sprite minimap symbol spec returned by
+/// Per-entity minimap symbol spec returned by
 /// <see cref="MinimapLayer2D.MarkerSelector"/>.
 /// </summary>
 /// <param name="Color">Fill color.</param>
@@ -58,11 +58,11 @@ public sealed class MinimapLayer2D : Layer2D
     public Color BorderColor { get; set; } = new Color(255, 255, 255, 96);
 
     /// <summary>
-    /// Selects how a sprite is drawn on the minimap, or returns
+    /// Selects how a sprite-role entity is drawn on the minimap, or returns
     /// <c>null</c> to hide it. Keeps the layer ignorant of
-    /// game-specific sprite types.
+    /// game-specific entity types.
     /// </summary>
-    public Func<Sprite2D, MinimapMarker?> MarkerSelector { get; set; } = _ => null;
+    public Func<IEntity, MinimapMarker?> MarkerSelector { get; set; } = _ => null;
 
     /// <summary>
     /// When set together with <see cref="ViewportSize"/>, draws an outline
@@ -111,8 +111,9 @@ public sealed class MinimapLayer2D : Layer2D
             if (Source.GetContainment(sprite) == Containment.Removing) continue;
             if (MarkerSelector(sprite) is not { } m) continue;
             if (m.Radius <= 0f || m.Color.A == 0) continue;
+            if (!sprite.TryGetTrait<Transform2D>(out var transform)) continue;
 
-            var c = ToMini(sprite.Center);
+            var c = ToMini(transform.Position);
             DrawMarker(renderer, c, m);
         }
 

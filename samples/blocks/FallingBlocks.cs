@@ -98,7 +98,7 @@ sealed class BlockSpawner : Spawner2D, IFallingBlocksSpawner
 {
     public required int WorldWidth { get; init; }
 
-    protected override Sprite2D CreateSprite() => new Block(Random, WorldWidth);
+    protected override IEntity CreateSprite() => new Block(Random, WorldWidth);
 }
 
 // Self-removes a sprite once its top edge clears the bottom of the world bounds.

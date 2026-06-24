@@ -3,8 +3,8 @@ using System.Diagnostics.CodeAnalysis;
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// The 2D "world" layer: owns a set of <see cref="Sprite2D"/>s and
-/// <see cref="Barrier2D"/>s, drives their per-tick updates, and
+/// The 2D "world" layer: owns sprite-role and barrier-role entities,
+/// drives their per-tick updates, and
 /// runs the collision pass that dispatches hits to each sprite's
 /// <see cref="IHittable2D"/> behaviors.
 /// </summary>
@@ -12,17 +12,18 @@ public class PlayField2D : Layer2D, IContainerEntity
 {
     // Live membership lists. Read-only views are exposed via
     // Sprites/Barriers; outside callers must not mutate.
-    private readonly List<Sprite2D> _sprites = new();
-    private readonly List<Barrier2D> _barriers = new();
+    private readonly List<IEntity> _sprites = new();
+    private readonly List<IEntity> _barriers = new();
 
     // While Update is iterating we can't mutate _sprites/_barriers
     // directly. AddSprite/AddBarrier/RemoveBarrier called during the
     // update push into these pending lists and the changes are
     // applied at the end of the frame.
-    private readonly List<Sprite2D> _pendingAddSprites = new();
-    private readonly HashSet<Sprite2D> _pendingRemoveSprites = new(ReferenceEqualityComparer.Instance);
-    private readonly List<Barrier2D> _pendingAddBarriers = new();
-    private readonly List<Barrier2D> _pendingRemoveBarriers = new();
+    private readonly List<IEntity> _pendingAddSprites = new();
+    private readonly HashSet<IEntity> _pendingRemoveSprites = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<IEntity> _pendingRetireSprites = new(ReferenceEqualityComparer.Instance);
+    private readonly List<IEntity> _pendingAddBarriers = new();
+    private readonly HashSet<IEntity> _pendingRemoveBarriers = new(ReferenceEqualityComparer.Instance);
     private bool _updating;
 
     // Spawn timestamp (this playfield's Elapsed clock) per member, used to
@@ -40,34 +41,53 @@ public class PlayField2D : Layer2D, IContainerEntity
     public PlayField2D()
     {
         AddTrait(_bounds);
-        _collider = new Collider2D(e => e is not Sprite2D s || IsLive(s));
+        _collider = new Collider2D(IsLive);
     }
 
-    public PlayField2D(IEnumerable<Sprite2D> sprites)
+    public PlayField2D(IEnumerable<IEntity> sprites)
         : this()
     {
         AdoptSprites(sprites);
     }
 
-    public PlayField2D(IEnumerable<Sprite2D> sprites, IEnumerable<Barrier2D> barriers)
+    public PlayField2D(IEnumerable<IEntity> sprites, IEnumerable<IEntity> barriers)
         : this()
     {
         AdoptSprites(sprites);
-        foreach (var b in barriers)
+        AdoptBarriers(barriers);
+    }
+
+    private static void SetParent(IEntity child, IContainerEntity? parent)
+    {
+        if (child is Entity entity)
         {
-            b.Parent = this;
-            _barriers.Add(b);
+            entity.Parent = parent;
+            return;
         }
+
+        throw new InvalidOperationException($"PlayField2D can only contain {nameof(Entity)} instances.");
     }
 
-    private void AdoptSprites(IEnumerable<Sprite2D> sprites)
+    private void AdoptSprites(IEnumerable<IEntity> sprites)
     {
         foreach (var s in sprites)
         {
             (s.Parent as PlayField2D)?.RemoveImmediate(s);
-            s.Parent = this;
+            RemoveBarrierMembership(s, clearParent: false);
+            SetParent(s, this);
             _spawnedAt[s] = Elapsed;
             _sprites.Add(s);
+        }
+    }
+
+    private void AdoptBarriers(IEnumerable<IEntity> barriers)
+    {
+        foreach (var b in barriers)
+        {
+            (b.Parent as PlayField2D)?.RemoveImmediate(b);
+            RemoveSpriteMembership(b, retired: false, clearParent: false);
+            SetParent(b, this);
+            _barriers.Add(b);
         }
     }
 
@@ -76,7 +96,7 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// an initial set at construction (object-initializer or constructor), taking
     /// ownership of each sprite just like <see cref="AddSprite"/>.
     /// </summary>
-    public IReadOnlyList<Sprite2D> Sprites
+    public IReadOnlyList<IEntity> Sprites
     {
         get => _sprites;
         init => AdoptSprites(value);
@@ -87,7 +107,7 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// in this playfield. Returns <c>false</c> if none. Throws if more than one
     /// matches.
     /// </summary>
-    public bool TryGetSprite<T>([NotNullWhen(true)] out T? sprite) where T : Sprite2D
+    public bool TryGetSprite<T>([NotNullWhen(true)] out T? sprite) where T : class, IEntity
     {
         T? match = null;
         foreach (var candidate in _sprites)
@@ -106,23 +126,19 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// Resolves the single sprite assignable to <typeparamref name="T"/> in
     /// this playfield. Throws if none exists or more than one matches.
     /// </summary>
-    public T GetSprite<T>() where T : Sprite2D =>
+    public T GetSprite<T>() where T : class, IEntity =>
         TryGetSprite<T>(out var sprite) ? sprite : throw new InvalidOperationException($"No sprite of type {typeof(T).Name}.");
 
     /// <summary>
-    /// Static, non-sprite obstacles in this playfield. 
-    /// Tested against every sprite's <see cref="Sprite2D.HitCircle"/> each tick.
+    /// Static, non-sprite obstacle-role entities in this playfield.
+    /// Tested against every sprite-role entity's hit shape each tick.
     /// The <c>init</c> accessor adds an initial set at construction
     /// (object-initializer or constructor).
     /// </summary>
-    public IReadOnlyList<Barrier2D> Barriers
+    public IReadOnlyList<IEntity> Barriers
     {
         get => _barriers;
-        init
-        {
-            foreach (var b in value)
-                _barriers.Add(b);
-        }
+        init => AdoptBarriers(value);
     }
 
     /// <summary>
@@ -154,18 +170,27 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// <summary>
     /// Adds a sprite to the playfield.
     /// </summary>
-    public void AddSprite(Sprite2D sprite)
+    public void AddSprite(IEntity sprite)
     {
         var existing = sprite.Parent as PlayField2D;
-        if (existing == this)
+        if (existing is not null && existing != this)
         {
-            // Already a member — cancel any pending removal so the
-            // sprite stays around past the current frame.
-            _pendingRemoveSprites.Remove(sprite);
-            return;
+            existing.RemoveImmediate(sprite);
         }
-        existing?.RemoveImmediate(sprite);
-        sprite.Parent = this;
+        else if (existing == this)
+        {
+            if (IsBarrierRoleMember(sprite) || _pendingRemoveBarriers.Contains(sprite))
+                RemoveBarrier(sprite);
+            if (IsSpriteRoleMember(sprite))
+            {
+                // Already a sprite-role member — cancel any pending
+                // removal so it stays around past the current frame.
+                _pendingRemoveSprites.Remove(sprite);
+                return;
+            }
+        }
+        if (sprite.Parent != this)
+            SetParent(sprite, this);
         _spawnedAt[sprite] = Elapsed;
         if (_updating)
         {
@@ -180,7 +205,7 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// <summary>
     /// Adds multiple sprites to the playfield.
     /// </summary>
-    public void AddSprites(IEnumerable<Sprite2D> sprites)
+    public void AddSprites(IEnumerable<IEntity> sprites)
     {
         foreach (var s in sprites)
             AddSprite(s);
@@ -191,14 +216,31 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// <see cref="Update"/>: the sprite stops updating and colliding
     /// immediately and the actual removal is deferred to end of frame.
     /// </summary>
-    public void RemoveSprite(Sprite2D sprite)
+    public void RemoveSprite(IEntity sprite)
     {
-        if (sprite.Parent != this)
+        RequestRemoveSprite(sprite, retired: true);
+    }
+
+    private void RequestRemoveSprite(IEntity sprite, bool retired)
+    {
+        if (sprite.Parent != this && !IsSpriteRoleMember(sprite))
             return;
         if (_updating)
         {
-            _pendingAddSprites.Remove(sprite);
-            _pendingRemoveSprites.Add(sprite);
+            var removedPendingAdd = _pendingAddSprites.Remove(sprite);
+            if (_sprites.Contains(sprite))
+            {
+                _pendingRemoveSprites.Add(sprite);
+                if (retired)
+                    _pendingRetireSprites.Add(sprite);
+                else
+                    _pendingRetireSprites.Remove(sprite);
+            }
+            else if (removedPendingAdd)
+            {
+                _spawnedAt.Remove(sprite);
+                ClearParentIfUncontained(sprite);
+            }
         }
         else if (_sprites.Remove(sprite))
         {
@@ -206,9 +248,41 @@ public class PlayField2D : Layer2D, IContainerEntity
         }
     }
 
+    private bool RemoveSpriteMembership(IEntity sprite, bool retired, bool clearParent)
+    {
+        var removed = _pendingAddSprites.Remove(sprite);
+        _pendingRemoveSprites.Remove(sprite);
+        _pendingRetireSprites.Remove(sprite);
+        if (_sprites.Remove(sprite))
+            removed = true;
+
+        if (!removed)
+            return false;
+
+        _spawnedAt.Remove(sprite);
+        if (clearParent)
+            ClearParentIfUncontained(sprite);
+        if (retired)
+            OnSpriteRetired(sprite);
+        return true;
+    }
+
     // A sprite is live while it is a member and not pending removal this
     // frame. Membership/removal is host-owned state; sprites carry no flag.
-    private bool IsLive(Sprite2D sprite) => !_pendingRemoveSprites.Contains(sprite);
+    private bool IsLive(IEntity entity) =>
+        !_pendingRemoveSprites.Contains(entity) && !_pendingRemoveBarriers.Contains(entity);
+
+    private bool IsSpriteRoleMember(IEntity entity) =>
+        _sprites.Contains(entity) || _pendingAddSprites.Contains(entity);
+
+    private bool IsBarrierRoleMember(IEntity entity) =>
+        _barriers.Contains(entity) || _pendingAddBarriers.Contains(entity);
+
+    private void ClearParentIfUncontained(IEntity child)
+    {
+        if (child.Parent == this && !IsSpriteRoleMember(child) && !IsBarrierRoleMember(child))
+            SetParent(child, null);
+    }
 
     /// <inheritdoc/>
     public TimeSpan GetAge(IEntity child) =>
@@ -221,15 +295,8 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// </summary>
     public void RemoveEntity(IEntity child)
     {
-        switch (child)
-        {
-            case Sprite2D sprite:
-                RemoveSprite(sprite);
-                break;
-            case Barrier2D barrier:
-                RemoveBarrier(barrier);
-                break;
-        }
+        RemoveSprite(child);
+        RemoveBarrier(child);
     }
 
     /// <summary>
@@ -238,20 +305,20 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// </summary>
     public override Containment GetContainment(IEntity child)
     {
-        if (child is Sprite2D sprite)
+        var isSpriteRoleMember = IsSpriteRoleMember(child);
+        var isBarrierRoleMember = IsBarrierRoleMember(child);
+        if (isSpriteRoleMember || isBarrierRoleMember)
         {
-            if (!ReferenceEquals(sprite.Parent, this))
+            if (!ReferenceEquals(child.Parent, this))
                 return Containment.NotContained;
-            return _pendingRemoveSprites.Contains(sprite) ? Containment.Removing : Containment.Contained;
+            return Containment.Contained;
         }
 
-        if (child is Barrier2D barrier)
-        {
-            if (_pendingRemoveBarriers.Contains(barrier))
-                return Containment.Removing;
-            if (_barriers.Contains(barrier) || _pendingAddBarriers.Contains(barrier))
-                return Containment.Contained;
-        }
+        if (_pendingRemoveSprites.Contains(child))
+            return Containment.Removing;
+
+        if (_pendingRemoveBarriers.Contains(child))
+            return Containment.Removing;
 
         return Containment.NotContained;
     }
@@ -259,9 +326,26 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// <summary>
     /// Adds a barrier to the playfield.
     /// </summary>
-    public void AddBarrier(Barrier2D barrier)
+    public void AddBarrier(IEntity barrier)
     {
-        barrier.Parent = this;
+        var existing = barrier.Parent as PlayField2D;
+        if (existing is not null && existing != this)
+        {
+            existing.RemoveImmediate(barrier);
+        }
+        else if (existing == this)
+        {
+            if (IsSpriteRoleMember(barrier) || _pendingRemoveSprites.Contains(barrier))
+                RequestRemoveSprite(barrier, retired: false);
+            if (IsBarrierRoleMember(barrier))
+            {
+                _pendingRemoveBarriers.Remove(barrier);
+                return;
+            }
+        }
+
+        if (barrier.Parent != this)
+            SetParent(barrier, this);
         if (_updating)
         {
             _pendingAddBarriers.Add(barrier);           
@@ -275,53 +359,67 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// <summary>
     /// Adds multiple barriers to the playfield.
     /// </summary>
-    public void AddBarriers(IEnumerable<Barrier2D> barriers)
+    public void AddBarriers(IEnumerable<IEntity> barriers)
     {
-        var sink = _updating ? _pendingAddBarriers : _barriers;
         foreach (var b in barriers)
-        {
-            b.Parent = this;
-            sink.Add(b);           
-        }
+            AddBarrier(b);
     }
 
     /// <summary>
     /// Removes a barrier from the playfield.
     /// </summary>
-    public void RemoveBarrier(Barrier2D barrier)
+    public void RemoveBarrier(IEntity barrier)
     {
+        if (barrier.Parent != this && !IsBarrierRoleMember(barrier))
+            return;
         if (_updating)
         {
-            _pendingRemoveBarriers.Add(barrier);
+            var removedPendingAdd = _pendingAddBarriers.Remove(barrier);
+            if (_barriers.Contains(barrier))
+                _pendingRemoveBarriers.Add(barrier);
+            else if (removedPendingAdd)
+                ClearParentIfUncontained(barrier);
         }
         else if (_barriers.Remove(barrier))
         {
-            barrier.Parent = null;
+            ClearParentIfUncontained(barrier);
         }
     }
 
-    // Removes `sprite` from this playfield immediately, regardless of update state. 
-    // Used by the reparenting path on AddSprite where we can't wait until end-of-frame. 
-    // User-facing removal goes through `RemoveSprite` and is reaped via the pending pipeline.
-    internal void RemoveImmediate(Sprite2D sprite)
+    private bool RemoveBarrierMembership(IEntity barrier, bool clearParent)
     {
-        _pendingAddSprites.Remove(sprite);
-        _pendingRemoveSprites.Remove(sprite);
-        if (_sprites.Remove(sprite))
-            Detach(sprite, retired: false);
+        var removed = _pendingAddBarriers.Remove(barrier);
+        _pendingRemoveBarriers.Remove(barrier);
+        if (_barriers.Remove(barrier))
+            removed = true;
+
+        if (!removed)
+            return false;
+
+        if (clearParent)
+            ClearParentIfUncontained(barrier);
+        return true;
+    }
+
+    // Removes `child` from this playfield immediately, regardless of update state. 
+    // Used by reparenting paths where we can't wait until end-of-frame.
+    // User-facing removal goes through RemoveSprite/RemoveBarrier and is reaped via the pending pipeline.
+    internal void RemoveImmediate(IEntity child)
+    {
+        var removed = RemoveSpriteMembership(child, retired: false, clearParent: false);
+        removed = RemoveBarrierMembership(child, clearParent: false) || removed;
+        if (removed && child.Parent == this)
+            SetParent(child, null);
     }
 
     // Clears the sprite's playfield link and, when `retired` is true,
     // notifies the playfield via OnSpriteRetired. Reparenting paths
     // pass retired=false so pool consumers don't try to recycle a
     // sprite that's about to live in another playfield.
-    private void Detach(Sprite2D sprite, bool retired)
+    private void Detach(IEntity sprite, bool retired)
     {
         _spawnedAt.Remove(sprite);
-        if (sprite.Parent == this)
-        {
-            sprite.Parent = null;
-        }
+        ClearParentIfUncontained(sprite);
         if (retired)
             OnSpriteRetired(sprite);
     }
@@ -332,7 +430,7 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// into another playfield.
     /// Override to return the sprite to a pool, recycle resources, etc.
     /// </summary>
-    protected virtual void OnSpriteRetired(Sprite2D sprite)
+    protected virtual void OnSpriteRetired(IEntity sprite)
     {
     }
 
@@ -386,7 +484,7 @@ public class PlayField2D : Layer2D, IContainerEntity
 
     // Estimate the substep count needed to keep the fastest sprite's
     // per-substep displacement under half the smallest hit radius.
-    // Uses the sprite's current Speed as the velocity proxy — that's
+    // Uses the sprite's Velocity2D.Speed as the velocity proxy — that's
     // the value Motion2D will integrate during this frame.
     private int ComputeSubstepCount(float dt)
     {
@@ -407,7 +505,9 @@ public class PlayField2D : Layer2D, IContainerEntity
                 continue;
             if (r < minRadius)
                 minRadius = r;
-            var step = MathF.Abs(s.Speed) * dt;
+            if (!s.TryGetTrait<Velocity2D>(out var velocity))
+                continue;
+            var step = MathF.Abs(velocity.Speed) * dt;
             if (step > maxStep)
                 maxStep = step;
         }
@@ -427,7 +527,11 @@ public class PlayField2D : Layer2D, IContainerEntity
         // before sprites so this frame's sprite-vs-barrier pass sees
         // the new geometry.
         for (int i = 0; i < _barriers.Count; i++)
-            _barriers[i].Update(spriteContext);
+        {
+            var barrier = _barriers[i];
+            if (IsLive(barrier))
+                barrier.Update(spriteContext);
+        }
 
         for (int i = 0; i < _sprites.Count; i++)
         {
@@ -452,9 +556,10 @@ public class PlayField2D : Layer2D, IContainerEntity
                 var s = _sprites[i];
                 if (!_pendingRemoveSprites.Contains(s)) continue;
                 _sprites.RemoveAt(i);
-                Detach(s, retired: true);
+                Detach(s, retired: _pendingRetireSprites.Contains(s));
             }
             _pendingRemoveSprites.Clear();
+            _pendingRetireSprites.Clear();
         }
 
         if (_pendingAddSprites.Count > 0)
@@ -469,7 +574,8 @@ public class PlayField2D : Layer2D, IContainerEntity
             {
                 if (_pendingRemoveBarriers.Contains(_barriers[i]))
                 {
-                    _barriers[i].Parent = null;
+                    if (_barriers[i].Parent == this)
+                        SetParent(_barriers[i], null);
                     _barriers.RemoveAt(i);
                 }
             }
@@ -489,13 +595,17 @@ public class PlayField2D : Layer2D, IContainerEntity
         // Barriers draw behind sprites so the ball, paddle, etc. sit
         // on top of bumpers, flippers, and other props.
         for (int i = 0; i < _barriers.Count; i++)
-            _barriers[i].Draw(renderer);
+        {
+            var barrier = _barriers[i];
+            if (IsLive(barrier) && barrier is IDrawable2D drawable)
+                drawable.Draw(renderer);
+        }
 
         for (int i = 0; i < _sprites.Count; i++)
         {
             var sprite = _sprites[i];
-            if (IsLive(sprite))
-                sprite.Draw(renderer);
+            if (IsLive(sprite) && sprite is IDrawable2D drawable)
+                drawable.Draw(renderer);
         }
 
         if (ShowWorldBounds && WorldBounds is not null)

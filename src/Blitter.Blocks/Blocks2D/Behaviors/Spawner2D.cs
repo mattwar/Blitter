@@ -1,11 +1,11 @@
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// Raised after a <see cref="Spawner2D"/> adds a sprite to its target.
+/// Raised after a <see cref="Spawner2D"/> adds an entity to its target.
 /// </summary>
 /// <param name="Source">The behavior instance that raised the event.</param>
-/// <param name="Sprite">The sprite that was just spawned.</param>
-public readonly record struct SpriteSpawned2DEventArgs(Spawner2D Source, Sprite2D Sprite);
+/// <param name="Spawned">The entity that was just spawned.</param>
+public readonly record struct SpriteSpawned2DEventArgs(Spawner2D Source, IEntity Spawned);
 
 /// <summary>
 /// Scene behavior that periodically adds new sprites to a
@@ -55,8 +55,8 @@ public abstract class Spawner2D : Behavior, IUpdatable
     // First tick rolls the StartDelay onto the timer.
     private bool _initialized;
 
-    /// <summary>Creates the next sprite to spawn. Invoked on the update thread.</summary>
-    protected abstract Sprite2D CreateSprite();
+    /// <summary>Creates the next entity to spawn. Invoked on the update thread.</summary>
+    protected abstract IEntity CreateSprite();
 
     /// <summary>Resolves the playfield that receives spawned sprites.</summary>
     protected virtual PlayField2D ResolveTarget()
@@ -68,7 +68,7 @@ public abstract class Spawner2D : Behavior, IUpdatable
     }
 
     /// <summary>Returns whether <paramref name="sprite"/> counts toward <see cref="MaxAlive"/>.</summary>
-    protected virtual bool CountsTowardMaxAlive(Sprite2D sprite) => true;
+    protected virtual bool CountsTowardMaxAlive(IEntity sprite) => true;
 
     /// <summary>
     /// Spawn <paramref name="count"/> sprites immediately, independent
