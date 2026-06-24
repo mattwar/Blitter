@@ -145,7 +145,7 @@ var ball = new BreakoutBall(BallRadius)
     Behaviors =
     [
         new Motion2D(),
-        new BarrierBounce2D
+        new SurfaceBounce2D
         {
             Restitution = 1f,
             TangentialDamping = 1f,
@@ -446,7 +446,7 @@ sealed class Brick : Barrier2D
 
         IsAlive = false;
         // Drop our collision geometry so the same-frame sprite-direction
-        // dispatch (the ball's BarrierBounce2D) sees no contact and can't
+        // dispatch (the ball's SurfaceBounce2D) sees no contact and can't
         // bounce off a brick we just cleared.
         this.GetOrAddTrait<CollisionShape2D>().Shape = HitShape2D.None;
         // Remove on next safe boundary so the collision pass doesn't

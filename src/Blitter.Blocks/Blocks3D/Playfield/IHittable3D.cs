@@ -6,7 +6,7 @@ namespace Blitter.Blocks3D;
 /// behavior of a sprite involved in a hit; the sprite itself exposes no
 /// collision API. Implement only the method you need — both default to no-ops.
 /// </summary>
-public interface IHitHandler3D
+public interface IHittable3D
 {
     /// <summary>
     /// Invoked when <paramref name="self"/>'s <see cref="Sprite3D.HitSphere"/>
@@ -22,7 +22,7 @@ public interface IHitHandler3D
 }
 
 /// <summary>
-/// Forwards playfield-detected hits to a sprite's <see cref="IHitHandler3D"/>
+/// Forwards playfield-detected hits to a sprite's <see cref="IHittable3D"/>
 /// behaviors. Collision dispatch lives with the playfield, not on the sprite.
 /// </summary>
 internal static class HitDispatch3D
@@ -31,7 +31,7 @@ internal static class HitDispatch3D
     {
         var behaviors = self.Behaviors;
         for (int i = 0; i < behaviors.Count; i++)
-            if (behaviors[i] is IHitHandler3D handler)
+            if (behaviors[i] is IHittable3D handler)
                 handler.OnHitSprite(self, other, in context);
     }
 
@@ -39,7 +39,7 @@ internal static class HitDispatch3D
     {
         var behaviors = self.Behaviors;
         for (int i = 0; i < behaviors.Count; i++)
-            if (behaviors[i] is IHitHandler3D handler)
+            if (behaviors[i] is IHittable3D handler)
                 handler.OnHitBarrier(self, barrier, in context);
     }
 }

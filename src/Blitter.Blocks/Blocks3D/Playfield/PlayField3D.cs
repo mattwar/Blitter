@@ -4,7 +4,7 @@ namespace Blitter.Blocks3D;
 /// The 3D "world" layer, containing a set of sprites and barriers
 /// that interact with each other.
 /// </summary>
-public class PlayField3D : Layer3D, ISpriteHost3D
+public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
 {
     private readonly List<Sprite3D> _sprites = new();
     private readonly List<Barrier3D> _barriers = new();
@@ -17,6 +17,10 @@ public class PlayField3D : Layer3D, ISpriteHost3D
     private readonly List<Barrier3D> _pendingAddBarriers = new();
     private readonly List<Barrier3D> _pendingRemoveBarriers = new();
     private bool _updating;
+
+    // Spawn timestamp (this playfield's Elapsed clock) per member, used to
+    // answer GetAge. The playfield owns this; sprites carry no age field.
+    private readonly Dictionary<IEntity, TimeSpan> _spawnedAt = new(ReferenceEqualityComparer.Instance);
 
     public PlayField3D()
     {
@@ -69,7 +73,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
 
         // Parenting drives attachment (Entity.OnAttach wires behaviors).
         sprite.Parent = this;
-        sprite._spawnedAt = Elapsed;
+        _spawnedAt[sprite] = Elapsed;
 
         if (_updating)
         {
@@ -111,6 +115,28 @@ public class PlayField3D : Layer3D, ISpriteHost3D
     // A sprite is live while it is a member and not pending removal this
     // frame. Membership/removal is host-owned state; sprites carry no flag.
     private bool IsLive(Sprite3D sprite) => !_pendingRemoveSprites.Contains(sprite);
+
+    /// <inheritdoc/>
+    public TimeSpan GetAge(IEntity child) =>
+        _spawnedAt.TryGetValue(child, out var t) ? Elapsed - t : TimeSpan.Zero;
+
+    /// <summary>
+    /// Removes <paramref name="child"/> from this playfield, dispatching to the
+    /// correct pool by runtime type so callers need not know the sprite/barrier
+    /// split. No-op for anything this playfield does not hold.
+    /// </summary>
+    public void RemoveEntity(IEntity child)
+    {
+        switch (child)
+        {
+            case Sprite3D sprite:
+                RemoveSprite(sprite);
+                break;
+            case Barrier3D barrier:
+                RemoveBarrier(barrier);
+                break;
+        }
+    }
 
     /// <summary>
     /// Reports whether <paramref name="child"/> is a sprite or barrier this
@@ -175,6 +201,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
 
     private void Detach(Sprite3D sprite, bool retired)
     {
+        _spawnedAt.Remove(sprite);
         if (sprite.Parent == this)
             sprite.Parent = null;
         if (retired)

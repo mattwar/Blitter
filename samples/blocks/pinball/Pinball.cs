@@ -165,7 +165,7 @@ var ball = new Pinball
     [
         new Gravity2D { Acceleration = new Vector2(0f, 1400f), MaxFallSpeed = 1600f },
         new Motion2D(),
-        new BarrierBounce2D
+        new SurfaceBounce2D
         {
             Restitution = 0.82f,
             TangentialDamping = 0.985f,

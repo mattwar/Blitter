@@ -65,15 +65,9 @@ public class Sprite3D : Entity, IDrawable3D
     /// </summary>
     public ISpriteHost3D? Host => this.Parent as ISpriteHost3D;
 
-    // Time the sprite was added to its current host; stamped by the host
-    // when it adopts the sprite (see PlayField3D.AddSprite).
-    internal TimeSpan _spawnedAt;
-
     /// <summary>How long this sprite has been a member of its current <see cref="Host"/>.</summary>
     public TimeSpan Age =>
-        this.Host is { } p
-            ? p.Elapsed - _spawnedAt
-            : TimeSpan.Zero;
+        this.Parent?.GetAge(this) ?? TimeSpan.Zero;
 
     /// <summary>
     /// The sprite's world-space collision shape: the current
@@ -99,7 +93,6 @@ public class Sprite3D : Entity, IDrawable3D
     {
         _transform = this.GetOrAddTrait<Transform3D>();
         _velocity = this.GetOrAddTrait<Velocity3D>();
-        _spawnedAt = TimeSpan.Zero;
         base.OnAttach(entity);
     }
 

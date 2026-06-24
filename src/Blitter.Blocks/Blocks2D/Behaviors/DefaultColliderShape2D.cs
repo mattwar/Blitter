@@ -1,14 +1,15 @@
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// Provides an entity's world-space collision shape, sourced from either the
-/// explicit <see cref="CollisionShape2D"/> trait or — when the entity presents
+/// The default <see cref="IColliderShape2D"/>: provides an entity's world-space
+/// collision shape, sourced from either the explicit
+/// <see cref="CollisionShape2D"/> trait or — when the entity presents
 /// a visual — derived from that visual. Shared by <see cref="Sprite2D"/> and
 /// <see cref="Barrier2D"/>; the <see cref="Appearance2D"/> trait is optional, so
 /// visual-less collidables (barriers) supply their geometry through
 /// <see cref="CollisionShape2D"/> alone.
 /// </summary>
-public class ColliderShape2D : Behavior
+public class DefaultColliderShape2D : Behavior, IColliderShape2D
 {
     private IEntity _entity = null!;
     private Transform2D _transform = null!;

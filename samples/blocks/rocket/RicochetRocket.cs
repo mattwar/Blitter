@@ -380,11 +380,11 @@ sealed class Rocket : Sprite2D
             new Motion2D(),  // move with simple 2D physics
             // Face direction of travel, except while stunned — then
             // let RotationSpeed drive the spin freely.
-            new CustomHitBehavior2D
+            new CustomUpdateBehavior
             {
-                OnApply = (s, in _) =>
+                OnUpdate = (e, in _) =>
                 {
-                    if (s is Rocket { IsStunned: true })
+                    if (e is not Sprite2D s || s is Rocket { IsStunned: true })
                         return;
                     s.Rotation = s.Heading;
                 },
@@ -579,7 +579,7 @@ sealed class Rocket : Sprite2D
     }
 }
 
-sealed class AsteroidSmasher : Behavior, IHitHandler2D
+sealed class AsteroidSmasher : Behavior, IHittable2D
 {
     private readonly ScoreLayer2D _scoreboard;
 
@@ -603,7 +603,7 @@ sealed class AsteroidSmasher : Behavior, IHitHandler2D
         _scoreboard = scoreboard;
     }
 
-    public void OnHitEntity(in Hit2D hit)
+    public void OnHit(in Hit2D hit)
     {
         if (this.Entity is not Sprite2D self || hit.Other is not Sprite2D other)
             return;

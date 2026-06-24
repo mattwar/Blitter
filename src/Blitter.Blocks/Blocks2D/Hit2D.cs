@@ -1,7 +1,7 @@
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// The information passed to an <see cref="IHitHandler2D.OnHitEntity"/> call:
+/// The information passed to an <see cref="IHittable2D.OnHit"/> call:
 /// the other party in the collision plus the contact manifold the playfield
 /// computed for it. The manifold is always oriented relative to the receiver —
 /// <see cref="HitContact2D.Normal"/> points from <see cref="Other"/> toward the

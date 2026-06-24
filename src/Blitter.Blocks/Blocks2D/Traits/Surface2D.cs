@@ -2,7 +2,7 @@ namespace Blitter.Blocks2D;
 
 /// <summary>
 /// Physical surface characteristics (restitution, friction, kick) of an entity. 
-/// Pure data, read by bounce behaviors such as <see cref="BarrierBounce2D"/> to modulate a collision response. 
+/// Pure data, read by bounce behaviors such as <see cref="SurfaceBounce2D"/> to modulate a collision response. 
 /// </summary>
 public sealed class Surface2D : Trait
 {

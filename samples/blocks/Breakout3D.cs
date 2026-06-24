@@ -430,7 +430,7 @@ sealed class BrickBarrier3D : Barrier3D
 // english from off-center paddle hits can compound into a near-flat
 // X/Y trajectory that ping-pongs between the side walls indefinitely
 // without ever returning to the bricks or to the paddle.
-sealed class ForwardKickFromPaddle3D : Behavior, IHitHandler3D
+sealed class ForwardKickFromPaddle3D : Behavior, IHittable3D
 {
     public Paddle3D? Paddle { get; set; }
 

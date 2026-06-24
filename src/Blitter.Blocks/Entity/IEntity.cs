@@ -8,7 +8,7 @@ public interface IEntity
     /// <summary>
     /// The container of this entity, or <c>null</c> at the root.
     /// </summary>
-    IEntity? Parent { get; }
+    IContainerEntity? Parent { get; }
 
     /// <summary>
     /// The traits for this entity.
@@ -54,16 +54,22 @@ public interface IEntity
     void Update(in UpdateContext context);
 }
 
-
+/// <summary>
+/// An <see cref="IEntity"/> that owns child entities: it answers how long a
+/// child has been a member and can remove a child without the caller needing
+/// to know the child's concrete type or which internal list holds it.
+/// </summary>
 public interface IContainerEntity : IEntity
 {
     /// <summary>
-    /// The entities directly contained by this container.
+    /// How long <paramref name="child"/> has been a member of this container,
+    /// or <see cref="TimeSpan.Zero"/> if it is not a tracked member.
     /// </summary>
-    IReadOnlyList<IEntity> Children { get; }
+    TimeSpan GetAge(IEntity child);
 
     /// <summary>
-    /// Adds a child entity to this container.
+    /// Removes <paramref name="child"/> from this container. No-op if the
+    /// child is not a member.
     /// </summary>
-    void AddChild(IEntity child);
+    void RemoveEntity(IEntity child);
 }

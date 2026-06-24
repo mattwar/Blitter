@@ -89,13 +89,14 @@ sealed class Block : Sprite2D
         Speed  = rng.Next(120, 320);
         Heading = 180f; // straight down (0 = up)
         AddBehavior(new Motion2D());
-        AddBehavior(new CustomHitBehavior2D
+        AddBehavior(new CustomUpdateBehavior
         {
-            OnApply = (sprite, in ctx) =>
+            OnUpdate = (entity, in ctx) =>
             {
-                if (sprite.TryFindTrait<Bounds2D>(out var bounds)
+                if (entity is Sprite2D sprite
+                    && sprite.TryFindTrait<Bounds2D>(out var bounds)
                     && sprite.Center.Y - Size > bounds.Rect.Height)
-                    sprite.PlayField.RemoveSprite(sprite);
+                    sprite.RemoveFromParent();
             }
         });
     }

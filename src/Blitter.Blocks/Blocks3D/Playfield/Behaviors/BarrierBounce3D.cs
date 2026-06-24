@@ -11,9 +11,9 @@ namespace Blitter.Blocks3D;
 /// <see cref="Barrier3D.PhysicsMaterial"/>. Shape-agnostic: any
 /// <see cref="Barrier3D"/> that implements
 /// <see cref="Barrier3D.HitShape"/> participates. The 3D analog of
-/// <c>Blitter.Blocks2D.BarrierBounce2D</c>.
+/// <c>Blitter.Blocks2D.SurfaceBounce2D</c>.
 /// </summary>
-public sealed class BarrierBounce3D : Behavior, IHitHandler3D
+public sealed class BarrierBounce3D : Behavior, IHittable3D
 {
     /// <summary>Ball-side elastic coefficient. Multiplied with the barrier's <see cref="PhysicsMaterial.Restitution"/>. 1 = perfectly elastic, 0 = sticks.</summary>
     public float Restitution { get; set; } = 1f;

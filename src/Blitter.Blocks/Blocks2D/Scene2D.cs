@@ -6,7 +6,7 @@ namespace Blitter.Blocks2D;
 /// <summary>
 /// A 2D scene comprised of one or more layers.
 /// </summary>
-public class Scene2D : Entity
+public class Scene2D : Entity, IContainerEntity
 {
     private Window2D? _window;
 
@@ -50,6 +50,21 @@ public class Scene2D : Entity
             return false;
         layer.Parent = null;
         return true;
+    }
+
+    /// <summary>
+    /// Scenes do not track layer age; always <see cref="TimeSpan.Zero"/>.
+    /// </summary>
+    public TimeSpan GetAge(IEntity child) => TimeSpan.Zero;
+
+    /// <summary>
+    /// Removes <paramref name="child"/> from the scene when it is one of its
+    /// layers. No-op otherwise.
+    /// </summary>
+    public void RemoveEntity(IEntity child)
+    {
+        if (child is Layer2D layer)
+            RemoveLayer(layer);
     }
 
     /// <summary>

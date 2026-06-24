@@ -5,7 +5,7 @@ namespace Blitter.Blocks3D;
 /// <summary>
 /// First-person walk controller for an entity. 
 /// </summary>
-public class WalkController3D : Behavior, IHitHandler3D, IUpdatable
+public class WalkController3D : Behavior, IHittable3D, IUpdatable
 {
     private readonly Window _window;
     private TimeSpan _elapsed;

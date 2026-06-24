@@ -56,12 +56,29 @@ public static class EntityExtensions
             : throw new InvalidOperationException(
                 $"Entity has no trait of type {typeof(T).Name}.");
 
+    /// <summary>
+    /// How long <paramref name="entity"/> has been a member of its current
+    /// <see cref="IEntity.Parent"/> container, or <see cref="TimeSpan.Zero"/>
+    /// when it has no container.
+    /// </summary>
+    public static TimeSpan Age(this IEntity entity) =>
+        entity.Parent?.GetAge(entity) ?? TimeSpan.Zero;
+
+    /// <summary>
+    /// Removes <paramref name="entity"/> from its current
+    /// <see cref="IEntity.Parent"/> container, if any.
+    /// </summary>
+    public static void RemoveFromParent(this IEntity entity) =>
+        entity.Parent?.RemoveEntity(entity);
+
 
     /// <summary>
     /// Finds the behavior of type <typeparamref name="T"/>, returning
-    /// <c>false</c> (and <c>null</c>) if the entity has none. <typeparamref
-    /// name="T"/> may be a concrete <see cref="Behavior"/> type or a capability
-    /// interface a behavior implements.
+    /// <c>false</c> (and <c>null</c>) if the entity has none. By convention
+    /// <typeparamref name="T"/> should be a capability interface a behavior
+    /// implements (e.g. <c>IColliderShape2D</c>) rather than a concrete
+    /// <see cref="Behavior"/> type, so consumers depend on the capability and
+    /// an entity may substitute the implementation.
     /// </summary>
     public static bool TryGetBehavior<T>(this IEntity entity, [NotNullWhen(true)] out T? behavior) where T : class
     {
@@ -80,9 +97,9 @@ public static class EntityExtensions
 
     /// <summary>
     /// Returns the behavior of type <typeparamref name="T"/>, throwing if the
-    /// entity has none. <typeparamref name="T"/> may be a concrete
-    /// <see cref="Behavior"/> type or a capability interface a behavior
-    /// implements.
+    /// entity has none. By convention <typeparamref name="T"/> should be a
+    /// capability interface a behavior implements rather than a concrete
+    /// <see cref="Behavior"/> type (see <see cref="TryGetBehavior{T}"/>).
     /// </summary>
     public static T GetBehavior<T>(this IEntity entity) where T : class =>
         entity.TryGetBehavior<T>(out var behavior)

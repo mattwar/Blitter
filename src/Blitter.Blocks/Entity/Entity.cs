@@ -8,7 +8,7 @@ public class Entity : IEntity
     /// <summary>
     /// The container this entity belongs, or null if this is the root.
     /// </summary>
-    public IEntity? Parent 
+    public IContainerEntity? Parent 
     { 
         get; 
         set
@@ -178,49 +178,3 @@ public class Entity : IEntity
         }
     }
 }
-
-
-#if false
-public class EntityContainer : Entity
-{
-    private readonly List<IEntity> _children = new();
-
-    /// <summary>
-    /// The entities contained by this entity.
-    /// </summary>
-    public IReadOnlyList<IEntity> Children
-    {
-        get => _children;
-
-        init
-        {
-            _children.AddRange(value);
-            foreach (var entity in value)
-            {
-                if (entity is Entity e)
-                {
-                    e.Parent = this;
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Adds a child to this entity.
-    /// </summary>
-    public void AddChild(IEntity child)
-    {
-        _children.Add(child);
-        if (child is Entity e)
-        {
-            e.Parent = this;
-        }
-    }
-
-    /// <inheritdoc/>
-    public override Containment GetContainment(IEntity child) =>
-        _children.Contains(child)
-            ? Containment.Contained
-            : Containment.NotContained;
-}
-#endif

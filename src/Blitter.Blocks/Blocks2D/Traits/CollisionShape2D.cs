@@ -3,7 +3,7 @@ namespace Blitter.Blocks2D;
 /// <summary>
 /// Optional, author-supplied collision geometry in the entity's own (unposed,
 /// unflipped) space. Pure data. When present and not
-/// <see cref="HitShape2D.None"/>, <see cref="ColliderShape2D"/> uses it in
+/// <see cref="HitShape2D.None"/>, <see cref="DefaultColliderShape2D"/> uses it in
 /// preference to the visual's hit shape; otherwise the collider falls back to
 /// the visual. Add this trait only when a sprite needs a collision boundary
 /// that differs from (or exists without) its visual.

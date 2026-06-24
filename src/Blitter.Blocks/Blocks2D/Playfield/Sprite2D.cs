@@ -37,9 +37,8 @@ public class Sprite2D : Entity, IDrawable2D
         _transform = this.GetOrAddTrait<Transform2D>();
         _velocity = this.GetOrAddTrait<Velocity2D>();
         _appearance = this.GetOrAddTrait<Appearance2D>();
-        if (!this.TryGetBehavior<ColliderShape2D>(out _))
-            this.AddBehavior(new ColliderShape2D());
-        _spawnedAt = TimeSpan.Zero;
+        if (!this.TryGetBehavior<IColliderShape2D>(out _))
+            this.AddBehavior(new DefaultColliderShape2D());
         base.OnAttach(entity);
     }
 
@@ -105,26 +104,21 @@ public class Sprite2D : Entity, IDrawable2D
     /// </summary>
     public Scene2D Scene => PlayField.Scene;
 
-    // Time sprite was added to playfield.
-    internal TimeSpan _spawnedAt;
-
     /// <summary>
     /// How long this sprite has been a member of its current <see cref="PlayField"/>.
     /// </summary>
-    public TimeSpan Age => 
-        this.Parent is PlayField2D p 
-            ? p.Elapsed - _spawnedAt 
-            : TimeSpan.Zero;
+    public TimeSpan Age =>
+        this.Parent?.GetAge(this) ?? TimeSpan.Zero;
 
     /// <summary>
     /// The sprite's world-space collision shape, provided by its
-    /// <see cref="ColliderShape2D"/> behavior. Empty when the sprite has no
+    /// <see cref="IColliderShape2D"/> behavior. Empty when the sprite has no
     /// collider (e.g. before it is attached to a playfield). Not overridable:
     /// to give a sprite custom geometry, set a <see cref="CollisionShape2D"/>
     /// trait (the collider reads it in preference to the visual's shape).
     /// </summary>
     public PosedHitShape2D HitShape =>
-        this.TryGetBehavior<ColliderShape2D>(out var collider)
+        this.TryGetBehavior<IColliderShape2D>(out var collider)
             ? collider.GetShape()
             : new(HitShape2D.None, Transform.Pose);
 

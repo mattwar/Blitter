@@ -9,7 +9,7 @@ namespace Blitter.Blocks2D;
 /// inspects the other entity (e.g. <c>other is Barrier2D</c>) to decide how to
 /// react. The hosting entity is available as <see cref="Behavior.Entity"/>.
 /// </summary>
-public interface IHitHandler2D
+public interface IHittable2D
 {
     /// <summary>
     /// Invoked when the hosting entity's hit shape overlaps another entity's
@@ -17,11 +17,11 @@ public interface IHitHandler2D
     /// carries the other party and the contact manifold (oriented for this
     /// receiver), so handlers need not recompute it.
     /// </summary>
-    void OnHitEntity(in Hit2D hit);
+    void OnHit(in Hit2D hit);
 }
 
 /// <summary>
-/// Forwards playfield-detected hits to an entity's <see cref="IHitHandler2D"/>
+/// Forwards playfield-detected hits to an entity's <see cref="IHittable2D"/>
 /// behaviors. Collision dispatch lives with the playfield, not on the entity.
 /// </summary>
 internal static class HitDispatch2D
@@ -30,7 +30,11 @@ internal static class HitDispatch2D
     {
         var behaviors = self.Behaviors;
         for (int i = 0; i < behaviors.Count; i++)
-            if (behaviors[i] is IHitHandler2D handler)
-                handler.OnHitEntity(in hit);
+        {
+            if (behaviors[i] is IHittable2D hittable)
+            {
+                hittable.OnHit(in hit);  
+            }            
+        }
     }
 }

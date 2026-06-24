@@ -6,9 +6,9 @@ namespace Blitter.Blocks2D;
 /// The 2D "world" layer: owns a set of <see cref="Sprite2D"/>s and
 /// <see cref="Barrier2D"/>s, drives their per-tick updates, and
 /// runs the collision pass that dispatches hits to each sprite's
-/// <see cref="IHitHandler2D"/> behaviors.
+/// <see cref="IHittable2D"/> behaviors.
 /// </summary>
-public class PlayField2D : Layer2D
+public class PlayField2D : Layer2D, IContainerEntity
 {
     // Live membership lists. Read-only views are exposed via
     // Sprites/Barriers; outside callers must not mutate.
@@ -25,12 +25,16 @@ public class PlayField2D : Layer2D
     private readonly List<Barrier2D> _pendingRemoveBarriers = new();
     private bool _updating;
 
+    // Spawn timestamp (this playfield's Elapsed clock) per member, used to
+    // answer GetAge. The playfield owns this; sprites carry no age field.
+    private readonly Dictionary<IEntity, TimeSpan> _spawnedAt = new(ReferenceEqualityComparer.Instance);
+
     // World-space bounds, refreshed each frame from WorldBounds or the
     // viewport. Resolved by sprite behaviors via TryFindTrait.
     private readonly Bounds2D _bounds = new();
 
     // Detects and dispatches collisions; entity-agnostic, shapes sourced
-    // from each entity's ColliderShape2D behavior.
+    // from each entity's IColliderShape2D behavior.
     private readonly Collider2D _collider;
 
     public PlayField2D()
@@ -62,7 +66,7 @@ public class PlayField2D : Layer2D
         {
             (s.Parent as PlayField2D)?.RemoveImmediate(s);
             s.Parent = this;
-            s._spawnedAt = Elapsed;
+            _spawnedAt[s] = Elapsed;
             _sprites.Add(s);
         }
     }
@@ -162,7 +166,7 @@ public class PlayField2D : Layer2D
         }
         existing?.RemoveImmediate(sprite);
         sprite.Parent = this;
-        sprite._spawnedAt = Elapsed;
+        _spawnedAt[sprite] = Elapsed;
         if (_updating)
         {
             _pendingAddSprites.Add(sprite);           
@@ -205,6 +209,28 @@ public class PlayField2D : Layer2D
     // A sprite is live while it is a member and not pending removal this
     // frame. Membership/removal is host-owned state; sprites carry no flag.
     private bool IsLive(Sprite2D sprite) => !_pendingRemoveSprites.Contains(sprite);
+
+    /// <inheritdoc/>
+    public TimeSpan GetAge(IEntity child) =>
+        _spawnedAt.TryGetValue(child, out var t) ? Elapsed - t : TimeSpan.Zero;
+
+    /// <summary>
+    /// Removes <paramref name="child"/> from this playfield, dispatching to the
+    /// correct pool by runtime type so callers need not know the sprite/barrier
+    /// split. No-op for anything this playfield does not hold.
+    /// </summary>
+    public void RemoveEntity(IEntity child)
+    {
+        switch (child)
+        {
+            case Sprite2D sprite:
+                RemoveSprite(sprite);
+                break;
+            case Barrier2D barrier:
+                RemoveBarrier(barrier);
+                break;
+        }
+    }
 
     /// <summary>
     /// Reports whether <paramref name="child"/> is a sprite or barrier this
@@ -291,6 +317,7 @@ public class PlayField2D : Layer2D
     // sprite that's about to live in another playfield.
     private void Detach(Sprite2D sprite, bool retired)
     {
+        _spawnedAt.Remove(sprite);
         if (sprite.Parent == this)
         {
             sprite.Parent = null;

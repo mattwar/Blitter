@@ -3,17 +3,17 @@ namespace Blitter.Blocks2D;
 /// <summary>
 /// Runs the playfield's 2D collision pass: sprite-vs-sprite and
 /// sprite-vs-barrier overlap detection, dispatching each contact to the
-/// involved entities' <see cref="IHitHandler2D"/> behaviors.
+/// involved entities' <see cref="IHittable2D"/> behaviors.
 /// </summary>
 /// <remarks>
 /// Entity-agnostic by design: both lists are typed as
 /// <see cref="IEntity"/> and every hit shape is sourced uniformly from the
-/// entity's <see cref="ColliderShape2D"/> behavior — never from a property on
+/// entity's <see cref="IColliderShape2D"/> behavior — never from a property on
 /// a concrete sprite/barrier type. The only host-specific knowledge it needs
 /// is liveness (handlers can remove entities mid-pass), supplied as a
 /// predicate so it can be re-queried between dispatches.
 /// </remarks>
-internal sealed class Collider2D
+public sealed class Collider2D
 {
     private readonly Func<IEntity, bool> _isLive;
 
@@ -118,12 +118,12 @@ internal sealed class Collider2D
 
     /// <summary>
     /// Resolves an entity's world-space hit shape from its
-    /// <see cref="ColliderShape2D"/> behavior. Returns <c>false</c> when the
+    /// <see cref="IColliderShape2D"/> behavior. Returns <c>false</c> when the
     /// entity carries no collider.
     /// </summary>
     public static bool TryGetHitShape(IEntity entity, out PosedHitShape2D shape)
     {
-        if (entity.TryGetBehavior<ColliderShape2D>(out var collider))
+        if (entity.TryGetBehavior<IColliderShape2D>(out var collider))
         {
             shape = collider.GetShape();
             return true;

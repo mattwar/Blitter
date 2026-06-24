@@ -14,7 +14,7 @@ namespace Blitter.Blocks2D;
 /// (Y is down), so 0° points right, 90° points down, -90° points up.
 /// Set <see cref="Pressed"/> from input each frame; the barrier
 /// interpolates toward the corresponding target angle at
-/// <see cref="SnapDegPerSec"/>. <see cref="BarrierBounce2D"/>
+/// <see cref="SnapDegPerSec"/>. <see cref="SurfaceBounce2D"/>
 /// reads the angular velocity to add a surface kick to the ball.
 /// </remarks>
 public class SwingArmBarrier2D : Barrier2D
@@ -67,7 +67,7 @@ public class SwingArmBarrier2D : Barrier2D
             new CapsuleHitShape2D(Vector2.Zero, new Vector2(Length, 0f), Radius);
         Transform.Position = Pivot;
         Transform.Rotation = float.IsNaN(CurrentAngleDeg) ? RestAngleDeg : CurrentAngleDeg;
-        // Expose the swing's surface velocity to BarrierBounce2D via a
+        // Expose the swing's surface velocity to SurfaceBounce2D via a
         // capability behavior instead of a barrier-template method.
         if (!this.TryGetBehavior<ISurfaceVelocity2D>(out _))
             this.AddBehavior(new SurfaceVelocityProvider());
@@ -127,7 +127,7 @@ public class SwingArmBarrier2D : Barrier2D
 
     /// <summary>
     /// Provider behavior that exposes the swinging capsule's surface velocity
-    /// (the 2D analog of ω × r about the pivot) to <see cref="BarrierBounce2D"/>
+    /// (the 2D analog of ω × r about the pivot) to <see cref="SurfaceBounce2D"/>
     /// so a moving flipper transfers energy to the ball.
     /// </summary>
     private sealed class SurfaceVelocityProvider : Behavior, ISurfaceVelocity2D
