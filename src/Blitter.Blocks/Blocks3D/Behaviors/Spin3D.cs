@@ -7,7 +7,7 @@ namespace Blitter.Blocks3D;
 /// This is useful for items like spinning coins, rotating signs, or 
 /// other objects that need a constant rotation effect.
 /// </summary>
-public sealed class Spin3D : Behavior
+public sealed class Spin3D : Behavior, IUpdatable
 {
     /// <summary>
     /// The speed of the spin in radians per second.
@@ -21,7 +21,7 @@ public sealed class Spin3D : Behavior
         _transform = entity.GetOrAddTrait<Transform3D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
         if (dt <= 0f || RotationSpeed == 0f)

@@ -257,7 +257,7 @@ sealed class BreakoutBall : Sprite2D
 
 // Optional ball-side behavior that clamps Speed each tick.
 // Keeps the ball lively even when bricks/paddle introduce damping.
-sealed class SpeedClamp2D : Behavior
+sealed class SpeedClamp2D : Behavior, IUpdatable
 {
     public float Min { get; set; }
     public float Max { get; set; }
@@ -266,7 +266,7 @@ sealed class SpeedClamp2D : Behavior
 
     protected override void OnAttach(IEntity entity) => _target = (Sprite2D)entity;
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         var target = _target;
         if (target.Speed > 0f && target.Speed < Min)
@@ -492,7 +492,7 @@ sealed class Brick : Barrier2D
 
 // Scene-wide game loop: input, paddle motion, launch flow, lives,
 // drain detection, win/lose state, level reset.
-sealed class BreakoutController : Behavior
+sealed class BreakoutController : Behavior, IUpdatable
 {
     private readonly FrameInput _input;
     private readonly Renderer2D _renderer;
@@ -531,7 +531,7 @@ sealed class BreakoutController : Behavior
         _launchSpeed = launchSpeed;
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         var scene = (Scene2D)this.Entity;
 

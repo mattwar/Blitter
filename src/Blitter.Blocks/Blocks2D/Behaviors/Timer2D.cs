@@ -5,7 +5,7 @@ namespace Blitter.Blocks2D;
 /// With <see cref="AutoRestart"/> enabled it fires repeatedly at <see cref="Duration"/> intervals — 
 /// useful for periodic AI checks, level countdowns, or rate-limited effects.
 /// </summary>
-public sealed class Timer2D : Behavior
+public sealed class Timer2D : Behavior, IUpdatable
 {
     /// <summary>Countdown length used on start and (when auto-restarting) after each fire.</summary>
     public TimeSpan Duration { get; set; }
@@ -40,7 +40,7 @@ public sealed class Timer2D : Behavior
         _initialized = true;
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         if (!_initialized)
         {

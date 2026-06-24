@@ -16,7 +16,7 @@ public class SpeedClamp3DTests
         var clamp = new SpeedClamp3D { Max = 4f };
         var sprite = new Sprite3D { Velocity = new Vector3(10f, 0f, 0f), Behaviors = [ clamp ] };
 
-        clamp.Apply(Ctx);
+        clamp.Update(Ctx);
 
         Assert.Equal(4f, sprite.Velocity.Length(), 5);
         Assert.Equal(new Vector3(4f, 0f, 0f), sprite.Velocity);
@@ -28,7 +28,7 @@ public class SpeedClamp3DTests
         var clamp = new SpeedClamp3D { Min = 5f };
         var sprite = new Sprite3D { Velocity = new Vector3(0f, 0f, 1f), Behaviors = [ clamp ] };
 
-        clamp.Apply(Ctx);
+        clamp.Update(Ctx);
 
         Assert.Equal(5f, sprite.Velocity.Length(), 5);
         Assert.Equal(new Vector3(0f, 0f, 5f), sprite.Velocity);
@@ -40,7 +40,7 @@ public class SpeedClamp3DTests
         var clamp = new SpeedClamp3D { Min = 1f, Max = 5f };
         var sprite = new Sprite3D { Velocity = new Vector3(3f, 0f, 0f), Behaviors = [ clamp ] };
 
-        clamp.Apply(Ctx);
+        clamp.Update(Ctx);
 
         Assert.Equal(new Vector3(3f, 0f, 0f), sprite.Velocity);
     }
@@ -52,7 +52,7 @@ public class SpeedClamp3DTests
         var clamp = new SpeedClamp3D { Max = 1f };
         var sprite = new Sprite3D { Velocity = v, Behaviors = [ clamp ] };
 
-        clamp.Apply(Ctx);
+        clamp.Update(Ctx);
 
         var expected = Vector3.Normalize(v);
         Assert.Equal(expected.X, Vector3.Normalize(sprite.Velocity).X, 5);
@@ -66,7 +66,7 @@ public class SpeedClamp3DTests
         var clamp = new SpeedClamp3D { Min = 5f, Max = 10f };
         var sprite = new Sprite3D { Velocity = Vector3.Zero, Behaviors = [ clamp ] };
 
-        clamp.Apply(Ctx);
+        clamp.Update(Ctx);
 
         Assert.Equal(Vector3.Zero, sprite.Velocity);
     }
@@ -77,7 +77,7 @@ public class SpeedClamp3DTests
         var clamp = new SpeedClamp3D { Min = 0f, Max = 10f };
         var sprite = new Sprite3D { Velocity = new Vector3(0.1f, 0f, 0f), Behaviors = [ clamp ] };
 
-        clamp.Apply(Ctx);
+        clamp.Update(Ctx);
 
         Assert.Equal(new Vector3(0.1f, 0f, 0f), sprite.Velocity);
     }

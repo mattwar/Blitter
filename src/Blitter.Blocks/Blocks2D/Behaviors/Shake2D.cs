@@ -8,7 +8,7 @@ namespace Blitter.Blocks2D;
 /// Place this behavior <em>after</em> <see cref="Motion2D"/> so motion
 /// integration runs against the unshaken position.
 /// </summary>
-public sealed class Shake2D : Behavior
+public sealed class Shake2D : Behavior, IUpdatable
 {
     /// <summary>Maximum offset magnitude (pixels) at full trauma (=1).</summary>
     public float MaxOffset { get; set; } = 8f;
@@ -38,7 +38,7 @@ public sealed class Shake2D : Behavior
         _transform = entity.GetOrAddTrait<Transform2D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         // Roll back last frame's shake before recomputing.
         _transform.Position -= _lastOffset;

@@ -437,11 +437,6 @@ sealed class ForwardKickFromPaddle3D : Behavior, IHitHandler3D
     /// <summary>0..1. Minimum |Vz| / |V| immediately after a paddle hit. 0.5 = Z must hold at least half the speed.</summary>
     public float MinForwardRatio { get; set; } = 0.5f;
 
-    public override void Apply(in UpdateContext context)
-    {
-        // do nothing.. work happens in OnHitBarrier
-    }
-
     public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
     {
         if (Paddle is null || !ReferenceEquals(barrier, Paddle))
@@ -478,7 +473,7 @@ sealed class ForwardKickFromPaddle3D : Behavior, IHitHandler3D
 
 // Top-level game state: input → paddle, ball launch / drain flow,
 // brick clean-up + scoring, win/lose banner.
-sealed class Breakout3DController : Behavior
+sealed class Breakout3DController : Behavior, IUpdatable
 {
     private readonly FrameInput _input;
     private readonly PlayField3D _playField;
@@ -521,7 +516,7 @@ sealed class Breakout3DController : Behavior
         SyncCameraToPaddle();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         // --- Paddle input: arrows + WASD.
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;

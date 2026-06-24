@@ -146,7 +146,7 @@ public class Spaceman : Sprite2D
 /// The spaceman movement controller.
 /// This handles all the spaceman's motion and gravity.
 /// </summary>
-public class SpacemanController : Behavior
+public class SpacemanController : Behavior, IUpdatable
 {
     private readonly FrameInput input;
 
@@ -164,7 +164,7 @@ public class SpacemanController : Behavior
         this.input = input;
     }
 
-    public override void Apply(in UpdateContext ctx)
+    public void Update(in UpdateContext ctx)
     {
         var self = (Sprite2D)this.Entity;
         if (self is not Spaceman spaceman) 

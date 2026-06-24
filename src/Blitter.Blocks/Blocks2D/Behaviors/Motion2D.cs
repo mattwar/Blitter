@@ -3,7 +3,7 @@ namespace Blitter.Blocks2D;
 /// <summary>
 /// Moves an entity's position (<see cref="Transform2D"/>) based on its velocity (<see cref="Velocity2D"/>).
 /// </summary>
-public class Motion2D : Behavior
+public class Motion2D : Behavior, IUpdatable
 {
     /// <summary>
     /// Minimum time that must accumulate between successful integration
@@ -24,7 +24,7 @@ public class Motion2D : Behavior
         _transform = entity.GetOrAddTrait<Transform2D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         if (context.ElapsedSinceLastUpdate == TimeSpan.Zero)
             return;

@@ -8,7 +8,7 @@ using System.Numerics;
 /// Attach to whichever sprite already drives the camera (typically the player) and place <em>after</em>
 /// <see cref="CameraFollow2D"/> so the shake offset is added on top of the followed position.
 /// </summary>
-public sealed class CameraShake2D : Behavior
+public sealed class CameraShake2D : Behavior, IUpdatable
 {
     /// <summary>Camera being jittered. Required.</summary>
     public required Camera2D Camera { get; init; }
@@ -37,7 +37,7 @@ public sealed class CameraShake2D : Behavior
     public void AddTrauma(float amount) =>
         Trauma = Math.Clamp(Trauma + amount, 0f, 1f);
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         var baseline = Camera.Position == _lastWritten
             ? Camera.Position - _lastOffset

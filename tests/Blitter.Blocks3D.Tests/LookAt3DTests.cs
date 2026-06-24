@@ -19,7 +19,7 @@ public class LookAt3DTests
         var look = new LookAt3D { TargetPoint = new Vector3(1f, 0f, 0f) };
         var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
 
-        look.Apply(Ctx(0.016));
+        look.Update(Ctx(0.016));
 
         var fwd = ForwardOf(sprite);
         Assert.Equal(1f, fwd.X, 4);
@@ -38,7 +38,7 @@ public class LookAt3DTests
         };
         var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
 
-        look.Apply(Ctx(0.016));
+        look.Update(Ctx(0.016));
 
         // Faces the sprite at -Z, not the point at +X.
         var fwd = ForwardOf(sprite);
@@ -55,7 +55,7 @@ public class LookAt3DTests
         };
         var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
 
-        look.Apply(Ctx(0.016));
+        look.Update(Ctx(0.016));
 
         Assert.Equal(-1f, ForwardOf(sprite).Z, 4);
     }
@@ -66,7 +66,7 @@ public class LookAt3DTests
         var look = new LookAt3D();
         var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
 
-        look.Apply(Ctx(0.016));
+        look.Update(Ctx(0.016));
 
         Assert.Equal(Quaternion.Identity, sprite.Orientation);
     }
@@ -77,7 +77,7 @@ public class LookAt3DTests
         var look = new LookAt3D { TargetSelector = () => null };
         var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
 
-        look.Apply(Ctx(0.016));
+        look.Update(Ctx(0.016));
 
         Assert.Equal(Quaternion.Identity, sprite.Orientation);
     }
@@ -92,7 +92,7 @@ public class LookAt3DTests
         };
         var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
 
-        look.Apply(Ctx(0.016));
+        look.Update(Ctx(0.016));
 
         // Forward stays level despite the target being above.
         Assert.Equal(0f, ForwardOf(sprite).Y, 4);
@@ -104,7 +104,7 @@ public class LookAt3DTests
         var look = new LookAt3D { TargetPoint = new Vector3(2f, 2f, 2f) };
         var sprite = new Sprite3D { Position = new Vector3(2f, 2f, 2f), Behaviors = [ look ] };
 
-        look.Apply(Ctx(0.016));
+        look.Update(Ctx(0.016));
 
         Assert.Equal(Quaternion.Identity, sprite.Orientation);
     }
@@ -120,7 +120,7 @@ public class LookAt3DTests
         };
         var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
 
-        look.Apply(Ctx(0.1)); // maxStep = 0.01 rad, far short of pi
+        look.Update(Ctx(0.1)); // maxStep = 0.01 rad, far short of pi
 
         // Should have rotated only a little — not snapped to face +Z.
         var fwd = ForwardOf(sprite);
@@ -137,7 +137,7 @@ public class LookAt3DTests
         };
         var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
 
-        look.Apply(Ctx(1.0));
+        look.Update(Ctx(1.0));
 
         Assert.Equal(1f, ForwardOf(sprite).X, 4);
     }

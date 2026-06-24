@@ -13,7 +13,7 @@ public delegate void SpriteApplier(Sprite2D target, in UpdateContext context);
 /// of whether the host or the other party is a sprite or a barrier — inspect
 /// the second argument's type to decide how to react.
 /// </summary>
-public sealed class CustomHitBehavior2D : Behavior, IHitHandler2D
+public sealed class CustomHitBehavior2D : Behavior, IHitHandler2D, IUpdatable
 {
     /// <summary>Invoked each frame with the host (only while it is a sprite).</summary>
     public SpriteApplier? OnApply { get; set; }
@@ -25,7 +25,7 @@ public sealed class CustomHitBehavior2D : Behavior, IHitHandler2D
     /// </summary>
     public Action<IEntity, IEntity>? OnHit { get; set; }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         if (this.Entity is Sprite2D sprite)
             OnApply?.Invoke(sprite, in context);

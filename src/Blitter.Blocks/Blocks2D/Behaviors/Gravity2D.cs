@@ -7,7 +7,7 @@ namespace Blitter.Blocks2D;
 /// Accelerates the sprite each tick by <see cref="Acceleration"/>.
 /// Pair with <see cref="Motion2D"/> to actually integrate position.
 /// </summary>
-public sealed class Gravity2D : Behavior
+public sealed class Gravity2D : Behavior, IUpdatable
 {
     /// <summary>
     /// Acceleration in world units / s². Defaults to (0, 1500) — downward in screen space.
@@ -23,7 +23,7 @@ public sealed class Gravity2D : Behavior
 
     private Velocity2D? _velocity;
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         if (this.Entity is not IEntity entity)
             return;

@@ -5,7 +5,7 @@ namespace Blitter.Blocks2D;
 /// when its center crosses an edge — 
 /// the classic Asteroids-style toroidal world.
 /// </summary>
-public class WrapInBounds2D : Behavior
+public class WrapInBounds2D : Behavior, IUpdatable
 {
     /// <summary>Invoked after the sprite has wrapped this tick.</summary>
     public Action<Sprite2D>? OnWrap { get; set; }
@@ -20,7 +20,7 @@ public class WrapInBounds2D : Behavior
         _transform = entity.GetOrAddTrait<Transform2D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         // Bounds live on an ancestor (the playfield), which isn't reachable
         // when this behavior is attached (the sprite may not be parented yet). 

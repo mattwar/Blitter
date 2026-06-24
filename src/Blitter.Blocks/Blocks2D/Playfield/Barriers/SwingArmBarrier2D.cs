@@ -136,8 +136,6 @@ public class SwingArmBarrier2D : Barrier2D
 
         protected override void OnAttach(IEntity entity) => _arm = (SwingArmBarrier2D)entity;
 
-        public override void Apply(in UpdateContext context) { }
-
         public Vector2 SurfaceVelocityAt(Vector2 point)
         {
             var offset = point - _arm.Pivot;

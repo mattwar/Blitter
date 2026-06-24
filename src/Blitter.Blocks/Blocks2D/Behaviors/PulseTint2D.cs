@@ -6,7 +6,7 @@ namespace Blitter.Blocks2D;
 /// with the given <see cref="Period"/>. Useful for radioactive /
 /// hazard markers, charged power-ups, and "hold to interact" prompts.
 /// </summary>
-public sealed class PulseTint2D : Behavior
+public sealed class PulseTint2D : Behavior, IUpdatable
 {
     /// <summary>
     /// Tint at the trough/bottom of the pulse (t = 0).
@@ -34,7 +34,7 @@ public sealed class PulseTint2D : Behavior
         _appearance = entity.GetOrAddTrait<Appearance2D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         var seconds = Period.TotalSeconds;
         if (seconds <= 0)

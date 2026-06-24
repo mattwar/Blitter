@@ -22,11 +22,6 @@ public sealed class BarrierBounce2D : Behavior, IHitHandler2D
 
     /// <summary>Called after a successful bounce. Args: the bouncing entity, the barrier entity, contact normal.</summary>
     public Action<IEntity, IEntity, Vector2>? OnBounce { get; set; }
-
-    public override void Apply(in UpdateContext context)
-    {
-        // No per-tick logic; bounce happens in OnHitEntity.
-    }
     
     public void OnHitEntity(in Hit2D hit)
     {

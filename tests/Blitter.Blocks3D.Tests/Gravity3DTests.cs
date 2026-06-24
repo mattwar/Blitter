@@ -16,7 +16,7 @@ public class Gravity3DTests
         var gravity = new Gravity3D { Acceleration = new Vector3(0f, -10f, 0f) };
         var sprite = new Sprite3D { Behaviors = [ gravity ] };
 
-        gravity.Apply(Ctx(0.5));
+        gravity.Update(Ctx(0.5));
 
         Assert.Equal(new Vector3(0f, -5f, 0f), sprite.Velocity);
     }
@@ -27,8 +27,8 @@ public class Gravity3DTests
         var gravity = new Gravity3D { Acceleration = new Vector3(0f, -10f, 0f) };
         var sprite = new Sprite3D { Behaviors = [ gravity ] };
 
-        gravity.Apply(Ctx(0.1));
-        gravity.Apply(Ctx(0.1));
+        gravity.Update(Ctx(0.1));
+        gravity.Update(Ctx(0.1));
 
         Assert.Equal(-2f, sprite.Velocity.Y, 5);
     }
@@ -39,7 +39,7 @@ public class Gravity3DTests
         var gravity = new Gravity3D();
         var sprite = new Sprite3D { Velocity = new Vector3(1f, 2f, 3f), Behaviors = [ gravity ] };
 
-        gravity.Apply(Ctx(0));
+        gravity.Update(Ctx(0));
 
         Assert.Equal(new Vector3(1f, 2f, 3f), sprite.Velocity);
     }
@@ -56,7 +56,7 @@ public class Gravity3DTests
         var sprite = new Sprite3D { Velocity = new Vector3(0f, -8f, 0f), Behaviors = [ gravity ] };
 
         // -8 + (-10 * 0.5) = -13, capped to -9.
-        gravity.Apply(Ctx(0.5));
+        gravity.Update(Ctx(0.5));
 
         Assert.Equal(-9f, sprite.Velocity.Y, 5);
     }
@@ -72,7 +72,7 @@ public class Gravity3DTests
 
         var sprite = new Sprite3D { Velocity = new Vector3(5f, -20f, 0f), Behaviors = [ gravity ] };
 
-        gravity.Apply(Ctx(0.1));
+        gravity.Update(Ctx(0.1));
 
         // Horizontal component is untouched; vertical is capped.
         Assert.Equal(5f, sprite.Velocity.X, 5);
@@ -90,7 +90,7 @@ public class Gravity3DTests
 
         var sprite = new Sprite3D { Behaviors = [ gravity ] };
 
-        gravity.Apply(Ctx(0.1));
+        gravity.Update(Ctx(0.1));
 
         Assert.Equal(-1f, sprite.Velocity.Y, 5);
     }
@@ -101,7 +101,7 @@ public class Gravity3DTests
         var gravity = new Gravity3D { Acceleration = Vector3.Zero };
         var sprite = new Sprite3D { Velocity = new Vector3(1f, 1f, 1f), Behaviors = [ gravity ] };
 
-        gravity.Apply(Ctx(0.1));
+        gravity.Update(Ctx(0.1));
 
         Assert.Equal(new Vector3(1f, 1f, 1f), sprite.Velocity);
     }

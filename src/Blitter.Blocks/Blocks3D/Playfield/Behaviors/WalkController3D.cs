@@ -5,7 +5,7 @@ namespace Blitter.Blocks3D;
 /// <summary>
 /// First-person walk controller for an entity. 
 /// </summary>
-public class WalkController3D : Behavior, IHitHandler3D
+public class WalkController3D : Behavior, IHitHandler3D, IUpdatable
 {
     private readonly Window _window;
     private TimeSpan _elapsed;
@@ -89,7 +89,7 @@ public class WalkController3D : Behavior, IHitHandler3D
         _velocity = entity.GetOrAddTrait<Velocity3D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         _elapsed += context.ElapsedSinceLastUpdate;
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;

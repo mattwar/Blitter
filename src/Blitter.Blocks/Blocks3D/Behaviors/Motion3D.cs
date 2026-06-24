@@ -7,7 +7,7 @@ namespace Blitter.Blocks3D;
 /// and its <see cref="Velocity3D.AngularVelocity"/> to <see cref="Transform3D.Orientation"/> each frame.
 /// The 3D analog of <c>Blitter.Blocks2D.Motion2D</c>.
 /// </summary>
-public class Motion3D : Behavior
+public class Motion3D : Behavior, IUpdatable
 {
     /// <summary>
     /// Minimum time that must accumulate between successful integration
@@ -28,7 +28,7 @@ public class Motion3D : Behavior
         _velocity = entity.GetOrAddTrait<Velocity3D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         if (context.ElapsedSinceLastUpdate == TimeSpan.Zero)
             return;

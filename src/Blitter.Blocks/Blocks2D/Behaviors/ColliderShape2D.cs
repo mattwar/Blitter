@@ -19,10 +19,6 @@ public class ColliderShape2D : Behavior
         _transform = entity.GetOrAddTrait<Transform2D>();
     }
 
-    public override void Apply(in UpdateContext context)
-    {
-    }
-
     /// <summary>
     /// The entity's world-space collision shape: the explicit
     /// <see cref="CollisionShape2D"/> override when supplied, otherwise the

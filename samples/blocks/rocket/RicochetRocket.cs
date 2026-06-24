@@ -603,8 +603,6 @@ sealed class AsteroidSmasher : Behavior, IHitHandler2D
         _scoreboard = scoreboard;
     }
 
-    public override void Apply(in UpdateContext context) { }
-
     public void OnHitEntity(in Hit2D hit)
     {
         if (this.Entity is not Sprite2D self || hit.Other is not Sprite2D other)
@@ -862,7 +860,7 @@ sealed class Asteroid : Sprite2D
     }
 }
 
-sealed class RocketController : Behavior
+sealed class RocketController : Behavior, IUpdatable
 {
     private readonly FrameInput _input;
 
@@ -884,7 +882,7 @@ sealed class RocketController : Behavior
 
     protected override void OnAttach(IEntity entity) => _rocket = (Sprite2D)entity;
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         var rocket = _rocket;
 

@@ -173,8 +173,8 @@ public class Entity : IEntity
     {
         for (int i = 0; i < this.Behaviors.Count; i++)
         {
-            var behavior = this.Behaviors[i];
-            behavior.Apply(in context);
+            if (this.Behaviors[i] is IUpdatable updatable)
+                updatable.Update(in context);
         }
     }
 }

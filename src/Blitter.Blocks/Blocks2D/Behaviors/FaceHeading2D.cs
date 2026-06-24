@@ -6,7 +6,7 @@ namespace Blitter.Blocks2D;
 /// <see cref="Sprite2D.Heading"/> each tick, so the image points
 /// in the direction of travel.
 /// </summary>
-public class FaceHeading2D : Behavior
+public class FaceHeading2D : Behavior, IUpdatable
 {
     /// <summary>
     /// Degrees added to <see cref="Sprite2D.Heading"/> when assigning
@@ -24,7 +24,7 @@ public class FaceHeading2D : Behavior
         _velocity = entity.GetOrAddTrait<Velocity2D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         _transform.Rotation = _velocity.Heading + RotationOffset;           
     }

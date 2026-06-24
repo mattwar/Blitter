@@ -95,7 +95,8 @@ public class Scene2D : Entity
     {
         foreach (var behavior in Behaviors)
         {
-            behavior.Apply(in context);
+            if (behavior is IUpdatable updatable)
+                updatable.Update(in context);
         }
 
         foreach (var layer in Layers)

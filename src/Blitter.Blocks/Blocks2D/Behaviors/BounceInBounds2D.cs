@@ -4,7 +4,7 @@ namespace Blitter.Blocks2D;
 /// Reflects a sprite's velocity when its center crosses the edge of the
 /// update context bounds, so the sprite stays inside the playfield.
 /// </summary>
-public class BounceInBounds2D : Behavior
+public class BounceInBounds2D : Behavior, IUpdatable
 {
     /// <summary>
     /// Invoked after the velocity has been reflected for the current tick.
@@ -24,7 +24,7 @@ public class BounceInBounds2D : Behavior
         _transform = entity.GetOrAddTrait<Transform2D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         // Bounds live on an ancestor (the playfield), which isn't reachable
         // when this behavior is attached (the sprite may not be parented

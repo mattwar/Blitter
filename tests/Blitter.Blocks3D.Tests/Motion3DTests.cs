@@ -16,7 +16,7 @@ public class Motion3DTests
         var motion = new Motion3D();
         var sprite = new Sprite3D { Velocity = new Vector3(2f, 0f, 0f), Behaviors = [ motion ] };
 
-        motion.Apply(Ctx(0.5));
+        motion.Update(Ctx(0.5));
 
         Assert.Equal(new Vector3(1f, 0f, 0f), sprite.Position);
     }
@@ -32,7 +32,7 @@ public class Motion3DTests
             Behaviors = [ motion ],
         };
 
-        motion.Apply(Ctx(0));
+        motion.Update(Ctx(0));
 
         Assert.Equal(new Vector3(5f, 5f, 5f), sprite.Position);
     }
@@ -44,13 +44,13 @@ public class Motion3DTests
         var sprite = new Sprite3D { Velocity = new Vector3(10f, 0f, 0f), Behaviors = [ motion ] };
 
         // Each step is under the 10ms interval, so nothing moves yet.
-        motion.Apply(Ctx(0.004));
+        motion.Update(Ctx(0.004));
         Assert.Equal(Vector3.Zero, sprite.Position);
-        motion.Apply(Ctx(0.004));
+        motion.Update(Ctx(0.004));
         Assert.Equal(Vector3.Zero, sprite.Position);
 
         // Third step crosses the threshold; the full 12ms is integrated.
-        motion.Apply(Ctx(0.004));
+        motion.Update(Ctx(0.004));
         Assert.Equal(10f * 0.012f, sprite.Position.X, 5);
     }
 
@@ -64,7 +64,7 @@ public class Motion3DTests
             Behaviors = [ motion ],
         };
 
-        motion.Apply(Ctx(1.0)); // one second => half turn
+        motion.Update(Ctx(1.0)); // one second => half turn
 
         // -Z forward rotated half a turn about Y lands on +Z.
         var forward = Vector3.Transform(-Vector3.UnitZ, sprite.Orientation);
@@ -79,7 +79,7 @@ public class Motion3DTests
         var motion = new Motion3D();
         var sprite = new Sprite3D { Position = new Vector3(1f, 2f, 3f), Behaviors = [ motion ] };
 
-        motion.Apply(Ctx(0.1));
+        motion.Update(Ctx(0.1));
 
         Assert.Equal(new Vector3(1f, 2f, 3f), sprite.Position);
         Assert.Equal(Quaternion.Identity, sprite.Orientation);

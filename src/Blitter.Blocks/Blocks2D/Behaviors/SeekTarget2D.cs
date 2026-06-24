@@ -9,7 +9,7 @@ namespace Blitter.Blocks2D;
 /// and accelerates <see cref="Sprite2D.Speed"/> toward <see cref="MaxSpeed"/>. 
 /// Composes with <see cref="Motion2D"/>, which actually integrates the updated heading + speed.
 /// </summary>
-public class SeekTarget2D : Behavior
+public class SeekTarget2D : Behavior, IUpdatable
 {
     /// <summary>
     /// Returns the current world-space target, or <c>null</c> to stop
@@ -48,7 +48,7 @@ public class SeekTarget2D : Behavior
         _transform = entity.GetOrAddTrait<Transform2D>();
     }    
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         if (Target() is not Vector2 dest)
             return;

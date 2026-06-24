@@ -7,7 +7,7 @@ namespace Blitter.Blocks2D;
 /// A self-moving, collidable inhabitant of a <see cref="PlayField2D"/>.
 /// Its collection of behaviors defines its logic: movement, collision response, and so on.
 /// </summary>
-public class Sprite2D : Entity, IEntity, IDrawable2D
+public class Sprite2D : Entity, IDrawable2D
 {
     public Sprite2D()
     {
@@ -132,15 +132,6 @@ public class Sprite2D : Entity, IEntity, IDrawable2D
     /// Bounding circle of the sprite
     /// </summary>
     public BoundingCircle HitCircle => HitShape.BoundingCircle;
-
-    /// <summary>Apply every behavior in order.</summary>
-    public override void Update(in UpdateContext context)
-    {
-        for (int i = 0; i < this.Behaviors.Count; i++)
-        {
-            this.Behaviors[i].Apply(in context);
-        }
-    }
 
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer2D renderer)

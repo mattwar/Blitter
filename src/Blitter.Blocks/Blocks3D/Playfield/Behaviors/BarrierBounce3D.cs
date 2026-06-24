@@ -24,11 +24,6 @@ public sealed class BarrierBounce3D : Behavior, IHitHandler3D
     /// <summary>Called after a successful bounce. Args: sprite, barrier, contact normal.</summary>
     public Action<Sprite3D, Barrier3D, Vector3>? OnBounce { get; set; }
 
-    public override void Apply(in UpdateContext context)
-    {
-        // no nothing - real work happens in OnHitBarrier.
-    }
-
     public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
     {
         // Normal convention: TryGetContact returns normal from b → a;

@@ -7,7 +7,7 @@ namespace Blitter.Blocks2D;
 /// "spawn another one every N seconds" without each game hand-rolling
 /// its own timer.
 /// </summary>
-public sealed class Spawner2D : Behavior
+public sealed class Spawner2D : Behavior, IUpdatable
 {
     /// <summary>Playfield that receives spawned sprites.</summary>
     public required PlayField2D Target { get; init; }
@@ -89,7 +89,7 @@ public sealed class Spawner2D : Behavior
         return spawned;
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         if (!_initialized)
         {

@@ -8,7 +8,7 @@ namespace Blitter.Blocks3D;
 /// The entity's local -Z axis (its "forward") is aimed at the target, matching Blitter's camera convention. 
 /// A set-and-forget way to make turrets, enemies, signposts, or billboards track something without writing any rotation math.
 /// </summary>
-public sealed class LookAt3D : Behavior
+public sealed class LookAt3D : Behavior, IUpdatable
 {
     /// <summary>
     /// An entity to face. 
@@ -56,7 +56,7 @@ public sealed class LookAt3D : Behavior
         _transform = entity.GetOrAddTrait<Transform3D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         if (ResolveTarget() is not { } point)
             return;

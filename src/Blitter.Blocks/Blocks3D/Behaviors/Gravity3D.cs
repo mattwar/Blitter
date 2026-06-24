@@ -7,7 +7,7 @@ namespace Blitter.Blocks3D;
 /// Pair with <see cref="Motion3D"/> to actually integrate position.
 /// The 3D analog of <c>Blitter.Blocks2D.Gravity2D</c>.
 /// </summary>
-public sealed class Gravity3D : Behavior
+public sealed class Gravity3D : Behavior, IUpdatable
 {
     /// <summary>
     /// Acceleration in world units / s². Defaults to (0, -9.81, 0) —
@@ -29,7 +29,7 @@ public sealed class Gravity3D : Behavior
         _velocity = entity.GetOrAddTrait<Velocity3D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
         if (dt <= 0f)

@@ -11,7 +11,7 @@ using System.Numerics;
 /// target back to the dead-zone edge. Optionally clamped so the
 /// viewport never extends outside <see cref="WorldBounds"/>.
 /// </summary>
-public class CameraFollow2D : Behavior
+public class CameraFollow2D : Behavior, IUpdatable
 {
     /// <summary>
     /// The camera being driven. If <c>null</c>, the behavior does
@@ -75,7 +75,7 @@ public class CameraFollow2D : Behavior
         _target = entity.GetOrAddTrait<Transform2D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         // The camera lives on a sibling layer reached through the scene,
         // which isn't reachable when this behavior is attached (the sprite

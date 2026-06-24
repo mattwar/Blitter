@@ -76,11 +76,11 @@ public class ContainmentTests
 
     // Removes its own sprite from the field during update and records the
     // containment state observed immediately after the kill request.
-    private sealed class SelfRemove : Behavior
+    private sealed class SelfRemove : Behavior, IUpdatable
     {
         public Containment Observed { get; private set; }
 
-        public override void Apply(in UpdateContext context)
+        public void Update(in UpdateContext context)
         {
             var sprite = (Sprite3D)Entity;
             var field = (PlayField3D)sprite.Parent!;

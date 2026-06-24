@@ -103,15 +103,6 @@ public class Sprite3D : Entity, IDrawable3D
         base.OnAttach(entity);
     }
 
-    /// <summary>Apply every behavior in order.</summary>
-    public override void Update(in UpdateContext context)
-    {
-        foreach (var behavior in this.Behaviors)
-        {
-            behavior.Apply(in context);
-        }
-    }
-
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer3D renderer)
     {

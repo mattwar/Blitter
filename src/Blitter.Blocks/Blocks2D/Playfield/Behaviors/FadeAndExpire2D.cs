@@ -6,15 +6,15 @@ namespace Blitter.Blocks2D;
 /// <see cref="PlayField2D.RemoveSprite(Sprite2D)"/> so the playfield
 /// reaps it. Useful for transient effects like score popups, debris, and impact flashes.
 /// </summary>
-public sealed class FadeAndExpire2D : Behavior
+public sealed class FadeAndExpire2D : Behavior, IUpdatable
 {
     /// <summary>Total lifetime over which the alpha ramps to zero.</summary>
     public TimeSpan Duration { get; set; } = TimeSpan.FromSeconds(1);
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         if (this.Entity is Sprite2D sprite)
-        {
+        {           
             if (Duration <= TimeSpan.Zero)
             {
                 sprite.PlayField.RemoveSprite(sprite);

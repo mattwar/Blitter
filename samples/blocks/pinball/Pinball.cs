@@ -441,7 +441,7 @@ sealed class Flipper : SwingArmBarrier2D
 }
 
 // Coordinates pinball gameplay controls and ball lifecycle at scene scope.
-sealed class PinballGameController : Behavior
+sealed class PinballGameController : Behavior, IUpdatable
 {
     private readonly FrameInput _input;
     private readonly Pinball _ball;
@@ -480,7 +480,7 @@ sealed class PinballGameController : Behavior
 
     private readonly Random _rng = new();
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in UpdateContext context)
     {
         var scene = (Scene2D)this.Entity;
 
