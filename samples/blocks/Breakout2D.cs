@@ -149,7 +149,7 @@ var ball = new BreakoutBall(BallRadius)
         {
             Restitution = 1f,
             TangentialDamping = 1f,
-            OnBounce = (s, _, _) => Audio.Play(Sounds.Bounce, 0.35f),
+            Bounced = new PlayBounceSound(),
         },
         new SpeedClamp2D { Min = 240f, Max = BallMaxSpeed },
     ],
@@ -161,33 +161,7 @@ var controller = new BreakoutController(window.Input, window.Renderer, ball, pad
     drainY: DrainY,
     launchSpeed: BallLaunchSpeed);
 
-var hud = new CustomLayer2D
-{
-    OnRender = rd =>
-    {
-        using var _ = rd.PushState();
-        rd.Camera = null;
-
-        var livesText = $"LIVES {controller.Lives}";
-        var livesSize = hudFont.Measure(livesText);
-        hudFont.DrawText(rd, livesText, new Color(220, 230, 255),
-            W - livesSize.X - 20f, 16f);
-
-        if (controller.Banner is { } banner)
-        {
-            var size = bannerFont.Measure(banner);
-            bannerFont.DrawText(rd, banner, new Color(255, 240, 200),
-                (W - size.X) * 0.5f, H * 0.42f);
-
-            var hint = controller.HasWon || controller.IsGameOver
-                ? "SPACE  new game"
-                : "SPACE  launch ball";
-            var hintSize = hudFont.Measure(hint);
-            hudFont.DrawText(rd, hint, new Color(180, 200, 230),
-                (W - hintSize.X) * 0.5f, H * 0.42f + size.Y + 12f);
-        }
-    },
-};
+var hud = new BreakoutHud(controller, hudFont, bannerFont, W, H);
 
 var scene = new Scene2D
 {
@@ -206,6 +180,41 @@ static Vector2 BallRestPosition(Paddle paddle) =>
 
 
 // ---- sprites, barriers, behaviors -------------------------------------
+
+// Plays the bounce SFX whenever the ball bounces off a surface.
+sealed class PlayBounceSound : IEventHandler<SurfaceBounced2DEventArgs>
+{
+    public void OnEvent(in SurfaceBounced2DEventArgs e) => Audio.Play(Sounds.Bounce, 0.35f);
+}
+
+// HUD overlay: lives counter and the win/lose banner with key hint.
+sealed class BreakoutHud(BreakoutController controller, Font hudFont, Font bannerFont, int w, int h) : Layer2D
+{
+    protected override void DrawContent(Renderer2D rd)
+    {
+        using var _ = rd.PushState();
+        rd.Camera = null;
+
+        var livesText = $"LIVES {controller.Lives}";
+        var livesSize = hudFont.Measure(livesText);
+        hudFont.DrawText(rd, livesText, new Color(220, 230, 255),
+            w - livesSize.X - 20f, 16f);
+
+        if (controller.Banner is { } banner)
+        {
+            var size = bannerFont.Measure(banner);
+            bannerFont.DrawText(rd, banner, new Color(255, 240, 200),
+                (w - size.X) * 0.5f, h * 0.42f);
+
+            var hint = controller.HasWon || controller.IsGameOver
+                ? "SPACE  new game"
+                : "SPACE  launch ball";
+            var hintSize = hudFont.Measure(hint);
+            hudFont.DrawText(rd, hint, new Color(180, 200, 230),
+                (w - hintSize.X) * 0.5f, h * 0.42f + size.Y + 12f);
+        }
+    }
+}
 
 // The ball: a small shaded disc. Its image supplies both the look and
 // the (circular) collision shape, so there's no Draw override and no
@@ -303,7 +312,14 @@ sealed class Paddle : Barrier2D
             new Vector2(-HalfWidth, 0f),
             new Vector2(HalfWidth, 0f),
             HalfHeight);
-        AddBehavior(new CustomHitBehavior2D { OnHit = OnHit });
+        AddBehavior(new HitResponse());
+    }
+
+    private sealed class HitResponse : Behavior, IHittable2D
+    {
+        private Paddle _host = null!;
+        protected override void OnAttach(IEntity entity) => _host = (Paddle)entity;
+        void IHittable2D.OnHit(in Hit2D hit) => _host.OnHit(_host, hit.Other);
     }
 
     public void MoveTo(float x, in UpdateContext context)
@@ -399,7 +415,14 @@ sealed class Brick : Barrier2D
         Points = points;
         this.GetOrAddTrait<CollisionShape2D>().Shape =
             new BoxHitShape2D(Vector2.Zero, new Vector2(HalfWidth, HalfHeight));
-        AddBehavior(new CustomHitBehavior2D { OnHit = OnHit });
+        AddBehavior(new HitResponse());
+    }
+
+    private sealed class HitResponse : Behavior, IHittable2D
+    {
+        private Brick _host = null!;
+        protected override void OnAttach(IEntity entity) => _host = (Brick)entity;
+        void IHittable2D.OnHit(in Hit2D hit) => _host.OnHit(_host, hit.Other);
     }
 
     private void OnHit(IEntity self, IEntity other)

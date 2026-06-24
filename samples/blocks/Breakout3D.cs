@@ -193,61 +193,14 @@ var controller = new Breakout3DController(
 
 // ---- HUD: debug-text overlay for score / lives / banner, plus a
 // wireframe outline so the player has a visible reticle on the paddle.
-var hud = new CustomLayer3D
-{
-    OnRender = rd =>
-    {
-        // Paddle as a faint wireframe so it doesn't occlude the arena
-        // but the player can see what they're aiming with.
-        DebugDraw.DrawBoxCentered(
-            paddle.Center,
-            new Vector3(PaddleHalfW, PaddleHalfH, PaddleHalfD) * 2f,
-            new Color(180, 210, 255));
-
-        // Predicted ball impact on the paddle's near face: drawn on
-        // the camera-facing side of the paddle so the paddle's own
-        // wireframe doesn't occlude it. Always visible so the player
-        // can see where to move the paddle, not just whether they're
-        // already lined up.
-        float impactZ = paddle.Center.Z - PaddleHalfD;
-        if (PredictPaddleHit(ball.Position, ball.Velocity, impactZ,
-                ArenaHalfW, ArenaHalfH, BallRadius) is { } hit)
-        {
-            var markerCenter = new Vector3(hit.X, hit.Y, paddle.Center.Z + PaddleHalfD + 0.05f);
-            DebugDraw.DrawSphere(markerCenter, BallRadius, new Color(255, 220, 90));
-        }
-
-        // Arena outline (handy for spatial reference).
-        DebugDraw.DrawBoxCentered(
-            new Vector3(0f, 0f, arenaMidZ),
-            new Vector3(ArenaHalfW, ArenaHalfH, arenaLen * 0.5f) * 2f,
-            new Color(50, 60, 90));
-
-        DebugDraw.DrawText($"SCORE  {controller.Score,6}", 18f, 16f);
-        DebugDraw.DrawText($"LIVES  {controller.Lives}",   18f, 48f);
-
-        if (controller.Banner is { } banner)
-        {
-            // Approximate center via a fixed offset; the renderer will
-            // letterbox the window so this is good-enough placement.
-            DebugDraw.DrawText(banner, 18f, 96f, pixelHeight: 44f);
-            var hint = controller.HasWon || controller.IsGameOver
-                ? "SPACE  new game"
-                : "SPACE  launch ball";
-            DebugDraw.DrawText(hint, 18f, 152f);
-        }
-    },
-};
+var hud = new Breakout3DHud(
+    paddle, ball, controller,
+    PaddleHalfW, PaddleHalfH, PaddleHalfD,
+    ArenaHalfW, ArenaHalfH, BallRadius,
+    arenaMidZ, arenaLen);
 
 // ---- Brick rendering layer: each live brick draws itself.
-var brickRenderer = new CustomLayer3D
-{
-    OnRender = rd =>
-    {
-        foreach (var b in bricks)
-            b.Draw(rd);
-    },
-};
+var brickRenderer = new BrickRenderLayer3D(bricks);
 
 var scene = new Scene3D
 {
@@ -264,58 +217,115 @@ Console.WriteLine($"Final Score: {controller.Score}");
 static Vector3 BallRestPosition(Paddle3D p) =>
     new(p.Center.X, p.Center.Y, p.Center.Z - PaddleHalfD - BallRadius - 0.02f);
 
-// Walks the ball forward, reflecting off the four side walls, until it
-// reaches <paramref name="targetZ"/> (the paddle's near face). Returns
-// the (X, Y) the ball would arrive at, or <see langword="null"/> if it
-// isn't currently moving toward the paddle. Ignores brick collisions
-// and the back wall, so the prediction stays in sync with the player's
-// expectation of "where will the ball end up if nothing changes."
-static Vector2? PredictPaddleHit(Vector3 ballPos, Vector3 ballVel,
-    float targetZ, float halfW, float halfH, float ballR, int maxBounces = 32)
+// ---- types ------------------------------------------------------------
+
+// HUD: paddle reticle, predicted impact marker, arena outline, and the
+// score/lives/banner debug text.
+sealed class Breakout3DHud(
+    Paddle3D paddle, Sprite3D ball, Breakout3DController controller,
+    float paddleHalfW, float paddleHalfH, float paddleHalfD,
+    float arenaHalfW, float arenaHalfH, float ballRadius,
+    float arenaMidZ, float arenaLen) : Layer3D
 {
-    if (ballVel.Z <= 0f || ballPos.Z >= targetZ)
-        return null;
-
-    // Bounding planes for the ball center (inset by the ball radius so
-    // the prediction lines up with the actual bounce point).
-    float xMin = -halfW + ballR;
-    float xMax = +halfW - ballR;
-    float yMin = -halfH + ballR;
-    float yMax = +halfH - ballR;
-
-    var p = ballPos;
-    var v = ballVel;
-    for (int i = 0; i < maxBounces; i++)
+    public override void Draw(Renderer3D rd)
     {
-        float tZ = (targetZ - p.Z) / v.Z;
-        float tX = v.X > 0f ? (xMax - p.X) / v.X
-                : v.X < 0f ? (xMin - p.X) / v.X
-                : float.PositiveInfinity;
-        float tY = v.Y > 0f ? (yMax - p.Y) / v.Y
-                : v.Y < 0f ? (yMin - p.Y) / v.Y
-                : float.PositiveInfinity;
-        if (tZ <= tX && tZ <= tY)
+        // Paddle as a faint wireframe so it doesn't occlude the arena
+        // but the player can see what they're aiming with.
+        DebugDraw.DrawBoxCentered(
+            paddle.Center,
+            new Vector3(paddleHalfW, paddleHalfH, paddleHalfD) * 2f,
+            new Color(180, 210, 255));
+
+        // Predicted ball impact on the paddle's near face, drawn on the
+        // camera-facing side so the paddle's own wireframe doesn't
+        // occlude it.
+        float impactZ = paddle.Center.Z - paddleHalfD;
+        if (PredictPaddleHit(ball.Position, ball.Velocity, impactZ,
+                arenaHalfW, arenaHalfH, ballRadius) is { } hit)
         {
-            p += v * tZ;
-            return new Vector2(p.X, p.Y);
+            var markerCenter = new Vector3(hit.X, hit.Y, paddle.Center.Z + paddleHalfD + 0.05f);
+            DebugDraw.DrawSphere(markerCenter, ballRadius, new Color(255, 220, 90));
         }
-        if (tX <= tY)
+
+        // Arena outline (handy for spatial reference).
+        DebugDraw.DrawBoxCentered(
+            new Vector3(0f, 0f, arenaMidZ),
+            new Vector3(arenaHalfW, arenaHalfH, arenaLen * 0.5f) * 2f,
+            new Color(50, 60, 90));
+
+        DebugDraw.DrawText($"SCORE  {controller.Score,6}", 18f, 16f);
+        DebugDraw.DrawText($"LIVES  {controller.Lives}",   18f, 48f);
+
+        if (controller.Banner is { } banner)
         {
-            p += v * tX;
-            v.X = -v.X;
-            p.X = Math.Clamp(p.X, xMin, xMax);
-        }
-        else
-        {
-            p += v * tY;
-            v.Y = -v.Y;
-            p.Y = Math.Clamp(p.Y, yMin, yMax);
+            // Approximate center via a fixed offset; the renderer will
+            // letterbox the window so this is good-enough placement.
+            DebugDraw.DrawText(banner, 18f, 96f, pixelHeight: 44f);
+            var hint = controller.HasWon || controller.IsGameOver
+                ? "SPACE  new game"
+                : "SPACE  launch ball";
+            DebugDraw.DrawText(hint, 18f, 152f);
         }
     }
-    return new Vector2(p.X, p.Y);
+
+    // Walks the ball forward, reflecting off the four side walls, until it
+    // reaches targetZ (the paddle's near face). Returns the (X, Y) the
+    // ball would arrive at, or null if it isn't moving toward the paddle.
+    private static Vector2? PredictPaddleHit(Vector3 ballPos, Vector3 ballVel,
+        float targetZ, float halfW, float halfH, float ballR, int maxBounces = 32)
+    {
+        if (ballVel.Z <= 0f || ballPos.Z >= targetZ)
+            return null;
+
+        // Bounding planes for the ball center (inset by the ball radius so
+        // the prediction lines up with the actual bounce point).
+        float xMin = -halfW + ballR;
+        float xMax = +halfW - ballR;
+        float yMin = -halfH + ballR;
+        float yMax = +halfH - ballR;
+
+        var p = ballPos;
+        var v = ballVel;
+        for (int i = 0; i < maxBounces; i++)
+        {
+            float tZ = (targetZ - p.Z) / v.Z;
+            float tX = v.X > 0f ? (xMax - p.X) / v.X
+                    : v.X < 0f ? (xMin - p.X) / v.X
+                    : float.PositiveInfinity;
+            float tY = v.Y > 0f ? (yMax - p.Y) / v.Y
+                    : v.Y < 0f ? (yMin - p.Y) / v.Y
+                    : float.PositiveInfinity;
+            if (tZ <= tX && tZ <= tY)
+            {
+                p += v * tZ;
+                return new Vector2(p.X, p.Y);
+            }
+            if (tX <= tY)
+            {
+                p += v * tX;
+                v.X = -v.X;
+                p.X = Math.Clamp(p.X, xMin, xMax);
+            }
+            else
+            {
+                p += v * tY;
+                v.Y = -v.Y;
+                p.Y = Math.Clamp(p.Y, yMin, yMax);
+            }
+        }
+        return new Vector2(p.X, p.Y);
+    }
 }
 
-// ---- types ------------------------------------------------------------
+// Brick rendering layer: each live brick draws itself.
+sealed class BrickRenderLayer3D(List<BrickBarrier3D> bricks) : Layer3D
+{
+    public override void Draw(Renderer3D rd)
+    {
+        foreach (var b in bricks)
+            b.Draw(rd);
+    }
+}
 
 // A thin box the player slides on the near plane. The bounce itself is
 // handled by the ball's BarrierBounce3D; this class adds two things:

@@ -9,14 +9,8 @@ namespace Blitter.Blocks2D;
 /// and accelerates <see cref="Sprite2D.Speed"/> toward <see cref="MaxSpeed"/>. 
 /// Composes with <see cref="Motion2D"/>, which actually integrates the updated heading + speed.
 /// </summary>
-public class SeekTarget2D : Behavior, IUpdatable
+public abstract class SeekTarget2D : Behavior, IUpdatable
 {
-    /// <summary>
-    /// Returns the current world-space target, or <c>null</c> to stop
-    /// steering this tick. Invoked once per update.
-    /// </summary>
-    public required Func<Vector2?> Target { get; init; }
-
     /// <summary>
     /// Maximum degrees of heading change per second.
     /// </summary>
@@ -48,9 +42,12 @@ public class SeekTarget2D : Behavior, IUpdatable
         _transform = entity.GetOrAddTrait<Transform2D>();
     }    
 
+    /// <summary>Returns the current world-space target, or <c>null</c> to stop steering this tick.</summary>
+    protected abstract Vector2? ResolveTarget();
+
     public void Update(in UpdateContext context)
     {
-        if (Target() is not Vector2 dest)
+        if (ResolveTarget() is not Vector2 dest)
             return;
 
         var to = dest - _transform.Position;

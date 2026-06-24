@@ -4,6 +4,15 @@
 namespace Blitter.Blocks3D;
 
 /// <summary>
+/// Raised after a successful <see cref="BarrierBounce3D"/> bounce.
+/// </summary>
+/// <param name="Source">The behavior instance that raised the event.</param>
+/// <param name="Self">The bouncing sprite.</param>
+/// <param name="Barrier">The barrier that was bounced off.</param>
+/// <param name="Normal">Contact normal, pointing from the barrier toward the sprite.</param>
+public readonly record struct BarrierBounced3DEventArgs(BarrierBounce3D Source, Sprite3D Self, Barrier3D Barrier, Vector3 Normal);
+
+/// <summary>
 /// On contact with a barrier, snaps the sprite out of penetration along
 /// the contact normal and reflects velocity. Final bounce composes the
 /// behavior's ball-side <see cref="Restitution"/> /
@@ -21,8 +30,8 @@ public sealed class BarrierBounce3D : Behavior, IHittable3D
     /// <summary>Ball-side tangent velocity retention. Multiplied with <c>(1 - barrier.PhysicsMaterial.Friction)</c>. 1 = frictionless ball, &lt; 1 = ball-side surface drag.</summary>
     public float TangentialDamping { get; set; } = 1f;
 
-    /// <summary>Called after a successful bounce. Args: sprite, barrier, contact normal.</summary>
-    public Action<Sprite3D, Barrier3D, Vector3>? OnBounce { get; set; }
+    /// <summary>Optional handler invoked after a successful bounce.</summary>
+    public IEventHandler<BarrierBounced3DEventArgs>? Bounced { get; set; }
 
     public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
     {
@@ -59,6 +68,7 @@ public sealed class BarrierBounce3D : Behavior, IHittable3D
             self.Velocity = vBall;
         }
 
-        OnBounce?.Invoke(self, barrier, normal);
+        var args = new BarrierBounced3DEventArgs(this, self, barrier, normal);
+        Bounced?.OnEvent(in args);
     }
 }

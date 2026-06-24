@@ -1,14 +1,21 @@
 namespace Blitter.Blocks2D;
 
 /// <summary>
+/// Raised after a sprite has wrapped via <see cref="WrapInBounds2D"/>.
+/// </summary>
+/// <param name="Source">The behavior instance that raised the event.</param>
+/// <param name="Sprite">The sprite that wrapped this tick.</param>
+public readonly record struct Wrapped2DEventArgs(WrapInBounds2D Source, Sprite2D Sprite);
+
+/// <summary>
 /// Moves a sprite to the opposite edge of the update context bounds
 /// when its center crosses an edge — 
 /// the classic Asteroids-style toroidal world.
 /// </summary>
 public class WrapInBounds2D : Behavior, IUpdatable
 {
-    /// <summary>Invoked after the sprite has wrapped this tick.</summary>
-    public Action<Sprite2D>? OnWrap { get; set; }
+    /// <summary>Optional handler invoked after the sprite wraps.</summary>
+    public IEventHandler<Wrapped2DEventArgs>? Wrapped { get; set; }
 
     private IEntity _entity = null!;
     private Bounds2D? _bounds;
@@ -62,7 +69,10 @@ public class WrapInBounds2D : Behavior, IUpdatable
         {
             _transform.Position = c;
             if (_entity is Sprite2D target)
-                OnWrap?.Invoke(target);
+            {
+                var args = new Wrapped2DEventArgs(this, target);
+                Wrapped?.OnEvent(in args);
+            }
         }
     }
 }

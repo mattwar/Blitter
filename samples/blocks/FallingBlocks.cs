@@ -14,7 +14,6 @@
 
 using System.Numerics;
 using Blitter;
-using Blitter.Bits;
 using Blitter.Blocks;
 using Blitter.Blocks2D;
 
@@ -28,21 +27,37 @@ var window = new Window2D(W, H)
     CloseKey = Key.Escape,
 };
 
-var playField = new PlayField2D { WorldBounds = new Rect(0, 0, W, H) };
-
-var spawner = new Spawner2D
+var scene = new Scene2D
 {
-    Target   = playField,
-    Interval = TimeSpan.FromMilliseconds(180),
-    Jitter   = TimeSpan.FromMilliseconds(120),
-    MaxAlive = 60,
-    Factory  = () => new Block(rng, W),
+    Layers = 
+    [ 
+        new PlayField2D { WorldBounds = new Rect(0, 0, W, H) }, 
+        new FallingBlocksHud() 
+    ],
+    Behaviors =
+    [
+        new BlockSpawner
+        {
+            Interval = TimeSpan.FromMilliseconds(180),
+            Jitter = TimeSpan.FromMilliseconds(120),
+            MaxAlive = 60,
+            Random = rng,
+            WorldWidth = W,
+        },
+        new PauseOnSpace2D(),
+    ],
 };
 
-var hud = new CustomLayer2D
+await scene.RunAsync(window);
+
+// HUD overlay: live sprite/spawn counts and the pause hint.
+sealed class FallingBlocksHud : Layer2D
 {
-    OnRender = rd =>
+    protected override void DrawContent(Renderer2D rd)
     {
+        var playField = Scene.GetLayer<PlayField2D>();
+        var spawner = Scene.GetBehavior<IFallingBlocksSpawner>();
+
         using var _ = rd.PushState();
         rd.Camera = null;
         rd.DrawDebugText(10, 10,
@@ -50,26 +65,55 @@ var hud = new CustomLayer2D
             $"  {(spawner.Paused ? "[PAUSED — Space to resume]" : "[Space to pause]")}",
             scale: 2f);
     }
-};
+}
 
-var scene = new Scene2D
+// Toggles a spawner's paused state when Space is pressed.
+sealed class PauseOnSpace2D : Behavior, IUpdatable
 {
-    Layers = [ playField, hud ],
-    Behaviors =
-    [
-        spawner,
-        new CustomSceneBehavior2D
-        {
-            OnApply = (s, in ctx) =>
-            {
-                if (window.Input.WasJustPressed(Key.Space))
-                    spawner.Paused = !spawner.Paused;
-            }
-        },
-    ],
-};
+    private IFallingBlocksSpawner? _spawner;
+    private bool _spaceWasDown;
 
-await scene.RunAsync(window);
+    protected override void OnAttach(IEntity entity)
+    {
+        _spawner = entity.GetBehavior<IFallingBlocksSpawner>();
+    }
+
+    public void Update(in UpdateContext context)
+    {
+        var spaceIsDown = Keyboard.IsDown(Key.Space);
+        if (spaceIsDown && !_spaceWasDown && _spawner is { } spawner)
+            spawner.Paused = !spawner.Paused;
+        _spaceWasDown = spaceIsDown;
+    }
+}
+
+interface IFallingBlocksSpawner
+{
+    bool Paused { get; set; }
+    int SpawnedCount { get; }
+}
+
+// Spawns falling blocks into the playfield.
+sealed class BlockSpawner : Spawner2D, IFallingBlocksSpawner
+{
+    public required int WorldWidth { get; init; }
+
+    protected override Sprite2D CreateSprite() => new Block(Random, WorldWidth);
+}
+
+// Self-removes a sprite once its top edge clears the bottom of the world bounds.
+sealed class RemoveBelowBounds2D : Behavior, IUpdatable
+{
+    public float Margin { get; set; }
+
+    public void Update(in UpdateContext context)
+    {
+        if (Entity is Sprite2D sprite
+            && sprite.TryFindTrait<Bounds2D>(out var bounds)
+            && sprite.Center.Y - Margin > bounds.Rect.Height)
+            sprite.RemoveFromParent();
+    }
+}
 
 // A 40×40 colored square that drifts straight down. Self-removes
 // once its top edge clears the bottom of the playfield.
@@ -89,16 +133,7 @@ sealed class Block : Sprite2D
         Speed  = rng.Next(120, 320);
         Heading = 180f; // straight down (0 = up)
         AddBehavior(new Motion2D());
-        AddBehavior(new CustomUpdateBehavior
-        {
-            OnUpdate = (entity, in ctx) =>
-            {
-                if (entity is Sprite2D sprite
-                    && sprite.TryFindTrait<Bounds2D>(out var bounds)
-                    && sprite.Center.Y - Size > bounds.Rect.Height)
-                    sprite.RemoveFromParent();
-            }
-        });
+        AddBehavior(new RemoveBelowBounds2D { Margin = Size });
     }
 
     public override void Draw(Renderer2D renderer)

@@ -4,6 +4,15 @@ using System.Numerics;
 namespace Blitter.Blocks2D;
 
 /// <summary>
+/// Raised after a successful <see cref="SurfaceBounce2D"/> bounce.
+/// </summary>
+/// <param name="Source">The behavior instance that raised the event.</param>
+/// <param name="Self">The bouncing entity.</param>
+/// <param name="Surface">The surface entity that was bounced off.</param>
+/// <param name="Normal">Contact normal, pointing from the surface toward the entity.</param>
+public readonly record struct SurfaceBounced2DEventArgs(SurfaceBounce2D Source, IEntity Self, IEntity Surface, Vector2 Normal);
+
+/// <summary>
 /// On contact with a surface, snaps the entity out of penetration along
 /// the contact normal and reflects velocity. The final bounce composes the
 /// behavior's ball-side <see cref="Restitution"/> /
@@ -24,8 +33,8 @@ public sealed class SurfaceBounce2D : Behavior, IHittable2D
     /// <summary>Ball-side tangent velocity retention. Multiplied with <c>(1 - surface.PhysicsMaterial.Friction)</c>. 1 = frictionless ball, &lt; 1 = ball-side surface drag.</summary>
     public float TangentialDamping { get; set; } = 1f;
 
-    /// <summary>Called after a successful bounce. Args: the bouncing entity, the surface entity, contact normal.</summary>
-    public Action<IEntity, IEntity, Vector2>? OnBounce { get; set; }
+    /// <summary>Optional handler invoked after a successful bounce.</summary>
+    public IEventHandler<SurfaceBounced2DEventArgs>? Bounced { get; set; }
 
     private Transform2D _transform = null!;
     private Velocity2D _velocity = null!;
@@ -89,6 +98,7 @@ public sealed class SurfaceBounce2D : Behavior, IHittable2D
             _velocity.Vector = vBall;
         }
 
-        OnBounce?.Invoke(this.Entity, other, normal);
+        var args = new SurfaceBounced2DEventArgs(this, this.Entity, other, normal);
+        Bounced?.OnEvent(in args);
     }
 }

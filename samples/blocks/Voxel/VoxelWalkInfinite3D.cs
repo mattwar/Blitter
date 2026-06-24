@@ -199,35 +199,14 @@ chunkSource.AddSprite(player);
 // anything that's drifted out. Runs as its own layer (before the
 // playfield's update via Scene3D.Layers ordering) so the playfield
 // always iterates the just-recentered range.
-var streamer = new CustomLayer3D
-{
-    OnUpdate = ctx =>
-    {
-        var here = chunkSource.GetChunkCoords(player.Position);
-        playField.MinChunk = new ChunkCoord(here.X - LoadRadius, 0, here.Z - LoadRadius);
-        playField.MaxChunk = new ChunkCoord(here.X + LoadRadius, 0, here.Z + LoadRadius);
-        chunkSource.TrimChunksOutside(playField.MinChunk, playField.MaxChunk);
-    },
-};
+var streamer = new ChunkStreamerLayer3D(chunkSource, playField, player, LoadRadius);
 
-var hud = new CustomLayer3D
-{
-    OnRender = rd =>
-    {
-        var pc = chunkSource.GetChunkCoords(player.Position);
-        DebugDraw.DrawText("WASD walk   SHIFT sprint   SPACE jump   Mouse look   ESC quit", 18f, 16f);
-        DebugDraw.DrawText($"pos ({player.Position.X:0.0}, {player.Position.Y:0.0}, {player.Position.Z:0.0}) chunk ({pc.X}, {pc.Z})", 18f, 48f);
-        DebugDraw.DrawText($"chunks active: {chunkSource.ActiveChunkCount} pooled: {chunkSource.PooledChunkCount} allocated: {chunkSource.ChunksAllocated} reused: {chunkSource.ChunksReused}", 18f, 80f);
-    },
-};
+var hud = new VoxelHud3D(chunkSource, player);
 
 // Draws the sky behind everything else each frame. The skybox shader
 // strips camera translation (so the sky never moves) and writes the
 // far depth, so it sits behind the opaque terrain regardless of order.
-var skyLayer = new CustomLayer3D
-{
-    OnRender = rd => rd.DrawSkybox(sky),
-};
+var skyLayer = new SkyLayer3D(sky);
 
 var scene = new Scene3D
 {
@@ -262,6 +241,39 @@ static Bitmap MakeGlassTile()
 }
 
 // ---- types ------------------------------------------------------------
+
+// Re-centers the chunk window on the player every frame and evicts
+// anything that's drifted out. Update-only, so Draw is a no-op.
+sealed class ChunkStreamerLayer3D(VoxelChunkSource3D chunkSource, ChunkedPlayField3D playField, Sprite3D player, int loadRadius) : Layer3D
+{
+    public override void Update(in UpdateContext context)
+    {
+        var here = chunkSource.GetChunkCoords(player.Position);
+        playField.MinChunk = new ChunkCoord(here.X - loadRadius, 0, here.Z - loadRadius);
+        playField.MaxChunk = new ChunkCoord(here.X + loadRadius, 0, here.Z + loadRadius);
+        chunkSource.TrimChunksOutside(playField.MinChunk, playField.MaxChunk);
+    }
+
+    public override void Draw(Renderer3D renderer) { }
+}
+
+// HUD overlay: player position and chunk-pool statistics.
+sealed class VoxelHud3D(VoxelChunkSource3D chunkSource, Sprite3D player) : Layer3D
+{
+    public override void Draw(Renderer3D rd)
+    {
+        var pc = chunkSource.GetChunkCoords(player.Position);
+        DebugDraw.DrawText("WASD walk   SHIFT sprint   SPACE jump   Mouse look   ESC quit", 18f, 16f);
+        DebugDraw.DrawText($"pos ({player.Position.X:0.0}, {player.Position.Y:0.0}, {player.Position.Z:0.0}) chunk ({pc.X}, {pc.Z})", 18f, 48f);
+        DebugDraw.DrawText($"chunks active: {chunkSource.ActiveChunkCount} pooled: {chunkSource.PooledChunkCount} allocated: {chunkSource.ChunksAllocated} reused: {chunkSource.ChunksReused}", 18f, 80f);
+    }
+}
+
+// Draws the sky behind everything else each frame.
+sealed class SkyLayer3D(Cubemap sky) : Layer3D
+{
+    public override void Draw(Renderer3D rd) => rd.DrawSkybox(sky);
+}
 
 // Two-octave value-noise heightmap with a per-cell splotch noise that
 // occasionally substitutes dirt or stone for grass on the surface.

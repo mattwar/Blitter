@@ -1,6 +1,7 @@
 namespace Blitter.Blocks2D.Tests;
 
 using System.Numerics;
+using Timer = Blitter.Blocks.Timer;
 
 public class BehaviorTests
 {
@@ -45,12 +46,12 @@ public class BehaviorTests
     [Fact]
     public void WrapInBounds_InvokesOnWrap()
     {
-        var count = 0;
+        var recorder = new EventRecorder<Wrapped2DEventArgs>();
         var sprite = new Sprite2D { Center = new Vector2(-1, 50) };
         sprite.AddTrait(new Bounds2D { Rect = new Rect(0, 0, 100, 100) });
-        sprite.AddBehavior(new WrapInBounds2D { OnWrap = _ => count++ });
+        sprite.AddBehavior(new WrapInBounds2D { Wrapped = recorder });
         sprite.Update(Context(0));
-        Assert.Equal(1, count);
+        Assert.Equal(1, recorder.Count);
     }
 
     // ---- SeekTarget2D ----
@@ -61,7 +62,7 @@ public class BehaviorTests
         var sprite = new Sprite2D
         {
             Center = Vector2.Zero,
-            Behaviors = [new SeekTarget2D { Target = () => new Vector2(0, -100), Acceleration = 50, MaxSpeed = 80, MaxTurnRate = 360 }],
+            Behaviors = [new TestSeekTarget2D { Target = new Vector2(0, -100), Acceleration = 50, MaxSpeed = 80, MaxTurnRate = 360 }],
         };
         sprite.Update(Context(1.0));
         Assert.Equal(50f, sprite.Speed, 3);
@@ -76,7 +77,7 @@ public class BehaviorTests
         {
             Center = Vector2.Zero,
             Heading = 0f, // facing up
-            Behaviors = [new SeekTarget2D { Target = () => new Vector2(100, 0), MaxTurnRate = 30 }],
+            Behaviors = [new TestSeekTarget2D { Target = new Vector2(100, 0), MaxTurnRate = 30 }],
         };
         // Desired heading is 90 (right). With MaxTurnRate=30 and 1s dt, heading = 30.
         sprite.Update(Context(1.0));
@@ -90,7 +91,7 @@ public class BehaviorTests
         {
             Speed = 10,
             Heading = 45,
-            Behaviors = [new SeekTarget2D { Target = () => null, Acceleration = 100 }],
+            Behaviors = [new TestSeekTarget2D { Target = null, Acceleration = 100 }],
         };
         sprite.Update(Context(1.0));
         Assert.Equal(10f, sprite.Speed);
@@ -103,52 +104,52 @@ public class BehaviorTests
         var sprite = new Sprite2D
         {
             Center = Vector2.Zero,
-            Behaviors = [new SeekTarget2D { Target = () => new Vector2(5, 0), Acceleration = 100, ArriveRadius = 10 }],
+            Behaviors = [new TestSeekTarget2D { Target = new Vector2(5, 0), Acceleration = 100, ArriveRadius = 10 }],
         };
         sprite.Update(Context(1.0));
         Assert.Equal(0f, sprite.Speed);
     }
 
-    // ---- Timer2D ----
+    // ---- Timer ----
 
     [Fact]
     public void Timer_FiresAfterDuration()
     {
-        var fires = 0;
+        var recorder = new EventRecorder<TimerExpiredEventArgs>();
         var scene = new Scene2D
         {
-            Behaviors = [new Timer2D { Duration = TimeSpan.FromSeconds(1), OnExpired = _ => fires++ }],
+            Behaviors = [new Timer { Duration = TimeSpan.FromSeconds(1), Expired = recorder }],
         };
         scene.Update(Context2D(0.5));
-        Assert.Equal(0, fires);
+        Assert.Equal(0, recorder.Count);
         scene.Update(Context2D(0.6));
-        Assert.Equal(1, fires);
+        Assert.Equal(1, recorder.Count);
     }
 
     [Fact]
     public void Timer_AutoRestart_FiresRepeatedly()
     {
-        var fires = 0;
+        var recorder = new EventRecorder<TimerExpiredEventArgs>();
         var scene = new Scene2D
         {
-            Behaviors = [new Timer2D { Duration = TimeSpan.FromSeconds(1), AutoRestart = true, OnExpired = _ => fires++ }],
+            Behaviors = [new Timer { Duration = TimeSpan.FromSeconds(1), AutoRestart = true, Expired = recorder }],
         };
         scene.Update(Context2D(1.0));
         scene.Update(Context2D(1.0));
         scene.Update(Context2D(1.0));
-        Assert.Equal(3, fires);
+        Assert.Equal(3, recorder.Count);
     }
 
     [Fact]
     public void Timer_Paused_DoesNotFire()
     {
-        var fires = 0;
+        var recorder = new EventRecorder<TimerExpiredEventArgs>();
         var scene = new Scene2D
         {
-            Behaviors = [new Timer2D { Duration = TimeSpan.FromSeconds(1), Paused = true, OnExpired = _ => fires++ }],
+            Behaviors = [new Timer { Duration = TimeSpan.FromSeconds(1), Paused = true, Expired = recorder }],
         };
         scene.Update(Context2D(2.0));
-        Assert.Equal(0, fires);
+        Assert.Equal(0, recorder.Count);
     }
 
     // ---- TriggerOnPredicate2D ----
@@ -156,37 +157,34 @@ public class BehaviorTests
     [Fact]
     public void Trigger_FiresOnRisingEdge()
     {
-        var fires = 0;
-        var flag = false;
+        var trigger = new TestTriggerOnPredicate2D();
         var scene = new Scene2D
         {
-            Behaviors = [new TriggerOnPredicate2D { Predicate = _ => flag, Action = _ => fires++ }],
+            Behaviors = [trigger],
         };
         scene.Update(Context2D());                // false → no fire
-        Assert.Equal(0, fires);
-        flag = true;
+        Assert.Equal(0, trigger.FireCount);
+        trigger.Flag = true;
         scene.Update(Context2D());                // false→true → fire
-        Assert.Equal(1, fires);
+        Assert.Equal(1, trigger.FireCount);
         scene.Update(Context2D());                // true→true → no fire
-        Assert.Equal(1, fires);
-        flag = false;
+        Assert.Equal(1, trigger.FireCount);
+        trigger.Flag = false;
         scene.Update(Context2D());
-        flag = true;
+        trigger.Flag = true;
         scene.Update(Context2D());                // re-arms and fires again
-        Assert.Equal(2, fires);
+        Assert.Equal(2, trigger.FireCount);
     }
 
     [Fact]
     public void Trigger_NonRepeating_FiresOnce()
     {
-        var fires = 0;
-        var flag = false;
-        var trig = new TriggerOnPredicate2D { Predicate = _ => flag, Action = _ => fires++, Repeating = false };
+        var trig = new TestTriggerOnPredicate2D { Repeating = false };
         var scene = new Scene2D { Behaviors = [trig] };
-        flag = true; scene.Update(Context2D());
-        flag = false; scene.Update(Context2D());
-        flag = true; scene.Update(Context2D());
-        Assert.Equal(1, fires);
+        trig.Flag = true; scene.Update(Context2D());
+        trig.Flag = false; scene.Update(Context2D());
+        trig.Flag = true; scene.Update(Context2D());
+        Assert.Equal(1, trig.FireCount);
     }
 
     // ---- Shake2D ----
@@ -247,4 +245,30 @@ public class BehaviorTests
         // With MaxOffset=0 the shake adds nothing, so camera should be at baseline.
         Assert.Equal(new Vector2(100, 100), cam.Position);
     }
+}
+
+file sealed class EventRecorder<T> : IEventHandler<T>
+{
+    public int Count { get; private set; }
+    public T Last { get; private set; } = default!;
+    public void OnEvent(in T args)
+    {
+        Count++;
+        Last = args;
+    }
+}
+
+file sealed class TestSeekTarget2D : SeekTarget2D
+{
+    public Vector2? Target { get; init; }
+    protected override Vector2? ResolveTarget() => Target;
+}
+
+file sealed class TestTriggerOnPredicate2D : TriggerOnPredicate2D
+{
+    public bool Flag { get; set; }
+    public int FireCount { get; private set; }
+
+    protected override bool IsTriggered(IEntity entity) => Flag;
+    protected override void OnTriggered(IEntity entity) => FireCount++;
 }

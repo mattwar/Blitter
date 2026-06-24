@@ -1,16 +1,20 @@
 namespace Blitter.Blocks2D;
 
 /// <summary>
+/// Raised after a <see cref="BounceInBounds2D"/> reflection.
+/// </summary>
+/// <param name="Source">The behavior instance that raised the event.</param>
+/// <param name="Self">The entity that bounced off the bounds.</param>
+public readonly record struct BoundsBounced2DEventArgs(BounceInBounds2D Source, IEntity Self);
+
+/// <summary>
 /// Reflects a sprite's velocity when its center crosses the edge of the
 /// update context bounds, so the sprite stays inside the playfield.
 /// </summary>
 public class BounceInBounds2D : Behavior, IUpdatable
 {
-    /// <summary>
-    /// Invoked after the velocity has been reflected for the current tick.
-    /// Useful for playing a sound or jittering the heading on bounce.
-    /// </summary>
-    public Action<IEntity>? OnBounce { get; set; }
+    /// <summary>Optional handler invoked after the velocity is reflected.</summary>
+    public IEventHandler<BoundsBounced2DEventArgs>? Bounced { get; set; }
 
     private IEntity _entity = null!;
     private Bounds2D? _bounds;
@@ -64,6 +68,7 @@ public class BounceInBounds2D : Behavior, IUpdatable
 
         (_velocity.Speed, _velocity.Heading) = Sprite2D.GetSpeedAndHeading(v);
     
-        OnBounce?.Invoke(_entity);
+        var args = new BoundsBounced2DEventArgs(this, _entity);
+        Bounced?.OnEvent(in args);
     }
 }

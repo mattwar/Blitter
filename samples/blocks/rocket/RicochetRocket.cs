@@ -66,9 +66,6 @@ var scoreboard = new ScoreLayer2D
     NegativePopupColor = new Color(120, 255, 120),
 };
 
-// Set by the exit behavior when the run ends. The HUD layer reads
-// this to draw a "GAME OVER" banner during the exit-delay window.
-DateTime? gameOverAt = null;
 var gameOverDuration = TimeSpan.FromSeconds(3);
 
 
@@ -152,49 +149,12 @@ var playField = new PlayField2D([..asteroids, rocket])
     ShowWorldBounds = true,
 };
 
-// Custom layer for overlay text
-var hud = new CustomLayer2D
-{
-    OnRender = rd =>
-    {
-        using var _ = rd.PushState();
-        rd.Camera = null; // detach camera so HUD is screen-locked
+// Ends the run when every target is cleared (or V is pressed). The HUD
+// layer reads GameOverAt to draw a "GAME OVER" banner during exit-delay.
+var levelComplete = new LevelComplete2D(playField, window, gameOverDuration);
 
-        // Speed readout under the score. The delegate runs every
-        // frame, so just reading rocket.Speed here keeps the HUD
-        // live — no separate update step needed. Below the smash
-        // threshold the readout flashes to nag the player.
-        const float SmashSpeed = 500f;
-        bool tooSlow = rocket.Speed < SmashSpeed;
-        bool flashOn = !tooSlow
-            || ((int)(Environment.TickCount / 250) & 1) == 0;
-        if (flashOn)
-        {
-            var speedColor = tooSlow
-                ? new Color(255, 140, 80)  // orange = too slow
-                : new Color(120, 255, 120); // green = smashing speed
-            scoreFont.DrawText(rd, $"SPEED {rocket.Speed:0}", speedColor, 20f, 120f);
-        }
-
-#if false
-        rd.DrawColor = Color.White;
-        var asteriodCount = playField.Sprites.Count(s => s is Asteroid);
-        rd.DrawDebugText(
-            0, 10,
-            $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.Center.X:#} y: {rocket.Center.Y:#} asteriods: {asteriodCount}",
-            scale: 2f);
-#endif
-
-        if (gameOverAt is not null)
-        {
-            const string banner = "GAME OVER";
-            var size = bannerFont.Measure(banner);
-            float x = (DesignW - size.X) / 2f;
-            float y = (DesignH - size.Y) / 2f;
-            bannerFont.DrawText(rd, banner, Color.White, x, y);
-        }
-    }
-};
+// HUD overlay: speed readout and the game-over banner.
+var hud = new RocketHud(rocket, scoreFont, bannerFont, levelComplete, DesignW, DesignH);
 
 // Overhead minimap so the player can see asteroids beyond the
 // viewport. Sized to the upper-right corner; markers are scaled
@@ -232,38 +192,7 @@ var minimap = new MinimapLayer2D
 
 // Debug overlay: outlines the rocket's HitShape in world space so
 // we can see exactly where collisions register. Toggle with H.
-bool showHitShape = false;
-var hitDebug = new CustomLayer2D
-{
-    OnUpdate = ctx =>
-    {
-        if (window.Input.WasJustPressed(Key.H))
-            showHitShape = !showHitShape;
-    },
-    OnRender = rd =>
-    {
-        if (!showHitShape) return;
-        using var _ = rd.PushState();
-        rd.DrawColor = new Color(0, 255, 120, 220);
-        rocket.HitShape.Visit(HitShapeDebug2D.Draw(rd));
-        // Also outline the bounding circle in a dimmer color
-        // so we can see when the cheap reject would skip.
-        rd.DrawColor = new Color(0, 200, 255, 90);
-        HitShapeDebug2D.DrawCircleOutline(rd, rocket.HitShape.BoundingCircle.Center, rocket.HitShape.BoundingCircle.Radius);
-
-        // Same treatment for every asteroid currently on the field:
-        // magenta hit shape outline + dim bounding circle.
-        var hitVisitor = HitShapeDebug2D.Draw(rd);
-        foreach (var sprite in playField.Sprites)
-        {
-            if (sprite is not Asteroid asteroid) continue;
-            rd.DrawColor = new Color(255, 80, 200, 220);
-            asteroid.HitShape.Visit(hitVisitor);
-            rd.DrawColor = new Color(255, 120, 220, 70);
-            HitShapeDebug2D.DrawCircleOutline(rd, asteroid.HitShape.BoundingCircle.Center, asteroid.HitShape.BoundingCircle.Radius);
-        }
-    },
-};
+var hitDebug = new HitDebugLayer(window, rocket, playField);
 
 var scene = new Scene2D
 {
@@ -281,21 +210,7 @@ var scene = new Scene2D
     ],
     Behaviors =
     [
-        new CustomSceneBehavior2D()
-        {
-            OnApply = (s, in ctx) =>
-            {
-                if (s.RunState != RunState.Running)
-                    return;
-                var remainingTargets = playField.Sprites.Count(s => s is Asteroid a && a.Kind != AsteriodKind.Radioactive);
-                if (remainingTargets == 0 || window.Input.WasJustPressed(Key.V))
-                {
-                    var task = Audio.PlayAsync(Melodies.LevelUp, volume: .3f);
-                    gameOverAt = DateTime.UtcNow;
-                    s.ExitWithDelay(gameOverDuration);
-                }
-            }
-        }
+        levelComplete,
     ],
 };
 
@@ -345,6 +260,100 @@ static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
     return asteroids;
 }
 
+// HUD overlay: flashing speed readout plus the "GAME OVER" banner that
+// LevelComplete2D triggers during the exit delay.
+sealed class RocketHud(Rocket rocket, Font scoreFont, Font bannerFont, LevelComplete2D levelComplete, int designW, int designH) : Layer2D
+{
+    protected override void DrawContent(Renderer2D rd)
+    {
+        using var _ = rd.PushState();
+        rd.Camera = null; // detach camera so HUD is screen-locked
+
+        // Speed readout under the score. Reading rocket.Speed here each
+        // frame keeps the HUD live. Below the smash threshold the
+        // readout flashes to nag the player.
+        const float SmashSpeed = 500f;
+        bool tooSlow = rocket.Speed < SmashSpeed;
+        bool flashOn = !tooSlow
+            || ((int)(Environment.TickCount / 250) & 1) == 0;
+        if (flashOn)
+        {
+            var speedColor = tooSlow
+                ? new Color(255, 140, 80)  // orange = too slow
+                : new Color(120, 255, 120); // green = smashing speed
+            scoreFont.DrawText(rd, $"SPEED {rocket.Speed:0}", speedColor, 20f, 120f);
+        }
+
+        if (levelComplete.GameOverAt is not null)
+        {
+            const string banner = "GAME OVER";
+            var size = bannerFont.Measure(banner);
+            float x = (designW - size.X) / 2f;
+            float y = (designH - size.Y) / 2f;
+            bannerFont.DrawText(rd, banner, Color.White, x, y);
+        }
+    }
+}
+
+// Debug overlay: outlines the rocket and asteroid HitShapes in world
+// space (toggle with H) so collision registration is visible.
+sealed class HitDebugLayer(Window2D window, Rocket rocket, PlayField2D playField) : Layer2D
+{
+    private bool _showHitShape;
+
+    public override void Update(in UpdateContext context)
+    {
+        if (window.Input.WasJustPressed(Key.H))
+            _showHitShape = !_showHitShape;
+    }
+
+    protected override void DrawContent(Renderer2D rd)
+    {
+        if (!_showHitShape) return;
+        using var _ = rd.PushState();
+        rd.DrawColor = new Color(0, 255, 120, 220);
+        rocket.HitShape.Visit(HitShapeDebug2D.Draw(rd));
+        // Also outline the bounding circle in a dimmer color
+        // so we can see when the cheap reject would skip.
+        rd.DrawColor = new Color(0, 200, 255, 90);
+        HitShapeDebug2D.DrawCircleOutline(rd, rocket.HitShape.BoundingCircle.Center, rocket.HitShape.BoundingCircle.Radius);
+
+        // Same treatment for every asteroid currently on the field:
+        // magenta hit shape outline + dim bounding circle.
+        var hitVisitor = HitShapeDebug2D.Draw(rd);
+        foreach (var sprite in playField.Sprites)
+        {
+            if (sprite is not Asteroid asteroid) continue;
+            rd.DrawColor = new Color(255, 80, 200, 220);
+            asteroid.HitShape.Visit(hitVisitor);
+            rd.DrawColor = new Color(255, 120, 220, 70);
+            HitShapeDebug2D.DrawCircleOutline(rd, asteroid.HitShape.BoundingCircle.Center, asteroid.HitShape.BoundingCircle.Radius);
+        }
+    }
+}
+
+// Ends the run when every non-radioactive target is cleared (or V is
+// pressed). The HUD reads GameOverAt to draw the "GAME OVER" banner.
+sealed class LevelComplete2D(PlayField2D playField, Window2D window, TimeSpan delay)
+    : Behavior, IUpdatable
+{
+    public DateTime? GameOverAt { get; private set; }
+
+    public void Update(in UpdateContext context)
+    {
+        if (Entity is not Scene2D scene || scene.RunState != RunState.Running)
+            return;
+        var remainingTargets = playField.Sprites.Count(
+            s => s is Asteroid a && a.Kind != AsteriodKind.Radioactive);
+        if (remainingTargets == 0 || window.Input.WasJustPressed(Key.V))
+        {
+            _ = Audio.PlayAsync(Melodies.LevelUp, volume: .3f);
+            GameOverAt = DateTime.UtcNow;
+            scene.ExitWithDelay(delay);
+        }
+    }
+}
+
 sealed class Rocket : Sprite2D
 {
     /// <summary>
@@ -380,26 +389,31 @@ sealed class Rocket : Sprite2D
             new Motion2D(),  // move with simple 2D physics
             // Face direction of travel, except while stunned — then
             // let RotationSpeed drive the spin freely.
-            new CustomUpdateBehavior
-            {
-                OnUpdate = (e, in _) =>
-                {
-                    if (e is not Sprite2D s || s is Rocket { IsStunned: true })
-                        return;
-                    s.Rotation = s.Heading;
-                },
-            },
-            new BounceInBounds2D  // bounce off the walls
-            {
-                OnBounce = e =>
-                {
-                    if (e is not Sprite2D s)
-                        return;
-                    s.Heading = (s.Heading + Random.Shared.Next(-10, 10) + 360f) % 360f;
-                    Audio.Play(Sounds.Boing, volume: .2f);
-                },
-            },
+            new FaceHeadingUnlessStunned(),
+            new BounceInBounds2D { Bounced = new BounceJitter() },  // bounce off the walls
         ];
+    }
+
+    private sealed class FaceHeadingUnlessStunned : Behavior, IUpdatable
+    {
+        public void Update(in UpdateContext context)
+        {
+            if (Entity is not Sprite2D s || s is Rocket { IsStunned: true })
+                return;
+            s.Rotation = s.Heading;
+        }
+    }
+
+    // On a wall bounce, nudge the heading randomly and play a boing.
+    private sealed class BounceJitter : IEventHandler<BoundsBounced2DEventArgs>
+    {
+        public void OnEvent(in BoundsBounced2DEventArgs e)
+        {
+            if (e.Self is not Sprite2D s)
+                return;
+            s.Heading = (s.Heading + Random.Shared.Next(-10, 10) + 360f) % 360f;
+            Audio.Play(Sounds.Boing, volume: .2f);
+        }
     }
 
     public void Stun(TimeSpan duration)

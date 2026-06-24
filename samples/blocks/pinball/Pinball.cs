@@ -181,33 +181,10 @@ var gameController = new PinballGameController(window.Input, ball, flipperLeft, 
 
 // The drain isn't an actual barrier
 // it is drawn as its own 'background' layer
-var drainBand = new CustomLayer2D
-{
-    OnRender = rd =>
-    {
-        rd.DrawColor = new Color(70, 20, 30);
-        rd.DrawFillRect(new Rect(WallInset, DrainY, W - 2f * WallInset, H - DrainY));
-    },
-};
+var drainBand = new DrainBandLayer(WallInset, DrainY, W, H);
 
 // The HUD with score and other text
-var hud = new CustomLayer2D
-{
-    OnRender = rd =>
-    {
-        using var _ = rd.PushState();
-        rd.Camera = null;
-
-        var status = gameController.BallInPlay
-            ? $"BALL {gameController.BallNumber}"
-            : "SPACE TO DROP";
-        scoreFont.DrawText(rd, status, Color.White, 20f, 64f);
-
-        // Subtle hint line for the keys.
-        rd.DrawColor = new Color(180, 200, 230);
-        rd.DrawDebugText(20, H - 28, "Shift flippers   <- -> nudge   Space drop   Esc quit", scale: 1.5f);
-    },
-};
+var hud = new PinballHud(gameController, scoreFont, H);
 
 // The scene puts it all togther.
 var scene = new Scene2D
@@ -315,6 +292,35 @@ static Bitmap MakeChromeBall(int size)
     return image;
 }
 
+// Background layer for the drain band beneath the playfield.
+sealed class DrainBandLayer(float wallInset, float drainY, int w, int h) : Layer2D
+{
+    protected override void DrawContent(Renderer2D rd)
+    {
+        rd.DrawColor = new Color(70, 20, 30);
+        rd.DrawFillRect(new Rect(wallInset, drainY, w - 2f * wallInset, h - drainY));
+    }
+}
+
+// HUD overlay: ball status text and the key hint line.
+sealed class PinballHud(PinballGameController gameController, Font scoreFont, int h) : Layer2D
+{
+    protected override void DrawContent(Renderer2D rd)
+    {
+        using var _ = rd.PushState();
+        rd.Camera = null;
+
+        var status = gameController.BallInPlay
+            ? $"BALL {gameController.BallNumber}"
+            : "SPACE TO DROP";
+        scoreFont.DrawText(rd, status, Color.White, 20f, 64f);
+
+        // Subtle hint line for the keys.
+        rd.DrawColor = new Color(180, 200, 230);
+        rd.DrawDebugText(20, h - 28, "Shift flippers   <- -> nudge   Space drop   Esc quit", scale: 1.5f);
+    }
+}
+
 // the pinball
 sealed class Pinball : Sprite2D
 {
@@ -348,12 +354,19 @@ sealed class Bumper : CircleBarrier2D
         : base(x, y, radius)
     {
         PhysicsMaterial = new PhysicsMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 320f);
-        AddBehavior(new CustomHitBehavior2D { OnHit = OnHit });
+        AddBehavior(new HitResponse());
     }
 
     public override void Draw(Renderer2D renderer)
     {
         renderer.DrawDisc(Center, Radius, Tint);
+    }
+
+    private sealed class HitResponse : Behavior, IHittable2D
+    {
+        private Bumper _host = null!;
+        protected override void OnAttach(IEntity entity) => _host = (Bumper)entity;
+        void IHittable2D.OnHit(in Hit2D hit) => _host.OnHit(_host, hit.Other);
     }
 
     private void OnHit(IEntity self, IEntity other)
@@ -389,12 +402,19 @@ sealed class Slingshot : LineBarrier2D
     {
         OneSided = true;
         PhysicsMaterial = new PhysicsMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 180f);
-        AddBehavior(new CustomHitBehavior2D { OnHit = OnHit });
+        AddBehavior(new HitResponse());
     }
 
     public override void Draw(Renderer2D renderer)
     {
         renderer.DrawThickLine(Start, End, new Color(255, 150, 80), 5f);
+    }
+
+    private sealed class HitResponse : Behavior, IHittable2D
+    {
+        private Slingshot _host = null!;
+        protected override void OnAttach(IEntity entity) => _host = (Slingshot)entity;
+        void IHittable2D.OnHit(in Hit2D hit) => _host.OnHit(_host, hit.Other);
     }
 
     private void OnHit(IEntity self, IEntity other)

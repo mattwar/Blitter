@@ -1,20 +1,21 @@
 namespace Blitter.Blocks2D;
 
 /// <summary>
+/// Raised after a <see cref="Spawner2D"/> adds a sprite to its target.
+/// </summary>
+/// <param name="Source">The behavior instance that raised the event.</param>
+/// <param name="Sprite">The sprite that was just spawned.</param>
+public readonly record struct SpriteSpawned2DEventArgs(Spawner2D Source, Sprite2D Sprite);
+
+/// <summary>
 /// Scene behavior that periodically adds new sprites to a
 /// <see cref="PlayField2D"/>. Use for falling debris, enemy waves,
 /// pickups, projectiles, particle bursts — any pattern that wants
 /// "spawn another one every N seconds" without each game hand-rolling
 /// its own timer.
 /// </summary>
-public sealed class Spawner2D : Behavior, IUpdatable
+public abstract class Spawner2D : Behavior, IUpdatable
 {
-    /// <summary>Playfield that receives spawned sprites.</summary>
-    public required PlayField2D Target { get; init; }
-
-    /// <summary>Produces the next sprite to spawn. Invoked on the update thread.</summary>
-    public required Func<Sprite2D> Factory { get; init; }
-
     /// <summary>Average time between spawns.</summary>
     public TimeSpan Interval { get; set; } = TimeSpan.FromSeconds(1);
 
@@ -28,11 +29,7 @@ public sealed class Spawner2D : Behavior, IUpdatable
     /// <summary>Wait this long after the spawner starts before the first spawn.</summary>
     public TimeSpan StartDelay { get; set; } = TimeSpan.Zero;
 
-    /// <summary>
-    /// When set, the spawner skips its turn while the playfield already
-    /// holds this many matching sprites (counted via <see cref="Filter"/>
-    /// when supplied, otherwise the total sprite count).
-    /// </summary>
+    /// <summary>When set, the spawner skips its turn while the playfield already holds this many matching sprites.</summary>
     public int? MaxAlive { get; set; }
 
     /// <summary>
@@ -40,14 +37,6 @@ public sealed class Spawner2D : Behavior, IUpdatable
     /// sprites in total.
     /// </summary>
     public int? MaxTotal { get; set; }
-
-    /// <summary>
-    /// Optional predicate that selects which sprites count toward
-    /// <see cref="MaxAlive"/>. Lets one spawner ignore sprites managed
-    /// by another (e.g. only count <c>Enemy</c> sprites when sharing
-    /// the playfield with bullets and pickups).
-    /// </summary>
-    public Func<Sprite2D, bool>? Filter { get; set; }
 
     /// <summary>When true the spawner accumulates time but skips spawning.</summary>
     public bool Paused { get; set; }
@@ -58,17 +47,28 @@ public sealed class Spawner2D : Behavior, IUpdatable
     /// <summary>Total sprites this spawner has produced.</summary>
     public int SpawnedCount { get; private set; }
 
-    /// <summary>
-    /// Raised after a spawned sprite has been added to <see cref="Target"/>.
-    /// Useful for logging, attaching extra behaviors, or anchoring
-    /// position relative to another sprite.
-    /// </summary>
-    public event Action<Sprite2D>? Spawned;
+    /// <summary>Optional handler invoked after a sprite has been added to the target playfield.</summary>
+    public IEventHandler<SpriteSpawned2DEventArgs>? Spawned { get; set; }
 
     // Time remaining before the next spawn attempt.
     private TimeSpan _timeUntilNext;
     // First tick rolls the StartDelay onto the timer.
     private bool _initialized;
+
+    /// <summary>Creates the next sprite to spawn. Invoked on the update thread.</summary>
+    protected abstract Sprite2D CreateSprite();
+
+    /// <summary>Resolves the playfield that receives spawned sprites.</summary>
+    protected virtual PlayField2D ResolveTarget()
+    {
+        if (Entity is Scene2D scene)
+            return scene.GetLayer<PlayField2D>();
+
+        throw new InvalidOperationException("Spawner2D must be attached to a Scene2D or override ResolveTarget().");
+    }
+
+    /// <summary>Returns whether <paramref name="sprite"/> counts toward <see cref="MaxAlive"/>.</summary>
+    protected virtual bool CountsTowardMaxAlive(Sprite2D sprite) => true;
 
     /// <summary>
     /// Spawn <paramref name="count"/> sprites immediately, independent
@@ -122,19 +122,20 @@ public sealed class Spawner2D : Behavior, IUpdatable
         if (MaxTotal is int total && SpawnedCount >= total)
             return false;
 
+        var target = ResolveTarget();
+
         if (MaxAlive is int cap)
         {
-            int alive = Filter is { } f
-                ? Target.Sprites.Count(f)
-                : Target.Sprites.Count;
+            int alive = target.Sprites.Count(CountsTowardMaxAlive);
             if (alive >= cap)
                 return false;
         }
 
-        var sprite = Factory();
-        Target.AddSprite(sprite);
+        var sprite = CreateSprite();
+        target.AddSprite(sprite);
         SpawnedCount++;
-        Spawned?.Invoke(sprite);
+        var args = new SpriteSpawned2DEventArgs(this, sprite);
+        Spawned?.OnEvent(in args);
         return true;
     }
 

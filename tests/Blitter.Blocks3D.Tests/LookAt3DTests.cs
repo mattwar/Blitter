@@ -16,7 +16,7 @@ public class LookAt3DTests
     [Fact]
     public void TargetPoint_AimsForwardAtTarget()
     {
-        var look = new LookAt3D { TargetPoint = new Vector3(1f, 0f, 0f) };
+        var look = new TestLookAt3D { TargetPoint = new Vector3(1f, 0f, 0f) };
         var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
 
         look.Update(Ctx(0.016));
@@ -31,7 +31,7 @@ public class LookAt3DTests
     public void TargetSprite_TakesPriorityOverPoint()
     {
         var targetSprite = new Sprite3D { Position = new Vector3(0f, 0f, -1f) };
-        var look = new LookAt3D
+        var look = new TestLookAt3D
         {
             Target = targetSprite,
             TargetPoint = new Vector3(1f, 0f, 0f),
@@ -49,9 +49,9 @@ public class LookAt3DTests
     [Fact]
     public void TargetSelector_UsedWhenNoSpriteOrPoint()
     {
-        var look = new LookAt3D
+        var look = new TestLookAt3D
         {
-            TargetSelector = () => new Vector3(0f, 0f, -1f),
+            SelectedTarget = new Vector3(0f, 0f, -1f),
         };
         var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
 
@@ -63,7 +63,7 @@ public class LookAt3DTests
     [Fact]
     public void NoTarget_LeavesOrientationUnchanged()
     {
-        var look = new LookAt3D();
+        var look = new TestLookAt3D();
         var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
 
         look.Update(Ctx(0.016));
@@ -74,7 +74,7 @@ public class LookAt3DTests
     [Fact]
     public void SelectorReturningNull_SkipsTurn()
     {
-        var look = new LookAt3D { TargetSelector = () => null };
+        var look = new TestLookAt3D { SelectedTarget = null };
         var sprite = new Sprite3D { Position = Vector3.Zero, Behaviors = [ look ] };
 
         look.Update(Ctx(0.016));
@@ -85,7 +85,7 @@ public class LookAt3DTests
     [Fact]
     public void KeepUpright_IgnoresHeightDifference()
     {
-        var look = new LookAt3D
+        var look = new TestLookAt3D
         {
             TargetPoint = new Vector3(1f, 5f, 0f),
             KeepUpright = true,
@@ -101,7 +101,7 @@ public class LookAt3DTests
     [Fact]
     public void TargetOnTopOfSprite_SkipsTurn()
     {
-        var look = new LookAt3D { TargetPoint = new Vector3(2f, 2f, 2f) };
+        var look = new TestLookAt3D { TargetPoint = new Vector3(2f, 2f, 2f) };
         var sprite = new Sprite3D { Position = new Vector3(2f, 2f, 2f), Behaviors = [ look ] };
 
         look.Update(Ctx(0.016));
@@ -113,7 +113,7 @@ public class LookAt3DTests
     public void TurnSpeed_EasesTowardTargetWithoutSnapping()
     {
         // Start facing -Z (identity); target is behind at +Z (180 deg away).
-        var look = new LookAt3D
+        var look = new TestLookAt3D
         {
             TargetPoint = new Vector3(0f, 0f, 1f),
             TurnSpeed = 0.1f, // very slow
@@ -130,7 +130,7 @@ public class LookAt3DTests
     [Fact]
     public void TurnSpeed_LargeStep_SnapsToTarget()
     {
-        var look = new LookAt3D
+        var look = new TestLookAt3D
         {
             TargetPoint = new Vector3(1f, 0f, 0f),
             TurnSpeed = 100f, // huge — step exceeds remaining angle
@@ -141,4 +141,10 @@ public class LookAt3DTests
 
         Assert.Equal(1f, ForwardOf(sprite).X, 4);
     }
+}
+
+file sealed class TestLookAt3D : LookAt3D
+{
+    public Vector3? SelectedTarget { get; init; }
+    protected override Vector3? SelectTarget() => SelectedTarget;
 }

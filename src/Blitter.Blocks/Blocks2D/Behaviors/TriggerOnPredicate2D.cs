@@ -1,17 +1,11 @@
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// Rising-edge trigger: invokes <see cref="Action"/> once each time <see cref="Predicate"/> transitions from <c>false</c> to <c>true</c>.
+/// Rising-edge trigger that runs subclass logic once each time its condition transitions from <c>false</c> to <c>true</c>.
 /// Useful for "all enemies dead", "player reached the exit", "score ≥ N", or any other one-shot scene gate.
 /// </summary>
-public sealed class TriggerOnPredicate2D : Behavior, IUpdatable
+public abstract class TriggerOnPredicate2D : Behavior, IUpdatable
 {
-    /// <summary>Condition evaluated each tick.</summary>
-    public required Func<IEntity, bool> Predicate { get; init; }
-
-    /// <summary>Invoked on each rising edge of <see cref="Predicate"/>.</summary>
-    public required Action<IEntity> Action { get; init; }
-
     /// <summary>
     /// When true (default), the trigger may fire each time the
     /// predicate transitions false→true. When false the trigger
@@ -29,6 +23,12 @@ public sealed class TriggerOnPredicate2D : Behavior, IUpdatable
     // Set once a non-repeating trigger has fired; further ticks are ignored.
     private bool _spent;
 
+    /// <summary>Returns the trigger condition for the current tick.</summary>
+    protected abstract bool IsTriggered(IEntity entity);
+
+    /// <summary>Runs when the trigger condition transitions from false to true.</summary>
+    protected abstract void OnTriggered(IEntity entity);
+
     public void Update(in UpdateContext context)
     {
         if (_spent)
@@ -36,11 +36,11 @@ public sealed class TriggerOnPredicate2D : Behavior, IUpdatable
 
         if (this.Entity is {} entity)
         {
-            var now = Predicate(entity);
+            var now = IsTriggered(entity);
             if (now && !_last)
             {
                 FiredCount++;
-                Action(entity);
+                OnTriggered(entity);
                 if (!Repeating)
                     _spent = true;
             }

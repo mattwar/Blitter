@@ -7,15 +7,19 @@ namespace Blitter.Blocks;
 /// </summary>
 public enum Containment
 {
-    /// <summary>The entity is not a member of the container.</summary>
+    /// <summary>
+    /// The entity is not a member of the container.
+    /// </summary>
     NotContained,
 
-    /// <summary>The entity is a live member of the container.</summary>
+    /// <summary>
+    /// The entity is a live member of the container.
+    /// </summary>
     Contained,
 
     /// <summary>
-    /// The entity is still held by the container but scheduled for removal
-    /// this frame, so it no longer participates in updates or collisions.
+    /// The entity is still held by the container but scheduled for removal this frame, 
+    /// so it no longer participates in updates or collisions.
     /// </summary>
     Removing,
 }
