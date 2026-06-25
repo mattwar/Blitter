@@ -6,9 +6,13 @@ public class ContainmentTests
 {
     private sealed class EmptyContainer : Entity, IContainerEntity
     {
-        public IReadOnlyList<IEntity> Entities => [];
+        private readonly List<IEntity> _entities = new();
+
+        public IReadOnlyList<IEntity> Entities => _entities;
         public void AddEntity(IEntity child) { }
         public void RemoveEntity(IEntity child) { }
+
+        public void Adopt(IEntity child) => _entities.Add(child);
     }
 
     private static UpdateContext Ctx() => new()
@@ -73,12 +77,16 @@ public class ContainmentTests
     }
 
     [Fact]
-    public void Container_Default_IsNotContained()
+    public void Container_Default_ReportsListMembership()
     {
         IContainerEntity container = new EmptyContainer();
         var child = new Sprite3D();
+        var other = new Sprite3D();
 
-        Assert.Equal(Containment.NotContained, container.GetContainment(child));
+        ((EmptyContainer)container).Adopt(child);
+
+        Assert.Equal(Containment.Contained, container.GetContainment(child));
+        Assert.Equal(Containment.NotContained, container.GetContainment(other));
     }
 
     // Removes its own sprite from the field during update and records the
