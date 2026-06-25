@@ -10,7 +10,7 @@ public class PlayField2DTests
 
         public void Update(in UpdateContext context)
         {
-            var playfield = (PlayField2D)Entity!.Parent!;
+            var playfield = (PlayField2D)Entity!.Container!;
             playfield.RemoveEntity(Entity!);
             ContainmentDuringUpdate = playfield.GetContainment(Entity!);
         }
@@ -25,7 +25,7 @@ public class PlayField2DTests
         playfield.AddEntity(entity);
 
         Assert.Same(entity, Assert.Single(playfield.Entities));
-        Assert.Same(playfield, entity.Parent);
+        Assert.Same(playfield, entity.Container);
         Assert.True(playfield.TryGetEntity<Entity>(out var found));
         Assert.Same(entity, found);
         Assert.Equal(Containment.Contained, playfield.GetContainment(entity));
@@ -33,7 +33,7 @@ public class PlayField2DTests
         playfield.RemoveEntity(entity);
 
         Assert.Empty(playfield.Entities);
-        Assert.Null(entity.Parent);
+        Assert.Null(entity.Container);
         Assert.Equal(Containment.NotContained, playfield.GetContainment(entity));
     }
 
@@ -55,7 +55,7 @@ public class PlayField2DTests
         playfield.AddEntity(entity);
 
         Assert.Same(entity, Assert.Single(playfield.Entities));
-        Assert.Same(playfield, entity.Parent);
+        Assert.Same(playfield, entity.Container);
     }
 
     [Fact]
@@ -72,8 +72,8 @@ public class PlayField2DTests
         playfield.RemoveEntity(barrier);
 
         Assert.Empty(playfield.Entities);
-        Assert.Null(entity.Parent);
-        Assert.Null(barrier.Parent);
+        Assert.Null(entity.Container);
+        Assert.Null(barrier.Container);
     }
 
     [Fact]
@@ -81,14 +81,13 @@ public class PlayField2DTests
     {
         var playfield = new PlayField2D();
         var entity = new Entity();
-        var removeSelf = new RemoveSelfOnUpdate();
-        entity.AddBehavior(removeSelf);
+        var removeSelf = entity.GetOrAddBehavior<RemoveSelfOnUpdate>();
         playfield.AddEntity(entity);
 
         playfield.Update(new UpdateContext());
 
         Assert.Equal(Containment.Removing, removeSelf.ContainmentDuringUpdate);
         Assert.Empty(playfield.Entities);
-        Assert.Null(entity.Parent);
+        Assert.Null(entity.Container);
     }
 }

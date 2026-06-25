@@ -38,7 +38,7 @@ public class Sprite2D : Entity, IDrawable2D
         _velocity = this.GetOrAddTrait<Velocity2D>();
         _appearance = this.GetOrAddTrait<Appearance2D>();
         if (!this.TryGetBehavior<IColliderShape2D>(out _))
-            this.AddBehavior(new DefaultColliderShape2D());
+            this.GetOrAddBehavior<DefaultColliderShape2D>();
         base.OnAttach(entity);
     }
 
@@ -94,7 +94,7 @@ public class Sprite2D : Entity, IDrawable2D
     /// The <see cref="PlayField2D"/> this sprite belongs to.
     /// </summary>
     public PlayField2D PlayField =>  
-        this.Parent as PlayField2D 
+        this.Container as PlayField2D 
             ?? throw new InvalidOperationException("Sprite is not attached to a PlayField. Access PlayField only while the sprite is a member of one.");
 
     /// <summary>
@@ -108,7 +108,7 @@ public class Sprite2D : Entity, IDrawable2D
     /// How long this sprite has been a member of its current <see cref="PlayField"/>.
     /// </summary>
     public TimeSpan Age =>
-        this.Parent?.GetAge(this) ?? TimeSpan.Zero;
+        this.Container?.GetAge(this) ?? TimeSpan.Zero;
 
     /// <summary>
     /// The sprite's world-space collision shape, provided by its

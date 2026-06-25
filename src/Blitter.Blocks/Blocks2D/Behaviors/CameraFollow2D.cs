@@ -143,7 +143,7 @@ public class CameraFollow2D : Behavior, IUpdatable
     /// </summary>
     private void ResolveCamera()
     {
-        if (_entity is Sprite2D { Parent: PlayField2D playfield } && playfield.Parent is Scene2D scene)
+        if (_entity is Sprite2D { Container: PlayField2D playfield } && playfield.Container is Scene2D scene)
         {
             CameraLayer2D? cameraLayer;
             if (CameraName is null)

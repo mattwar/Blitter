@@ -103,13 +103,11 @@ var camera = new Camera2D { Position = rocket.Center };
 window.Renderer.Camera = camera;
 
 var worldBounds = new Rect(0, 0, WorldW, WorldH);
-rocket.AddBehavior(new CameraFollow2D
-{
-    Camera = camera,
-    ViewportSize = new Vector2(DesignW, DesignH),
-    MarginFraction = 0.3f,
-    WorldBounds = worldBounds,
-});
+var cameraFollow = rocket.GetOrAddBehavior<CameraFollow2D>();
+cameraFollow.Camera = camera;
+cameraFollow.ViewportSize = new Vector2(DesignW, DesignH);
+cameraFollow.MarginFraction = 0.3f;
+cameraFollow.WorldBounds = worldBounds;
 
 // Parallax star field. The rocket is buzzing around an asteroid
 // field, not zooming between stars, so both layers stay nearly
@@ -801,11 +799,11 @@ sealed class Asteroid : Sprite2D
         else if (kind == AsteriodKind.Radioactive)
         {
             this.Tint = _radioactiveTint;
-            this.AddBehavior(PulseTint2D.FromBrightness(_radioactiveTint, amount: 0.5f, period: TimeSpan.FromSeconds(0.6)));
+            this.GetOrAddBehavior<PulseTint2D>().SetBrightness(_radioactiveTint, amount: 0.5f, period: TimeSpan.FromSeconds(0.6));
         }
 
-        this.AddBehavior(new Motion2D());
-        this.AddBehavior(new BounceInBounds2D());
+        this.GetOrAddBehavior<Motion2D>();
+        this.GetOrAddBehavior<BounceInBounds2D>();
     }
 
     public void Smash()

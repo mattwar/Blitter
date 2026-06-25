@@ -11,17 +11,17 @@ public sealed class PulseTint2D : Behavior, IUpdatable
     /// <summary>
     /// Tint at the trough/bottom of the pulse (t = 0).
     /// </summary>
-    public required Color Low { get; init; }
+    public Color Low { get; set; } = Color.White;
 
     /// <summary>
     /// Tint at the crest/top of the pulse (t = 1).
     /// </summary>
-    public required Color High { get; init; }
+    public Color High { get; set; } = Color.White;
 
     /// <summary>
     /// Time for one full Low → High → Low cycle.
     /// </summary>
-    public TimeSpan Period { get; init; } = TimeSpan.FromSeconds(1);
+    public TimeSpan Period { get; set; } = TimeSpan.FromSeconds(1);
 
     private Appearance2D _appearance = null!;
 
@@ -54,13 +54,19 @@ public sealed class PulseTint2D : Behavior, IUpdatable
     /// </summary>
     public static PulseTint2D FromBrightness(Color baseColor, float amount, TimeSpan period)
     {
+        return new PulseTint2D().SetBrightness(baseColor, amount, period);
+    }
+
+    /// <summary>
+    /// Configures this behavior to pulse brightness around <paramref name="baseColor"/>.
+    /// </summary>
+    public PulseTint2D SetBrightness(Color baseColor, float amount, TimeSpan period)
+    {
         amount = Math.Clamp(amount, 0f, 1f);
-        return new PulseTint2D
-        {
-            Low = Color.Lerp(baseColor, new Color(0, 0, 0, baseColor.A), amount),
-            High = Color.Lerp(baseColor, new Color(255, 255, 255, baseColor.A), amount),
-            Period = period,
-        };
+        Low = Color.Lerp(baseColor, new Color(0, 0, 0, baseColor.A), amount);
+        High = Color.Lerp(baseColor, new Color(255, 255, 255, baseColor.A), amount);
+        Period = period;
+        return this;
     }
 
     /// <summary>
@@ -68,13 +74,19 @@ public sealed class PulseTint2D : Behavior, IUpdatable
     /// </summary>
     public static PulseTint2D FromAlpha(Color color, byte minAlpha, TimeSpan period)
     {
+        return new PulseTint2D().SetAlpha(color, minAlpha, period);
+    }
+
+    /// <summary>
+    /// Configures this behavior to pulse only the alpha channel of <paramref name="color"/>.
+    /// </summary>
+    public PulseTint2D SetAlpha(Color color, byte minAlpha, TimeSpan period)
+    {
         if (minAlpha > color.A)
             minAlpha = color.A;
-        return new PulseTint2D
-        {
-            Low = new Color(color.R, color.G, color.B, minAlpha),
-            High = color,
-            Period = period,
-        };
+        Low = new Color(color.R, color.G, color.B, minAlpha);
+        High = color;
+        Period = period;
+        return this;
     }
 }

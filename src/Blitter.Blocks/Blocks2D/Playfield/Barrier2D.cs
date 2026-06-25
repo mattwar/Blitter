@@ -19,7 +19,7 @@ public abstract class Barrier2D : Entity, IColliderBarrier2D, IDrawable2D
         _transform = this.GetOrAddTrait<Transform2D>();
         this.GetOrAddTrait<Surface2D>();
         if (!this.TryGetBehavior<IColliderShape2D>(out _))
-            this.AddBehavior(new DefaultColliderShape2D());
+            this.GetOrAddBehavior<DefaultColliderShape2D>();
         base.OnAttach(entity);
     }
 

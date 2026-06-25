@@ -111,7 +111,7 @@ sealed class RemoveBelowBounds2D : Behavior, IUpdatable
         if (Entity is Sprite2D sprite
             && sprite.TryFindTrait<Bounds2D>(out var bounds)
             && sprite.Center.Y - Margin > bounds.Rect.Height)
-            sprite.RemoveFromParent();
+            sprite.RemoveFromContainer();
     }
 }
 
@@ -132,8 +132,8 @@ sealed class Block : Sprite2D
         Center = new Vector2(rng.Next((int)Size, worldWidth - (int)Size), -Size);
         Speed  = rng.Next(120, 320);
         Heading = 180f; // straight down (0 = up)
-        AddBehavior(new Motion2D());
-        AddBehavior(new RemoveBelowBounds2D { Margin = Size });
+        GetOrAddBehavior<Motion2D>();
+        GetOrAddBehavior<RemoveBelowBounds2D>().Margin = Size;
     }
 
     public override void Draw(Renderer2D renderer)

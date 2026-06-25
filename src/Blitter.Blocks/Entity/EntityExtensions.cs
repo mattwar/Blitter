@@ -35,7 +35,7 @@ public static class EntityExtensions
     public static bool TryFindTrait<T>(this IEntity entity, [NotNullWhen(true)] out T? trait)
         where T : Trait
     {
-        for (IEntity? current = entity; current is not null; current = current.Parent)
+        for (IEntity? current = entity; current is not null; current = current.Container)
         {
             if (current.TryGetTrait(out trait))
                 return true;
@@ -58,18 +58,18 @@ public static class EntityExtensions
 
     /// <summary>
     /// How long <paramref name="entity"/> has been a member of its current
-    /// <see cref="IEntity.Parent"/> container, or <see cref="TimeSpan.Zero"/>
+    /// <see cref="IEntity.Container"/> container, or <see cref="TimeSpan.Zero"/>
     /// when it has no container.
     /// </summary>
     public static TimeSpan Age(this IEntity entity) =>
-        entity.Parent?.GetAge(entity) ?? TimeSpan.Zero;
+        entity.Container?.GetAge(entity) ?? TimeSpan.Zero;
 
     /// <summary>
     /// Removes <paramref name="entity"/> from its current
-    /// <see cref="IEntity.Parent"/> container, if any.
+    /// <see cref="IEntity.Container"/> container, if any.
     /// </summary>
-    public static void RemoveFromParent(this IEntity entity) =>
-        entity.Parent?.RemoveEntity(entity);
+    public static void RemoveFromContainer(this IEntity entity) =>
+        entity.Container?.RemoveEntity(entity);
 
 
     /// <summary>

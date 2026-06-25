@@ -358,7 +358,7 @@ sealed class Bumper : CircleBarrier2D
         : base(x, y, radius)
     {
         PhysicsMaterial = new PhysicsMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 320f);
-        AddBehavior(new HitResponse());
+        GetOrAddBehavior<HitResponse>();
     }
 
     public override void Draw(Renderer2D renderer)
@@ -406,7 +406,7 @@ sealed class Slingshot : LineBarrier2D
     {
         OneSided = true;
         PhysicsMaterial = new PhysicsMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 180f);
-        AddBehavior(new HitResponse());
+        GetOrAddBehavior<HitResponse>();
     }
 
     public override void Draw(Renderer2D renderer)

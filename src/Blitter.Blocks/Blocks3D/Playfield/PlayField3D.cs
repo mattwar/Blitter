@@ -74,8 +74,8 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
         else
             sprite.Host?.RemoveSprite(sprite);
 
-        // Parenting drives attachment (Entity.OnAttach wires behaviors).
-        sprite.Parent = this;
+        // Container assignment drives attachment (Entity.OnAttach wires behaviors).
+        sprite.Container = this;
         _spawnedAt[sprite] = Elapsed;
 
         if (_updating)
@@ -165,7 +165,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
     {
         if (child is Sprite3D sprite)
         {
-            if (!ReferenceEquals(sprite.Parent, this))
+            if (!ReferenceEquals(sprite.Container, this))
                 return Containment.NotContained;
             return _pendingRemoveSprites.Contains(sprite) ? Containment.Removing : Containment.Contained;
         }
@@ -221,8 +221,8 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
     private void Detach(Sprite3D sprite, bool retired)
     {
         _spawnedAt.Remove(sprite);
-        if (sprite.Parent == this)
-            sprite.Parent = null;
+        if (sprite.Container == this)
+            sprite.Container = null;
         if (retired)
             OnSpriteRetired(sprite);
     }

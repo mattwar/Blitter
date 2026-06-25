@@ -59,10 +59,9 @@ public class SceneLookupTests
     public void CameraFollow2D_ResolvesCameraByType()
     {
         var cameraLayer = new CameraLayer2D();
-        var follow = new CameraFollow2D();
         var sprite = new Sprite2D();
         var playfield = new PlayField2D();
-        sprite.AddBehavior(follow);
+        var follow = sprite.GetOrAddBehavior<CameraFollow2D>();
         playfield.AddEntity(sprite);
         SceneWith(cameraLayer, playfield);
 
@@ -76,10 +75,10 @@ public class SceneLookupTests
     {
         var world = new CameraLayer2D { Name = "world" };
         var hud = new CameraLayer2D { Name = "hud" };
-        var follow = new CameraFollow2D { CameraName = "world" };
         var sprite = new Sprite2D();
         var playfield = new PlayField2D();
-        sprite.AddBehavior(follow);
+        var follow = sprite.GetOrAddBehavior<CameraFollow2D>();
+        follow.CameraName = "world";
         playfield.AddEntity(sprite);
         SceneWith(world, hud, playfield);
 
@@ -93,10 +92,10 @@ public class SceneLookupTests
     {
         var cameraLayer = new CameraLayer2D();
         var explicitCamera = new Camera2D();
-        var follow = new CameraFollow2D { Camera = explicitCamera };
         var sprite = new Sprite2D();
         var playfield = new PlayField2D();
-        sprite.AddBehavior(follow);
+        var follow = sprite.GetOrAddBehavior<CameraFollow2D>();
+        follow.Camera = explicitCamera;
         playfield.AddEntity(sprite);
         SceneWith(cameraLayer, playfield);
 

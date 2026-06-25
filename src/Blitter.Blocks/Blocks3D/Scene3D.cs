@@ -53,7 +53,7 @@ public class Scene3D : Entity, IContainerEntity
         if (child is not Layer3D layer)
             throw new InvalidOperationException("Scene3D can only contain Layer3D entities.");
         _layers.Add(layer);
-        layer.Parent = this;
+        layer.Container = this;
     }
 
     /// <summary>
@@ -68,7 +68,7 @@ public class Scene3D : Entity, IContainerEntity
     public void RemoveEntity(IEntity child)
     {
         if (child is Layer3D layer && _layers.Remove(layer))
-            layer.Parent = null;
+            layer.Container = null;
     }
 
     /// <summary>

@@ -23,7 +23,7 @@ public abstract class Layer2D : Entity, IDrawable2D
     /// The <see cref="Scene2D"/> this layer belongs to.
     /// </summary>
     public Scene2D Scene =>
-        this.Parent as Scene2D 
+        this.Container as Scene2D 
             ?? throw new InvalidOperationException("Layer is not attached to a Scene. Access Scene only while the layer is part of a running scene.");
 
     /// <summary>

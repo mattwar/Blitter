@@ -24,7 +24,7 @@ public class Scene2D : Entity, IContainerEntity
         get => _layers; 
         set
         {
-            if (this.Parent != null)
+            if (this.Container != null)
                 throw new InvalidOperationException("Can only set layers collection during object initlialization");
             _layers.Clear();
             _layers.AddRange(value);
@@ -47,7 +47,7 @@ public class Scene2D : Entity, IContainerEntity
         // attach any layers added via object initialization
         AttachLayers();
         _layers.Add(layer);
-        layer.Parent = this;
+        layer.Container = this;
     }
 
     /// <summary>
@@ -59,7 +59,7 @@ public class Scene2D : Entity, IContainerEntity
         AttachLayers();
         if (!_layers.Remove(layer))
             return false;
-        layer.Parent = null;
+        layer.Container = null;
         return true;
     }
 
@@ -100,7 +100,7 @@ public class Scene2D : Entity, IContainerEntity
         if (!_layersAttached)
         {
             _layersAttached = true;
-            // The scene is the root, so its own Parent is never set and
+            // The scene is the root, so its own Container is never set and
             // OnAttach never fires — wire its scene behaviors here instead.
             foreach (var behavior in Behaviors)
             {
@@ -108,7 +108,7 @@ public class Scene2D : Entity, IContainerEntity
             }
             foreach (var layer in Layers)
             {
-                layer.Parent = this;
+                layer.Container = this;
             }
         }
     }

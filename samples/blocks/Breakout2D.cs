@@ -313,7 +313,7 @@ sealed class Paddle : Barrier2D
             new Vector2(-HalfWidth, 0f),
             new Vector2(HalfWidth, 0f),
             HalfHeight);
-        AddBehavior(new HitResponse());
+        GetOrAddBehavior<HitResponse>();
     }
 
     private sealed class HitResponse : Behavior, IHittable2D
@@ -416,7 +416,7 @@ sealed class Brick : Barrier2D
         Points = points;
         this.GetOrAddTrait<CollisionShape2D>().Shape =
             new BoxHitShape2D(Vector2.Zero, new Vector2(HalfWidth, HalfHeight));
-        AddBehavior(new HitResponse());
+        GetOrAddBehavior<HitResponse>();
     }
 
     private sealed class HitResponse : Behavior, IHittable2D

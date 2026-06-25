@@ -8,7 +8,7 @@ public class Entity : IEntity
     /// <summary>
     /// The container this entity belongs, or null if this is the root.
     /// </summary>
-    public IContainerEntity? Parent 
+    public IContainerEntity? Container 
     { 
         get; 
         set
@@ -20,7 +20,7 @@ public class Entity : IEntity
     }
 
     /// <summary>
-    /// Called when this entities is attached to a parent entity.
+    /// Called when this entity is attached to a container entity.
     /// </summary>
     protected virtual void OnAttach(IEntity entity)
     {    
@@ -104,21 +104,32 @@ public class Entity : IEntity
         }   
     }
 
-    /// <summary>
-    /// Adds a trait to this entity.
-    /// </summary>
-    public void AddTrait(Trait trait)
+    private void AddTraitCore(Trait trait)
     {
         _traits.Add(trait);
     }
 
-    /// <summary>
-    /// Adds a behavior to this entity.
-    /// </summary>
-    public void AddBehavior(Behavior behavior)
+    private void AddBehaviorCore(Behavior behavior)
     {
         _behaviors.Add(behavior);
         behavior.Entity = this;
+    }
+
+    /// <summary>
+    /// Returns the existing behavior of type <typeparamref name="T"/>, or creates,
+    /// attaches, and returns a new one if absent.
+    /// </summary>
+    public T GetOrAddBehavior<T>() where T : Behavior, new()
+    {
+        for (int i = 0; i < _behaviors.Count; i++)
+        {
+            if (_behaviors[i].GetType() == typeof(T))
+                return (T)_behaviors[i];
+        }
+
+        var newBehavior = new T();
+        AddBehaviorCore(newBehavior);
+        return newBehavior;
     }
 
     /// <summary>
@@ -131,7 +142,7 @@ public class Entity : IEntity
         if (this.TryGetTrait<T>(out var existing))
             return existing;            
         var newTrait = new T();
-        AddTrait(newTrait);
+        AddTraitCore(newTrait);
         return newTrait;
     }
 
@@ -140,7 +151,7 @@ public class Entity : IEntity
     /// </summary>
     public bool TryGetAncestor<TEntity>(out TEntity? ancestor) where TEntity : class, IEntity
     {
-        var current = this.Parent;
+        var current = this.Container;
         while (current is not null)
         {
             if (current is TEntity match)
@@ -148,7 +159,7 @@ public class Entity : IEntity
                 ancestor = match;
                 return true;
             }
-            current = current.Parent;
+            current = current.Container;
         }
         ancestor = null;
         return false;

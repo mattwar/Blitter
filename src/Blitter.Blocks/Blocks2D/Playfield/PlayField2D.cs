@@ -14,12 +14,12 @@ public class PlayField2D : Layer2D, IContainerEntity
     private bool _updating;
 
     private readonly Dictionary<IEntity, TimeSpan> _spawnedAt = new(ReferenceEqualityComparer.Instance);
-    private readonly Bounds2D _bounds = new();
+    private readonly Bounds2D _bounds;
     private readonly Collider2D _collider;
 
     public PlayField2D()
     {
-        AddTrait(_bounds);
+        _bounds = GetOrAddTrait<Bounds2D>();
         _collider = new Collider2D(IsLive);
     }
 
@@ -29,11 +29,11 @@ public class PlayField2D : Layer2D, IContainerEntity
         AdoptEntities(entities);
     }
 
-    private static void SetParent(IEntity child, IContainerEntity? parent)
+    private static void SetContainer(IEntity child, IContainerEntity? container)
     {
         if (child is Entity entity)
         {
-            entity.Parent = parent;
+            entity.Container = container;
             return;
         }
 
@@ -44,8 +44,8 @@ public class PlayField2D : Layer2D, IContainerEntity
     {
         foreach (var entity in entities)
         {
-            (entity.Parent as PlayField2D)?.RemoveImmediate(entity);
-            SetParent(entity, this);
+            (entity.Container as PlayField2D)?.RemoveImmediate(entity);
+            SetContainer(entity, this);
             _spawnedAt[entity] = Elapsed;
             _entities.Add(entity);
         }
@@ -113,7 +113,7 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// <inheritdoc/>
     public void AddEntity(IEntity child)
     {
-        var existing = child.Parent as PlayField2D;
+        var existing = child.Container as PlayField2D;
         if (existing is not null && existing != this)
             existing.RemoveImmediate(child);
         else if (existing == this)
@@ -123,8 +123,8 @@ public class PlayField2D : Layer2D, IContainerEntity
                 return;
         }
 
-        if (child.Parent != this)
-            SetParent(child, this);
+        if (child.Container != this)
+            SetContainer(child, this);
         _spawnedAt[child] = Elapsed;
 
         if (_updating)
@@ -140,7 +140,7 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// <inheritdoc/>
     public void RemoveEntity(IEntity child)
     {
-        if (child.Parent != this && !IsEntityMember(child))
+        if (child.Container != this && !IsEntityMember(child))
             return;
 
         if (_updating)
@@ -165,7 +165,7 @@ public class PlayField2D : Layer2D, IContainerEntity
 
         if (IsEntityMember(child))
         {
-            if (!ReferenceEquals(child.Parent, this))
+            if (!ReferenceEquals(child.Container, this))
                 return Containment.NotContained;
             return Containment.Contained;
         }
@@ -191,8 +191,8 @@ public class PlayField2D : Layer2D, IContainerEntity
     private void Detach(IEntity child)
     {
         _spawnedAt.Remove(child);
-        if (child.Parent == this)
-            SetParent(child, null);
+        if (child.Container == this)
+            SetContainer(child, null);
     }
 
     /// <summary>
@@ -209,7 +209,7 @@ public class PlayField2D : Layer2D, IContainerEntity
         Elapsed += context.ElapsedSinceLastUpdate;
 
         _bounds.Rect = WorldBounds
-            ?? (this.Parent as Scene2D)?.RendererOrNull?.LogicalBounds
+            ?? (this.Container as Scene2D)?.RendererOrNull?.LogicalBounds
             ?? _bounds.Rect;
 
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;

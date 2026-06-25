@@ -8,12 +8,7 @@ public interface IEntity
     /// <summary>
     /// The container of this entity, or <c>null</c> at the root.
     /// </summary>
-    IContainerEntity? Parent { get; }
-
-    /// <summary>
-    /// The traits for this entity.
-    /// </summary>
-    IReadOnlyList<Trait> Traits { get; }
+    IContainerEntity? Container { get; }
 
     /// <summary>
     /// The behaviors for this entity.
@@ -21,14 +16,15 @@ public interface IEntity
     IReadOnlyList<Behavior> Behaviors { get; }
 
     /// <summary>
-    /// Adds a trait to this entity.
+    /// The traits for this entity.
     /// </summary>
-    void AddTrait(Trait trait);
+    IReadOnlyList<Trait> Traits { get; }
 
     /// <summary>
-    /// Adds a behavior to this entity.
+    /// Gets the existing behavior of type <typeparamref name="T"/>, 
+    /// or creates and adds a new one if absent.
     /// </summary>
-    void AddBehavior(Behavior behavior);
+    T GetOrAddBehavior<T>() where T : Behavior, new();
 
     /// <summary>
     /// Gets the existing trait of type <typeparamref name="T"/>, 

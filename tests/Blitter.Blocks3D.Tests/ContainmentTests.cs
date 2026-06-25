@@ -76,10 +76,10 @@ public class ContainmentTests
     [Fact]
     public void Container_Default_IsNotContained()
     {
-        IContainerEntity parent = new EmptyContainer();
+        IContainerEntity container = new EmptyContainer();
         var child = new Sprite3D();
 
-        Assert.Equal(Containment.NotContained, parent.GetContainment(child));
+        Assert.Equal(Containment.NotContained, container.GetContainment(child));
     }
 
     // Removes its own sprite from the field during update and records the
@@ -91,7 +91,7 @@ public class ContainmentTests
         public void Update(in UpdateContext context)
         {
             var sprite = (Sprite3D)Entity;
-            var field = (PlayField3D)sprite.Parent!;
+            var field = (PlayField3D)sprite.Container!;
             field.RemoveSprite(sprite);
             Observed = field.GetContainment(sprite);
         }

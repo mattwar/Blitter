@@ -63,11 +63,11 @@ public class Sprite3D : Entity, IDrawable3D
     /// <summary>
     /// The host this sprite belongs to.
     /// </summary>
-    public ISpriteHost3D? Host => this.Parent as ISpriteHost3D;
+    public ISpriteHost3D? Host => this.Container as ISpriteHost3D;
 
     /// <summary>How long this sprite has been a member of its current <see cref="Host"/>.</summary>
     public TimeSpan Age =>
-        this.Parent?.GetAge(this) ?? TimeSpan.Zero;
+        this.Container?.GetAge(this) ?? TimeSpan.Zero;
 
     /// <summary>
     /// The sprite's world-space collision shape: the current

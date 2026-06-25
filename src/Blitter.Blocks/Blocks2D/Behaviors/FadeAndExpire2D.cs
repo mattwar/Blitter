@@ -19,7 +19,7 @@ public sealed class FadeAndExpire2D : Behavior, IUpdatable
 
         if (Duration <= TimeSpan.Zero || age >= Duration)
         {
-            entity.RemoveFromParent();
+            entity.RemoveFromContainer();
             return;
         }
 

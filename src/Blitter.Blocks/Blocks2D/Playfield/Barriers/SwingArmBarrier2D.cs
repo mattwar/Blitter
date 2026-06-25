@@ -70,7 +70,7 @@ public class SwingArmBarrier2D : Barrier2D
         // Expose the swing's surface velocity to SurfaceBounce2D via a
         // capability behavior instead of a barrier-template method.
         if (!this.TryGetBehavior<ISurfaceVelocity2D>(out _))
-            this.AddBehavior(new SurfaceVelocityProvider());
+            this.GetOrAddBehavior<SurfaceVelocityProvider>();
     }
 
     public override void Update(in UpdateContext context)

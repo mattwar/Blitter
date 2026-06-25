@@ -17,8 +17,8 @@ public class BehaviorTests
     public void WrapInBounds_WrapsLeftEdgeToRight()
     {
         var sprite = new Sprite2D { Center = new Vector2(-10, 50) };
-        sprite.AddTrait(new Bounds2D { Rect = new Rect(0, 0, 100, 100) });
-        sprite.AddBehavior(new WrapInBounds2D());
+        sprite.GetOrAddTrait<Bounds2D>().Rect = new Rect(0, 0, 100, 100);
+        sprite.GetOrAddBehavior<WrapInBounds2D>();
         sprite.Update(Context(0));
         Assert.Equal(new Vector2(90, 50), sprite.Center);
     }
@@ -27,8 +27,8 @@ public class BehaviorTests
     public void WrapInBounds_WrapsBottomToTop()
     {
         var sprite = new Sprite2D { Center = new Vector2(50, 110) };
-        sprite.AddTrait(new Bounds2D { Rect = new Rect(0, 0, 100, 100) });
-        sprite.AddBehavior(new WrapInBounds2D());
+        sprite.GetOrAddTrait<Bounds2D>().Rect = new Rect(0, 0, 100, 100);
+        sprite.GetOrAddBehavior<WrapInBounds2D>();
         sprite.Update(Context(0));
         Assert.Equal(new Vector2(50, 10), sprite.Center);
     }
@@ -37,8 +37,8 @@ public class BehaviorTests
     public void WrapInBounds_InsideBounds_LeavesCenterAlone()
     {
         var sprite = new Sprite2D { Center = new Vector2(50, 50) };
-        sprite.AddTrait(new Bounds2D { Rect = new Rect(0, 0, 100, 100) });
-        sprite.AddBehavior(new WrapInBounds2D());
+        sprite.GetOrAddTrait<Bounds2D>().Rect = new Rect(0, 0, 100, 100);
+        sprite.GetOrAddBehavior<WrapInBounds2D>();
         sprite.Update(Context(0));
         Assert.Equal(new Vector2(50, 50), sprite.Center);
     }
@@ -48,8 +48,8 @@ public class BehaviorTests
     {
         var recorder = new EventRecorder<Wrapped2DEventArgs>();
         var sprite = new Sprite2D { Center = new Vector2(-1, 50) };
-        sprite.AddTrait(new Bounds2D { Rect = new Rect(0, 0, 100, 100) });
-        sprite.AddBehavior(new WrapInBounds2D { Wrapped = recorder });
+        sprite.GetOrAddTrait<Bounds2D>().Rect = new Rect(0, 0, 100, 100);
+        sprite.GetOrAddBehavior<WrapInBounds2D>().Wrapped = recorder;
         sprite.Update(Context(0));
         Assert.Equal(1, recorder.Count);
     }
