@@ -65,10 +65,6 @@ public class Sprite3D : Entity, IDrawable3D
     /// </summary>
     public ISpriteHost3D? Host => this.Container as ISpriteHost3D;
 
-    /// <summary>How long this sprite has been a member of its current <see cref="Host"/>.</summary>
-    public TimeSpan Age =>
-        this.Container?.GetAge(this) ?? TimeSpan.Zero;
-
     /// <summary>
     /// The sprite's world-space collision shape: the current
     /// <see cref="Visual"/>'s <see cref="Visual3D.HitShape"/> combined
@@ -101,6 +97,6 @@ public class Sprite3D : Entity, IDrawable3D
     {
         if (!this.Visible)
             return;
-        this.Visual?.Draw(renderer, Transform.Pose, this.Tint, this.Age);
+        this.Visual?.Draw(renderer, Transform.Pose, this.Tint, TimeSpan.Zero);
     }
 }

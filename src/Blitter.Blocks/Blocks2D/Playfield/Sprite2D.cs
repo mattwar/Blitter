@@ -105,12 +105,6 @@ public class Sprite2D : Entity, IDrawable2D
     public Scene2D Scene => PlayField.Scene;
 
     /// <summary>
-    /// How long this sprite has been a member of its current <see cref="PlayField"/>.
-    /// </summary>
-    public TimeSpan Age =>
-        this.Container?.GetAge(this) ?? TimeSpan.Zero;
-
-    /// <summary>
     /// The sprite's world-space collision shape, provided by its
     /// <see cref="IColliderShape2D"/> behavior. Empty when the sprite has no
     /// collider (e.g. before it is attached to a playfield). Not overridable:
@@ -130,7 +124,7 @@ public class Sprite2D : Entity, IDrawable2D
     /// <summary>Render the sprite at its current transform.</summary>
     public virtual void Draw(Renderer2D renderer)
     {
-        this.Visual?.Draw(renderer, new Pose2D(Center, Rotation, Scale), this.Tint, this.Age, this.Flipped);
+        this.Visual?.Draw(renderer, new Pose2D(Center, Rotation, Scale), this.Tint, TimeSpan.Zero, this.Flipped);
     }
 
     /// <summary>

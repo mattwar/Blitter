@@ -8,7 +8,6 @@ public class ContainmentTests
     {
         public IReadOnlyList<IEntity> Entities => [];
         public void AddEntity(IEntity child) { }
-        public TimeSpan GetAge(IEntity child) => TimeSpan.Zero;
         public void RemoveEntity(IEntity child) { }
     }
 

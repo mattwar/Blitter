@@ -64,11 +64,6 @@ public class Scene2D : Entity, IContainerEntity
     }
 
     /// <summary>
-    /// Scenes do not track layer age; always <see cref="TimeSpan.Zero"/>.
-    /// </summary>
-    public TimeSpan GetAge(IEntity child) => TimeSpan.Zero;
-
-    /// <summary>
     /// Removes <paramref name="child"/> from the scene when it is one of its
     /// layers. No-op otherwise.
     /// </summary>

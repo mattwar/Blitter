@@ -474,17 +474,12 @@ public abstract class ChunkSource3D : IChunkSource3D
 
     public virtual void Update(in UpdateContext context)
     {
-        this.Elapsed += context.ElapsedSinceLastUpdate;
-
         // Open a new frame: last frame's retired sprites have already been
         // reaped from their chunks, so clear the pending-removal set.
         _removing.Clear();
     }
 
     #region ISpriteHost3D
-
-    /// <inheritdoc/>
-    public TimeSpan Elapsed { get; private set; }
 
     /// <summary>
     /// Adds <paramref name="sprite"/> to the chunk that contains its current <see cref="Sprite3D.Position"/>.

@@ -1,9 +1,9 @@
 namespace Blitter.Blocks;
 
 /// <summary>
-/// An <see cref="IEntity"/> that owns child entities: it answers how long a
-/// child has been a member and can remove a child without the caller needing
-/// to know the child's concrete type or which internal list holds it.
+/// An <see cref="IEntity"/> that owns child entities and can remove a child
+/// without the caller needing to know the child's concrete type or which
+/// internal list holds it.
 /// </summary>
 public interface IContainerEntity : IEntity
 {
@@ -16,12 +16,6 @@ public interface IContainerEntity : IEntity
     /// Adds <paramref name="child"/> to this container.
     /// </summary>
     void AddEntity(IEntity child);
-
-    /// <summary>
-    /// How long <paramref name="child"/> has been a member of this container,
-    /// or <see cref="TimeSpan.Zero"/> if it is not a tracked member.
-    /// </summary>
-    TimeSpan GetAge(IEntity child);
 
     /// <summary>
     /// Removes <paramref name="child"/> from this container. No-op if the

@@ -57,14 +57,6 @@ public static class EntityExtensions
                 $"Entity has no trait of type {typeof(T).Name}.");
 
     /// <summary>
-    /// How long <paramref name="entity"/> has been a member of its current
-    /// <see cref="IEntity.Container"/> container, or <see cref="TimeSpan.Zero"/>
-    /// when it has no container.
-    /// </summary>
-    public static TimeSpan Age(this IEntity entity) =>
-        entity.Container?.GetAge(entity) ?? TimeSpan.Zero;
-
-    /// <summary>
     /// Removes <paramref name="entity"/> from its current
     /// <see cref="IEntity.Container"/> container, if any.
     /// </summary>

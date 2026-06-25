@@ -12,12 +12,14 @@ public sealed class FadeAndExpire2D : Behavior, IUpdatable
     /// <summary>Total lifetime over which the alpha ramps to zero.</summary>
     public TimeSpan Duration { get; set; } = TimeSpan.FromSeconds(1);
 
+    private TimeSpan _elapsed;
+
     public void Update(in UpdateContext context)
     {
         var entity = this.Entity;
-        var age = entity.Age();
+        _elapsed += context.ElapsedSinceLastUpdate;
 
-        if (Duration <= TimeSpan.Zero || age >= Duration)
+        if (Duration <= TimeSpan.Zero || _elapsed >= Duration)
         {
             entity.RemoveFromContainer();
             return;
@@ -25,7 +27,7 @@ public sealed class FadeAndExpire2D : Behavior, IUpdatable
 
         if (entity.TryGetTrait<Appearance2D>(out var appearance))
         {
-            var t = (float)(age.TotalSeconds / Duration.TotalSeconds);
+            var t = (float)(_elapsed.TotalSeconds / Duration.TotalSeconds);
             var tint = appearance.Tint;
             byte a = (byte)Math.Clamp((1f - t) * 255f, 0f, 255f);
             appearance.Tint = new Color(tint.R, tint.G, tint.B, a);

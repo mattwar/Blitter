@@ -18,10 +18,6 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
     private readonly List<Barrier3D> _pendingRemoveBarriers = new();
     private bool _updating;
 
-    // Spawn timestamp (this playfield's Elapsed clock) per member, used to
-    // answer GetAge. The playfield owns this; sprites carry no age field.
-    private readonly Dictionary<IEntity, TimeSpan> _spawnedAt = new(ReferenceEqualityComparer.Instance);
-
     public PlayField3D()
     {
     }
@@ -50,11 +46,6 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
     /// <inheritdoc/>
     public IReadOnlyList<IEntity> Entities => [.. _sprites, .. _barriers];
 
-    /// <summary>
-    /// Total time since construction of the playfield.
-    /// </summary>
-    public TimeSpan Elapsed { get; private set; }
-
     /// <summary>Adds a sprite to the playfield.</summary>
     public void AddSprite(Sprite3D sprite)
     {
@@ -76,7 +67,6 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
 
         // Container assignment drives attachment (Entity.OnAttach wires behaviors).
         sprite.Container = this;
-        _spawnedAt[sprite] = Elapsed;
 
         if (_updating)
         {
@@ -134,10 +124,6 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
     // A sprite is live while it is a member and not pending removal this
     // frame. Membership/removal is host-owned state; sprites carry no flag.
     private bool IsLive(Sprite3D sprite) => !_pendingRemoveSprites.Contains(sprite);
-
-    /// <inheritdoc/>
-    public TimeSpan GetAge(IEntity child) =>
-        _spawnedAt.TryGetValue(child, out var t) ? Elapsed - t : TimeSpan.Zero;
 
     /// <summary>
     /// Removes <paramref name="child"/> from this playfield, dispatching to the
@@ -220,7 +206,6 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
 
     private void Detach(Sprite3D sprite, bool retired)
     {
-        _spawnedAt.Remove(sprite);
         if (sprite.Container == this)
             sprite.Container = null;
         if (retired)
@@ -240,8 +225,6 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
     /// <inheritdoc/>
     public override void Update(in UpdateContext context)
     {
-        Elapsed += context.ElapsedSinceLastUpdate;
-
         _updating = true;
         try
         {

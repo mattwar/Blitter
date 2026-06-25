@@ -361,11 +361,13 @@ sealed class Rocket : Sprite2D
     /// </summary>
     public ImageSource Flame { get; set; } = new();
 
+    public TimeSpan Elapsed { get; private set; }
+
     public TimeSpan FlameUntil { get; private set; }
-    public bool IsFlameVisible => Age < FlameUntil;
+    public bool IsFlameVisible => Elapsed < FlameUntil;
 
     public TimeSpan ShieldUntil { get; private set; }
-    public bool IsShieldVisible => Age < ShieldUntil;
+    public bool IsShieldVisible => Elapsed < ShieldUntil;
 
     private const int ShieldVisualSize = 256;
     private const float ShieldDrawDiameterScale = 2.35f;
@@ -375,10 +377,10 @@ sealed class Rocket : Sprite2D
     private static readonly Visual2D ShieldVisual = MakeShieldVisual(ShieldVisualSize);
 
     // Set by SmashAsteroidBehavior on a radioactive hit. While
-    // Age < StunUntil the rocket spins freely, ignores input, and
+    // Elapsed < StunUntil the rocket spins freely, ignores input, and
     // bounces off asteroids instead of smashing them.
     public TimeSpan StunUntil { get; set; }
-    public bool IsStunned => Age < StunUntil;
+    public bool IsStunned => Elapsed < StunUntil;
 
     public Rocket()
     {
@@ -390,6 +392,12 @@ sealed class Rocket : Sprite2D
             new FaceHeadingUnlessStunned(),
             new BounceInBounds2D { Bounced = new BounceJitter() },  // bounce off the walls
         ];
+    }
+
+    public override void Update(in UpdateContext context)
+    {
+        Elapsed += context.ElapsedSinceLastUpdate;
+        base.Update(context);
     }
 
     private sealed class FaceHeadingUnlessStunned : Behavior, IUpdatable
@@ -416,7 +424,7 @@ sealed class Rocket : Sprite2D
 
     public void Stun(TimeSpan duration)
     {
-        StunUntil = Age + duration;
+        StunUntil = Elapsed + duration;
         // Random direction & rate for the spin.
         var rate = Random.Shared.Next(240, 540);
         if (Random.Shared.Next(2) == 0) rate = -rate;
@@ -428,7 +436,7 @@ sealed class Rocket : Sprite2D
         if (duration <= TimeSpan.Zero)
             return;
 
-        var until = Age + duration;
+        var until = Elapsed + duration;
         if (until > FlameUntil)
             FlameUntil = until;
     }
@@ -438,7 +446,7 @@ sealed class Rocket : Sprite2D
         if (duration == default)
             duration = TimeSpan.FromMilliseconds(150);
 
-        var until = Age + duration;
+        var until = Elapsed + duration;
         if (until > ShieldUntil)
             ShieldUntil = until;
     }
@@ -448,21 +456,21 @@ sealed class Rocket : Sprite2D
         var pose = new Pose2D(Center, Rotation, Scale);
 
         if (IsFlameVisible)
-            Flame.GetComposedVisual()?.Draw(renderer, pose, Color.White, Age, Flipped);
+            Flame.GetComposedVisual()?.Draw(renderer, pose, Color.White, Elapsed, Flipped);
 
-        Image.GetComposedVisual()?.Draw(renderer, pose, Tint, Age, Flipped);
+        Image.GetComposedVisual()?.Draw(renderer, pose, Tint, Elapsed, Flipped);
 
         // Shield image drawn at the bounding circle size, rotated with the heading.
         if (IsShieldVisible)
         {
             const float ShieldDuration = 0.15f;
-            var shieldAge = (float)(Age - (ShieldUntil - TimeSpan.FromSeconds(ShieldDuration))).TotalSeconds;
+            var shieldAge = (float)(Elapsed - (ShieldUntil - TimeSpan.FromSeconds(ShieldDuration))).TotalSeconds;
             var alpha = Math.Clamp(1f - shieldAge / ShieldDuration, 0f, 1f);
             var shieldRadius = HitShape.BoundingCircle.Radius;
             var shieldScale = (shieldRadius * ShieldDrawDiameterScale) / ShieldVisualSize;
             var shieldPose = new Pose2D(Center, Heading, shieldScale);
             var tint = new Color(255, 255, 255, (byte)(255 * alpha));
-            ShieldVisual.Draw(renderer, shieldPose, tint, Age, Flipped);
+            ShieldVisual.Draw(renderer, shieldPose, tint, Elapsed, Flipped);
         }
     }
 
@@ -617,53 +625,44 @@ sealed class AsteroidSmasher : Behavior, IHittable2D
 
     public void OnHit(in Hit2D hit)
     {
-        if (this.Entity is not Sprite2D self || hit.Other is not Sprite2D other)
+        if (this.Entity is not Rocket rocket || hit.Other is not Asteroid asteroid)
             return;
 
         // Grace period: ignore freshly-spawned shards so they
         // can spread out before being hit again. Without this
         // the rocket sits inside the impact zone and devours
         // every shard on the very next frame.
-        if (other.Age < TimeSpan.FromMilliseconds(400))
-            return;
-
-        if (other is not Asteroid asteroid)
+        if (asteroid.Elapsed < TimeSpan.FromMilliseconds(400))
             return;
 
         // Shield flash on any collision (before deflect/stun/smash logic)
-        if (self is Rocket rocketShield)
-        {
-            rocketShield.TriggerShieldFlash();
-        }
+        rocket.TriggerShieldFlash();
 
         // Cooldown after a deflect so we don't re-trigger every
         // frame while the rocket is still overlapping this rock.
-        if (asteroid.Age < asteroid.HitCooldownUntil)
+        if (asteroid.Elapsed < asteroid.HitCooldownUntil)
             return;
 
         // Capture impact speed before applying momentum loss so the
         // smash-threshold check reflects how fast the player was
         // actually going at the moment of contact.
-        float impactSpeed = self is Rocket r ? r.Speed : 0f;
+        float impactSpeed = rocket.Speed;
 
         // Any hit costs momentum — scaled by the asteroid's mass so
         // the big rocks really pull you up short. Player has to lean
         // on the thrusters to recover.
-        if (self is Rocket hitRocket)
-        {
-            var loss = 50f * asteroid.Scale;
-            hitRocket.Speed = Math.Max(0f, hitRocket.Speed - loss);
-        }
+        var loss = 50f * asteroid.Scale;
+        rocket.Speed = Math.Max(0f, rocket.Speed - loss);
 
         // Stunned rocket can't smash — it caroms off instead, and
         // shoves the asteroid the other way. No score, no shards.
-        if (self is Rocket { IsStunned: true })
+        if (rocket.IsStunned)
         {
-            var delta = self.Center - asteroid.Center;
+            var delta = rocket.Center - asteroid.Center;
             var awayFromAsteroid = MathF.Atan2(delta.Y, delta.X) * 180f / MathF.PI + 90f;
-            self.Heading = (awayFromAsteroid + 360f) % 360f;
+            rocket.Heading = (awayFromAsteroid + 360f) % 360f;
             asteroid.Heading = (awayFromAsteroid + 180f) % 360f;
-            asteroid.HitCooldownUntil = asteroid.Age + TimeSpan.FromMilliseconds(400);
+            asteroid.HitCooldownUntil = asteroid.Elapsed + TimeSpan.FromMilliseconds(400);
             Audio.Play(Sounds.Boing, volume: .2f);
             return;
         }
@@ -675,19 +674,19 @@ sealed class AsteroidSmasher : Behavior, IHittable2D
         const float SmashSpeed = 500f;
         if (impactSpeed < SmashSpeed)
         {
-            var delta = self.Center - asteroid.Center;
+            var delta = rocket.Center - asteroid.Center;
             var awayFromAsteroid = MathF.Atan2(delta.Y, delta.X) * 180f / MathF.PI + 90f;
-            self.Heading = NudgeToward(self.Heading, awayFromAsteroid, fraction: 0.35f, jitterDeg: 5f, maxDeg: 20f);
+            rocket.Heading = NudgeToward(rocket.Heading, awayFromAsteroid, fraction: 0.35f, jitterDeg: 5f, maxDeg: 20f);
             asteroid.Heading = NudgeToward(asteroid.Heading, awayFromAsteroid + 180f, fraction: 0.5f, jitterDeg: 8f, maxDeg: 25f);
-            asteroid.HitCooldownUntil = asteroid.Age + TimeSpan.FromMilliseconds(400);
+            asteroid.HitCooldownUntil = asteroid.Elapsed + TimeSpan.FromMilliseconds(400);
             Audio.Play(Sounds.Hurt, volume: .1f);
             return;
         }
 
         // Mark the meteor for removal; the playfield reaps it
         // on its next update pass.
-        other.PlayField.RemoveEntity(other);
-        self.Heading = (self.Heading + Random.Shared.Next(-15, 15) + 360f) % 360f;
+        asteroid.PlayField.RemoveEntity(asteroid);
+        rocket.Heading = (rocket.Heading + Random.Shared.Next(-15, 15) + 360f) % 360f;
         Audio.Play(Sounds.Explosion, volume: .3f);
 
         // Score & popup for gold ("valuable minerals") asteroids.
@@ -699,11 +698,11 @@ sealed class AsteroidSmasher : Behavior, IHittable2D
             // Combo: chain consecutive gold smashes within the
             // window for an N× multiplier (capped). Each scoring
             // hit extends the window from itself.
-            if (self.Age < _comboExpiresAt)
+            if (rocket.Elapsed < _comboExpiresAt)
                 _comboCount++;
             else
                 _comboCount = 1;
-            _comboExpiresAt = self.Age + ComboWindow;
+            _comboExpiresAt = rocket.Elapsed + ComboWindow;
             int multiplier = Math.Min(_comboCount, ComboMaxMultiplier);
 
             _scoreboard.Add(points * multiplier, asteroid.Center);
@@ -725,8 +724,7 @@ sealed class AsteroidSmasher : Behavior, IHittable2D
         // current speed but spins freely, ignores the player's
         // controls, and bounces off rather than smashing asteroids
         // until the stun wears off.
-        if (asteroid.Kind == AsteriodKind.Radioactive
-            && self is Rocket rocketStun)
+        if (asteroid.Kind == AsteriodKind.Radioactive)
         {
             // Radioactive hit breaks any combo streak — no chaining
             // through a penalty.
@@ -734,7 +732,7 @@ sealed class AsteroidSmasher : Behavior, IHittable2D
             _comboExpiresAt = TimeSpan.Zero;
 
             var stunDuration = TimeSpan.FromSeconds(4 * asteroid.Scale);
-            rocketStun.Stun(stunDuration);
+            rocket.Stun(stunDuration);
             Audio.Play(_radioactiveAlarm, volume: .2f);
 
             // Bigger rocks hurt more; round to tens — same shape as
@@ -777,7 +775,9 @@ sealed class Asteroid : Sprite2D
 
     public AsteriodKind Kind { get; }
 
-    // While Age < HitCooldownUntil this asteroid ignores rocket
+    public TimeSpan Elapsed { get; private set; }
+
+    // While Elapsed < HitCooldownUntil this asteroid ignores rocket
     // contacts — used after a deflect so we don't keep colliding
     // every frame while the two are still overlapping.
     public TimeSpan HitCooldownUntil { get; set; }
@@ -804,6 +804,12 @@ sealed class Asteroid : Sprite2D
 
         this.GetOrAddBehavior<Motion2D>();
         this.GetOrAddBehavior<BounceInBounds2D>();
+    }
+
+    public override void Update(in UpdateContext context)
+    {
+        Elapsed += context.ElapsedSinceLastUpdate;
+        base.Update(context);
     }
 
     public void Smash()

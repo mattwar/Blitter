@@ -13,7 +13,6 @@ public class PlayField2D : Layer2D, IContainerEntity
     private readonly HashSet<IEntity> _pendingRemoveEntities = new(ReferenceEqualityComparer.Instance);
     private bool _updating;
 
-    private readonly Dictionary<IEntity, TimeSpan> _spawnedAt = new(ReferenceEqualityComparer.Instance);
     private readonly Bounds2D _bounds;
     private readonly Collider2D _collider;
 
@@ -46,7 +45,6 @@ public class PlayField2D : Layer2D, IContainerEntity
         {
             (entity.Container as PlayField2D)?.RemoveImmediate(entity);
             SetContainer(entity, this);
-            _spawnedAt[entity] = Elapsed;
             _entities.Add(entity);
         }
     }
@@ -89,11 +87,6 @@ public class PlayField2D : Layer2D, IContainerEntity
         TryGetEntity<T>(out var entity) ? entity : throw new InvalidOperationException($"No entity of type {typeof(T).Name}.");
 
     /// <summary>
-    /// Total time accumulated from <see cref="UpdateContext"/> deltas passed through this playfield's <see cref="Update"/>.
-    /// </summary>
-    public TimeSpan Elapsed { get; private set; }
-
-    /// <summary>
     /// Optional world rectangle larger (or smaller) than the visible viewport.
     /// When set, behaviors can resolve this rectangle as their
     /// <see cref="Bounds2D"/> trait instead of the renderer's viewport.
@@ -125,17 +118,12 @@ public class PlayField2D : Layer2D, IContainerEntity
 
         if (child.Container != this)
             SetContainer(child, this);
-        _spawnedAt[child] = Elapsed;
 
         if (_updating)
             _pendingAddEntities.Add(child);
         else
             _entities.Add(child);
     }
-
-    /// <inheritdoc/>
-    public TimeSpan GetAge(IEntity child) =>
-        _spawnedAt.TryGetValue(child, out var t) ? Elapsed - t : TimeSpan.Zero;
 
     /// <inheritdoc/>
     public void RemoveEntity(IEntity child)
@@ -190,7 +178,6 @@ public class PlayField2D : Layer2D, IContainerEntity
 
     private void Detach(IEntity child)
     {
-        _spawnedAt.Remove(child);
         if (child.Container == this)
             SetContainer(child, null);
     }
@@ -206,8 +193,6 @@ public class PlayField2D : Layer2D, IContainerEntity
     /// <inheritdoc/>
     public override void Update(in UpdateContext context)
     {
-        Elapsed += context.ElapsedSinceLastUpdate;
-
         _bounds.Rect = WorldBounds
             ?? (this.Container as Scene2D)?.RendererOrNull?.LogicalBounds
             ?? _bounds.Rect;
