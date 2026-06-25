@@ -61,10 +61,10 @@ public abstract class Spawner2D : Behavior, IUpdatable
     /// <summary>Resolves the playfield that receives spawned sprites.</summary>
     protected virtual PlayField2D ResolveTarget()
     {
-        if (Entity is IContainerEntity container)
+        if (Entity is IContainer container)
             return container.GetEntity<PlayField2D>();
 
-        throw new InvalidOperationException("Spawner2D must be attached to an IContainerEntity or override ResolveTarget().");
+        throw new InvalidOperationException("Spawner2D must be attached to an IContainer or override ResolveTarget().");
     }
 
     /// <summary>Returns whether <paramref name="sprite"/> counts toward <see cref="MaxAlive"/>.</summary>

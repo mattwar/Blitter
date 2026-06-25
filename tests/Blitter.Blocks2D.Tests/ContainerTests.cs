@@ -1,11 +1,11 @@
 namespace Blitter.Blocks2D.Tests;
 
-public class ContainerEntityTests
+public class ContainerTests
 {
     [Fact]
     public void AddEntity_AttachesChild()
     {
-        var container = new ContainerEntity();
+        var container = new Container();
         var child = new Entity();
 
         container.AddEntity(child);
@@ -17,7 +17,7 @@ public class ContainerEntityTests
     [Fact]
     public void RemoveEntity_DetachesChild()
     {
-        var container = new ContainerEntity();
+        var container = new Container();
         var child = new Entity();
         container.AddEntity(child);
 
@@ -32,7 +32,7 @@ public class ContainerEntityTests
     {
         var child = new Entity();
 
-        var container = new ContainerEntity { Entities = [child] };
+        var container = new Container { Entities = [child] };
 
         Assert.Same(container, child.Container);
         Assert.Same(child, Assert.Single(container.Entities));
@@ -41,8 +41,8 @@ public class ContainerEntityTests
     [Fact]
     public void AddEntity_ReparentsChild()
     {
-        var first = new ContainerEntity();
-        var second = new ContainerEntity();
+        var first = new Container();
+        var second = new Container();
         var child = new Entity();
         first.AddEntity(child);
 

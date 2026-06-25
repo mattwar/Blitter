@@ -8,7 +8,7 @@ namespace Blitter.Blocks2D;
 /// so it can be positioned, named, and resolved like any other node.
 /// </summary>
 /// <remarks>
-/// Place this before world layers in <see cref="IContainerEntity.Entities"/>: the camera is
+/// Place this before world layers in <see cref="IContainer.Entities"/>: the camera is
 /// assigned when this layer draws, so every layer composited after it sees
 /// the camera that same frame. The <see cref="Camera2D"/> instance is stable
 /// — only its <see cref="Camera2D.Position"/> mutates — so a behaviour such

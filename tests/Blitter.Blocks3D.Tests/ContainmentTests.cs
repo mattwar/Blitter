@@ -4,7 +4,7 @@ namespace Blitter.Tests;
 
 public class ContainmentTests
 {
-    private sealed class EmptyContainer : Entity, IContainerEntity
+    private sealed class EmptyContainer : Entity, IContainer
     {
         private readonly List<IEntity> _entities = new();
 
@@ -79,7 +79,7 @@ public class ContainmentTests
     [Fact]
     public void Container_Default_ReportsListMembership()
     {
-        IContainerEntity container = new EmptyContainer();
+        IContainer container = new EmptyContainer();
         var child = new Sprite3D();
         var other = new Sprite3D();
 

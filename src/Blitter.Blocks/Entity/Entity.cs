@@ -8,7 +8,7 @@ public class Entity : IEntity
     /// <summary>
     /// The container this entity belongs, or null if this is the root.
     /// </summary>
-    public IContainerEntity? Container 
+    public IContainer? Container 
     { 
         get; 
         set

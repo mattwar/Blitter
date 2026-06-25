@@ -6,7 +6,7 @@ namespace Blitter.Blocks2D;
 /// The 2D world layer: owns a flat entity list, updates and draws live
 /// children, and runs 2D collision over those entities.
 /// </summary>
-public class PlayField2D : Layer2D, IContainerEntity, IUpdatable, IUpdateTraversalOwner
+public class PlayField2D : Layer2D, IContainer, IUpdatable, IUpdateTraversalOwner
 {
     private readonly List<IEntity> _entities = new();
     private readonly List<IEntity> _pendingAddEntities = new();
@@ -28,7 +28,7 @@ public class PlayField2D : Layer2D, IContainerEntity, IUpdatable, IUpdateTravers
         AdoptEntities(entities);
     }
 
-    private static void SetContainer(IEntity child, IContainerEntity? container)
+    private static void SetContainer(IEntity child, IContainer? container)
     {
         if (child is Entity entity)
         {

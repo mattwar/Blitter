@@ -3,9 +3,9 @@ namespace Blitter.Blocks2D.Tests;
 public class SceneLookupTests
 {
     // Wires layers into a root container without needing a window/renderer.
-    private static ContainerEntity SceneWith(params Layer2D[] layers)
+    private static Container SceneWith(params Layer2D[] layers)
     {
-        var scene = new ContainerEntity();
+        var scene = new Container();
         foreach (var layer in layers)
         {
             scene.AddEntity(layer);

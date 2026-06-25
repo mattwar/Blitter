@@ -164,7 +164,7 @@ var controller = new BreakoutController(window.Input, window.Renderer, ball, pad
 
 var hud = new BreakoutHud(controller, hudFont, bannerFont, W, H);
 
-var scene = new ContainerEntity
+var scene = new Container
 {
     Entities  = [ playField, popups, scoreboard, hud ],
     Behaviors = [ controller ],

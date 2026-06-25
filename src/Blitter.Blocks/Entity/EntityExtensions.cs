@@ -132,7 +132,7 @@ public static class EntityExtensions
     /// Tries to resolve the single child entity assignable to <typeparamref name="T"/>.
     /// Returns <c>false</c> if none. Throws if more than one matches.
     /// </summary>
-    public static bool TryGetEntity<T>(this IContainerEntity container, [NotNullWhen(true)] out T? entity) where T : class
+    public static bool TryGetEntity<T>(this IContainer container, [NotNullWhen(true)] out T? entity) where T : class
     {
         T? match = null;
         foreach (var candidate in container.Entities)
@@ -151,7 +151,7 @@ public static class EntityExtensions
     /// Resolves the single child entity assignable to <typeparamref name="T"/>.
     /// Throws if none exists or more than one matches.
     /// </summary>
-    public static T GetEntity<T>(this IContainerEntity container) where T : class =>
+    public static T GetEntity<T>(this IContainer container) where T : class =>
         container.TryGetEntity<T>(out var entity) ? entity : throw new InvalidOperationException($"No entity of type {typeof(T).Name}.");
 
     /// <summary>
@@ -160,7 +160,7 @@ public static class EntityExtensions
     /// name. Throws if the name is duplicated or the named entity is a
     /// different type.
     /// </summary>
-    public static bool TryGetEntity<T>(this IContainerEntity container, string name, [NotNullWhen(true)] out T? entity) where T : class
+    public static bool TryGetEntity<T>(this IContainer container, string name, [NotNullWhen(true)] out T? entity) where T : class
     {
         ArgumentNullException.ThrowIfNull(name);
         INamedEntity? named = null;
@@ -190,6 +190,6 @@ public static class EntityExtensions
     /// <typeparamref name="T"/>. Throws if no such entity exists or it is a
     /// different type.
     /// </summary>
-    public static T GetEntity<T>(this IContainerEntity container, string name) where T : class =>
+    public static T GetEntity<T>(this IContainer container, string name) where T : class =>
         container.TryGetEntity<T>(name, out var entity) ? entity : throw new InvalidOperationException($"No entity named '{name}'.");
 }

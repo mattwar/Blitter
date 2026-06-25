@@ -24,7 +24,7 @@ public sealed class Drawer3D
 
         DrawBehaviors(entity, renderer);
 
-        if (entity is not IContainerEntity container)
+        if (entity is not IContainer container)
             return;
 
         for (int i = 0; i < container.Entities.Count; i++)

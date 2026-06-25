@@ -21,7 +21,7 @@ public sealed class Updater
         if (entity is IUpdateTraversalOwner)
             return;
 
-        if (entity is not IContainerEntity container)
+        if (entity is not IContainer container)
             return;
 
         for (int i = 0; i < container.Entities.Count; i++)
@@ -34,7 +34,7 @@ public sealed class Updater
     /// Updates <paramref name="entity"/> and its behaviors, but not child entities.
     /// Use when another operation owns child traversal.
     /// </summary>
-    public void UpdateEntity(IEntity entity, in EntityUpdateContext context)
+    private void UpdateEntity(IEntity entity, in EntityUpdateContext context)
     {
         if (entity is IUpdateEnabled { Enabled: false })
             return;
@@ -48,7 +48,7 @@ public sealed class Updater
     /// <summary>
     /// Updates all updatable behaviors attached to <paramref name="entity"/>.
     /// </summary>
-    public void UpdateBehaviors(IEntity entity, in EntityUpdateContext context)
+    private void UpdateBehaviors(IEntity entity, in EntityUpdateContext context)
     {
         for (int i = 0; i < entity.Behaviors.Count; i++)
         {

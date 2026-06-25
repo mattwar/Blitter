@@ -1,9 +1,9 @@
 namespace Blitter.Blocks;
 
 /// <summary>
-/// Default list-backed implementation of <see cref="IContainerEntity"/>.
+/// Default list-backed implementation of <see cref="IContainer"/>.
 /// </summary>
-public class ContainerEntity : Entity, IContainerEntity
+public class Container : Entity, IContainer
 {
     private readonly List<IEntity> _entities = new();
 

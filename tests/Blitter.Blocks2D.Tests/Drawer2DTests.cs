@@ -6,7 +6,7 @@ public class Drawer2DTests
     public void Draw_WalksDrawableEntitiesAndBehaviors()
     {
         var calls = new List<string>();
-        var root = new ContainerEntity
+        var root = new Container
         {
             Behaviors = [new TestDrawableBehavior("root behavior", calls)],
             Entities = [new TestDrawableEntity("child", calls)]
@@ -37,7 +37,7 @@ public class Drawer2DTests
         public void Draw(Renderer2D renderer) => calls.Add(name);
     }
 
-    private sealed class TestDrawableContainer(string name, List<string> calls) : ContainerEntity, IDrawable2D
+    private sealed class TestDrawableContainer(string name, List<string> calls) : Container, IDrawable2D
     {
         public void Draw(Renderer2D renderer) => calls.Add(name);
     }

@@ -3,7 +3,7 @@ namespace Blitter.Blocks;
 /// <summary>
 /// An <see cref="IEntity"/> that contains other entities.
 /// </summary>
-public interface IContainerEntity : IEntity
+public interface IContainer : IEntity
 {
     /// <summary>
     /// The contained entities.

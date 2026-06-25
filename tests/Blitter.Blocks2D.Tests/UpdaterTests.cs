@@ -55,7 +55,7 @@ public class UpdaterTests
         }
     }
 
-    private class TestContainer : TestEntity, IContainerEntity
+    private class TestContainer : TestEntity, IContainer
     {
         private readonly List<IEntity> _entities = new();
 

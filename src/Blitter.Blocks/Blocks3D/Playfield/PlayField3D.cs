@@ -4,7 +4,7 @@ namespace Blitter.Blocks3D;
 /// The 3D "world" layer, containing a set of sprites and barriers
 /// that interact with each other.
 /// </summary>
-public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity, IUpdatable, IUpdateTraversalOwner
+public class PlayField3D : Layer3D, ISpriteHost3D, IContainer, IUpdatable, IUpdateTraversalOwner
 {
     private readonly List<Sprite3D> _sprites = new();
     private readonly List<Barrier3D> _barriers = new();

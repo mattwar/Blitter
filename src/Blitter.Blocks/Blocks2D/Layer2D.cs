@@ -14,7 +14,7 @@ public abstract class Layer2D : Entity, IDrawable2D, IUpdateEnabled, INamedEntit
 {
     /// <summary>
     /// Optional scene-unique name. When set, other nodes can resolve this
-    /// entity through <see cref="EntityExtensions.GetEntity{T}(IContainerEntity, string)"/> in their
+    /// entity through <see cref="EntityExtensions.GetEntity{T}(IContainer, string)"/> in their
     /// <c>OnAttach</c> hook instead of capturing it in a local variable.
     /// </summary>
     public string? Name { get; set; }

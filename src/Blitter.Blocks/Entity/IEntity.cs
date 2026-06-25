@@ -8,7 +8,7 @@ public interface IEntity
     /// <summary>
     /// The container of this entity, or <c>null</c> at the root.
     /// </summary>
-    IContainerEntity? Container { get; }
+    IContainer? Container { get; }
 
     /// <summary>
     /// The behaviors for this entity.
