@@ -16,16 +16,44 @@ namespace Blitter.Blocks2D;
 public sealed class Collider2D
 {
     private readonly Func<IEntity, bool> _isLive;
+    private readonly List<IEntity> _sprites = new();
+    private readonly List<IEntity> _barriers = new();
 
     public Collider2D(Func<IEntity, bool> isLive) => _isLive = isLive;
 
     /// <summary>
-    /// Detects overlaps among <paramref name="sprites"/> and between sprites
-    /// and <paramref name="barriers"/>, dispatching hits as it goes. Barriers
-    /// never collide with each other. Shapes are re-read between dispatches so
-    /// a handler that moves an entity is reflected immediately.
+    /// Detects overlaps among non-barrier colliders and between those colliders
+    /// and barrier colliders, dispatching hits as it goes. Barriers never
+    /// collide with each other. Shapes are re-read between dispatches so a
+    /// handler that moves an entity is reflected immediately.
     /// </summary>
-    public void Collide(IReadOnlyList<IEntity> sprites, IReadOnlyList<IEntity> barriers)
+    public void Collide(IReadOnlyList<IEntity> entities)
+    {
+        Partition(entities);
+        CollidePartitioned(_sprites, _barriers);
+    }
+
+    private void Partition(IReadOnlyList<IEntity> entities)
+    {
+        _sprites.Clear();
+        _barriers.Clear();
+
+        for (int i = 0; i < entities.Count; i++)
+        {
+            var entity = entities[i];
+            if (!_isLive(entity))
+                continue;
+            if (!TryGetHitShape(entity, out var shape) || shape.BoundingCircle.IsEmpty)
+                continue;
+
+            if (entity is IColliderBarrier2D)
+                _barriers.Add(entity);
+            else
+                _sprites.Add(entity);
+        }
+    }
+
+    private void CollidePartitioned(IReadOnlyList<IEntity> sprites, IReadOnlyList<IEntity> barriers)
     {
         // sprite-vs-sprite
         for (int i = 0; i < sprites.Count; i++)

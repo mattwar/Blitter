@@ -47,6 +47,9 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
     /// </summary>
     public IReadOnlyList<Barrier3D> Barriers => _barriers;
 
+    /// <inheritdoc/>
+    public IReadOnlyList<IEntity> Entities => [.. _sprites, .. _barriers];
+
     /// <summary>
     /// Total time since construction of the playfield.
     /// </summary>
@@ -82,6 +85,22 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
         else
         {
             _sprites.Add(sprite);
+        }
+    }
+
+    /// <inheritdoc/>
+    public void AddEntity(IEntity child)
+    {
+        switch (child)
+        {
+            case Sprite3D sprite:
+                AddSprite(sprite);
+                break;
+            case Barrier3D barrier:
+                AddBarrier(barrier);
+                break;
+            default:
+                throw new InvalidOperationException("PlayField3D can only contain Sprite3D and Barrier3D entities.");
         }
     }
 
@@ -142,7 +161,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
     /// Reports whether <paramref name="child"/> is a sprite or barrier this
     /// playfield contains, is removing this frame, or does not hold.
     /// </summary>
-    public override Containment GetContainment(IEntity child)
+    public Containment GetContainment(IEntity child)
     {
         if (child is Sprite3D sprite)
         {

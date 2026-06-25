@@ -106,8 +106,9 @@ public sealed class MinimapLayer2D : Layer2D
             ScreenRect.X + (worldPos.X - world.X) * sx,
             ScreenRect.Y + (worldPos.Y - world.Y) * sy);
 
-        foreach (var sprite in Source.Sprites)
+        foreach (var sprite in Source.Entities)
         {
+            if (sprite is IColliderBarrier2D) continue;
             if (Source.GetContainment(sprite) == Containment.Removing) continue;
             if (MarkerSelector(sprite) is not { } m) continue;
             if (m.Radius <= 0f || m.Color.A == 0) continue;

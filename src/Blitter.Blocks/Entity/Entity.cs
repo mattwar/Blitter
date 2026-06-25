@@ -155,18 +155,6 @@ public class Entity : IEntity
     }
 
     /// <summary>
-    /// Reports the membership state of <paramref name="child"/> within this entity. 
-    /// </summary>
-    public virtual Containment GetContainment(IEntity child) => 
-        Containment.NotContained;
-
-    /// <summary>
-    /// Determines whether this entity contains the specified <paramref name="child"/>.
-    /// </summary>
-    public bool Contains(IEntity child) => 
-        GetContainment(child) == Containment.Contained;
-
-    /// <summary>
     /// Advances the entity one tick by applying each attached behavior in order.
     /// </summary>
     public virtual void Update(in UpdateContext context)

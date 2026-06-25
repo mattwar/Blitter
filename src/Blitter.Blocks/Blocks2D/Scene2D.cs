@@ -31,6 +31,17 @@ public class Scene2D : Entity, IContainerEntity
         }   
     }
 
+    /// <inheritdoc/>
+    public IReadOnlyList<IEntity> Entities => _layers;
+
+    /// <inheritdoc/>
+    public void AddEntity(IEntity child)
+    {
+        if (child is not Layer2D layer)
+            throw new InvalidOperationException("Scene2D can only contain Layer2D entities.");
+        AddLayer(layer);
+    }
+
     public void AddLayer(Layer2D layer)
     {
         // attach any layers added via object initialization
@@ -72,7 +83,7 @@ public class Scene2D : Entity, IContainerEntity
     /// Scenes remove layers immediately, so this never returns
     /// <see cref="Containment.Removing"/>.
     /// </summary>
-    public override Containment GetContainment(IEntity child) =>
+    public Containment GetContainment(IEntity child) =>
         child is Layer2D layer && _layers.Contains(layer)
             ? Containment.Contained
             : Containment.NotContained;

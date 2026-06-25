@@ -63,7 +63,7 @@ public class SceneLookupTests
         var sprite = new Sprite2D();
         var playfield = new PlayField2D();
         sprite.AddBehavior(follow);
-        playfield.AddSprite(sprite);
+        playfield.AddEntity(sprite);
         SceneWith(cameraLayer, playfield);
 
         sprite.Update(new UpdateContext());
@@ -80,7 +80,7 @@ public class SceneLookupTests
         var sprite = new Sprite2D();
         var playfield = new PlayField2D();
         sprite.AddBehavior(follow);
-        playfield.AddSprite(sprite);
+        playfield.AddEntity(sprite);
         SceneWith(world, hud, playfield);
 
         sprite.Update(new UpdateContext());
@@ -97,7 +97,7 @@ public class SceneLookupTests
         var sprite = new Sprite2D();
         var playfield = new PlayField2D();
         sprite.AddBehavior(follow);
-        playfield.AddSprite(sprite);
+        playfield.AddEntity(sprite);
         SceneWith(cameraLayer, playfield);
 
         sprite.Update(new UpdateContext());

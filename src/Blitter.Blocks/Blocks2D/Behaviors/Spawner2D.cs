@@ -126,13 +126,13 @@ public abstract class Spawner2D : Behavior, IUpdatable
 
         if (MaxAlive is int cap)
         {
-            int alive = target.Sprites.Count(CountsTowardMaxAlive);
+            int alive = target.Entities.Count(entity => entity is not IColliderBarrier2D && CountsTowardMaxAlive(entity));
             if (alive >= cap)
                 return false;
         }
 
         var sprite = CreateSprite();
-        target.AddSprite(sprite);
+        target.AddEntity(sprite);
         SpawnedCount++;
         var args = new SpriteSpawned2DEventArgs(this, sprite);
         Spawned?.OnEvent(in args);

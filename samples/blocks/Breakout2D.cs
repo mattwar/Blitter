@@ -95,12 +95,13 @@ var scoreboard = new ScoreLayer2D
 var playField = new PlayField2D { WorldBounds = new Rect(0, 0, W, H) };
 
 // Outer walls: top + two sides. Bottom is open (drain).
-playField.AddBarriers(new Barrier2D[]
+foreach (var barrier in new Barrier2D[]
 {
     new LineBarrier2D(new Vector2(WallInset, WallInset),       new Vector2(W - WallInset, WallInset)),       // top
     new LineBarrier2D(new Vector2(WallInset, H),               new Vector2(WallInset, WallInset)),           // left (wound so normal points right)
     new LineBarrier2D(new Vector2(W - WallInset, WallInset),   new Vector2(W - WallInset, H)),               // right
-});
+})
+    playField.AddEntity(barrier);
 
 // Bricks: rows colored top-to-bottom, more points the higher you reach.
 var bricks = new List<Brick>();
@@ -121,7 +122,7 @@ for (int r = 0; r < BrickRows; r++)
             Popups = popups,
         };
         bricks.Add(brick);
-        playField.AddBarrier(brick);
+        playField.AddEntity(brick);
     }
 }
 
@@ -135,7 +136,7 @@ var paddle = new Paddle(PaddleHalfW, PaddleHalfH)
     XMin = WallInset + PaddleHalfW,
     XMax = W - WallInset - PaddleHalfW,
 };
-playField.AddBarrier(paddle);
+playField.AddEntity(paddle);
 
 // Ball with a real hit radius. Visual is procedural so we can keep
 // the file self-contained.
@@ -154,7 +155,7 @@ var ball = new BreakoutBall(BallRadius)
         new SpeedClamp2D { Min = 240f, Max = BallMaxSpeed },
     ],
 };
-playField.AddSprite(ball);
+playField.AddEntity(ball);
 
 // HUD layer: lives, banner text.
 var controller = new BreakoutController(window.Input, window.Renderer, ball, paddle, bricks,
@@ -403,7 +404,7 @@ sealed class Brick : Barrier2D
         IsAlive = true;
         this.GetOrAddTrait<CollisionShape2D>().Shape =
             new BoxHitShape2D(Vector2.Zero, new Vector2(HalfWidth, HalfHeight));
-        playField.AddBarrier(this);
+        playField.AddEntity(this);
     }
 
     public Brick(Vector2 center, float width, float height, Color color, long points)
@@ -474,7 +475,7 @@ sealed class Brick : Barrier2D
         this.GetOrAddTrait<CollisionShape2D>().Shape = HitShape2D.None;
         // Remove on next safe boundary so the collision pass doesn't
         // see this barrier again this frame.
-        ball.PlayField.RemoveBarrier(this);
+        ball.PlayField.RemoveEntity(this);
     }
 
     public override void Draw(Renderer2D renderer)

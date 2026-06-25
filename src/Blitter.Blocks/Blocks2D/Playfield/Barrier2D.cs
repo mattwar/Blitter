@@ -4,7 +4,7 @@ namespace Blitter.Blocks2D;
 /// An obstacle in a <see cref="PlayField2D"/>.
 /// Barriers collide with sprites, but not each other.
 /// </summary>
-public abstract class Barrier2D : Entity
+public abstract class Barrier2D : Entity, IColliderBarrier2D, IDrawable2D
 {
     private Transform2D? _transform;
 

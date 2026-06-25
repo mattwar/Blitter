@@ -321,7 +321,7 @@ sealed class HitDebugLayer(Window2D window, Rocket rocket, PlayField2D playField
         // Same treatment for every asteroid currently on the field:
         // magenta hit shape outline + dim bounding circle.
         var hitVisitor = HitShapeDebug2D.Draw(rd);
-        foreach (var sprite in playField.Sprites)
+        foreach (var sprite in playField.Entities)
         {
             if (sprite is not Asteroid asteroid) continue;
             rd.DrawColor = new Color(255, 80, 200, 220);
@@ -343,7 +343,7 @@ sealed class LevelComplete2D(PlayField2D playField, Window2D window, TimeSpan de
     {
         if (Entity is not Scene2D scene || scene.RunState != RunState.Running)
             return;
-        var remainingTargets = playField.Sprites.Count(
+        var remainingTargets = playField.Entities.Count(
             s => s is Asteroid a && a.Kind != AsteriodKind.Radioactive);
         if (remainingTargets == 0 || window.Input.WasJustPressed(Key.V))
         {
@@ -688,7 +688,7 @@ sealed class AsteroidSmasher : Behavior, IHittable2D
 
         // Mark the meteor for removal; the playfield reaps it
         // on its next update pass.
-        other.PlayField.RemoveSprite(other);
+        other.PlayField.RemoveEntity(other);
         self.Heading = (self.Heading + Random.Shared.Next(-15, 15) + 360f) % 360f;
         Audio.Play(Sounds.Explosion, volume: .3f);
 
@@ -750,7 +750,7 @@ sealed class AsteroidSmasher : Behavior, IHittable2D
 
         // split the asteroid into shards
         asteroid.Smash();
-        asteroid.PlayField.RemoveSprite(asteroid);
+        asteroid.PlayField.RemoveEntity(asteroid);
     }
 
     private static float NudgeToward(float current, float target, float fraction, float jitterDeg, float maxDeg)
@@ -848,7 +848,7 @@ sealed class Asteroid : Sprite2D
                     RotationSpeed = shardSpin,
                 };  
 
-                playfield.AddSprite(shard);
+                playfield.AddEntity(shard);
             }           
         }
     }

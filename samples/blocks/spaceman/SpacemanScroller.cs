@@ -73,12 +73,11 @@ var scene = new Scene2D
             GroundY = GroundY 
         },
 
-        // The playfield contains any sprites
+        // The playfield contains the walking, jumping spaceman.
         new PlayField2D
         {
-            Sprites =
+            Entities =
             [
-                // the walking, jumping spacemen
                 new Spaceman
                 {
                     Image =
@@ -225,7 +224,7 @@ public class SpacemanShadowLayer : Layer2D
     protected override void OnAttach(IEntity entity)
     {
         base.OnAttach(entity);
-        _spaceman = Scene.GetLayer<PlayField2D>().GetSprite<Spaceman>();
+        _spaceman = Scene.GetLayer<PlayField2D>().GetEntity<Spaceman>();
     }
 
     public override void Update(in UpdateContext context) { }

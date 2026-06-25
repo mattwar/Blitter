@@ -61,7 +61,7 @@ sealed class FallingBlocksHud : Layer2D
         using var _ = rd.PushState();
         rd.Camera = null;
         rd.DrawDebugText(10, 10,
-            $"alive: {playField.Sprites.Count}  spawned: {spawner.SpawnedCount}" +
+            $"alive: {playField.Entities.Count(e => e is not IColliderBarrier2D)}  spawned: {spawner.SpawnedCount}" +
             $"  {(spawner.Paused ? "[PAUSED — Space to resume]" : "[Space to pause]")}",
             scale: 2f);
     }

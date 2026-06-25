@@ -4,7 +4,7 @@ namespace Blitter.Blocks3D;
 /// A 3D scene comprised of one or more layers. 
 /// The 3D analog of <c>Blitter.Blocks2D.Scene2D</c>.
 /// </summary>
-public class Scene3D : Entity
+public class Scene3D : Entity, IContainerEntity
 {
     public Scene3D()
     {
@@ -44,10 +44,37 @@ public class Scene3D : Entity
         }
     }
 
+    /// <inheritdoc/>
+    public IReadOnlyList<IEntity> Entities => _layers;
+
+    /// <inheritdoc/>
+    public void AddEntity(IEntity child)
+    {
+        if (child is not Layer3D layer)
+            throw new InvalidOperationException("Scene3D can only contain Layer3D entities.");
+        _layers.Add(layer);
+        layer.Parent = this;
+    }
+
+    /// <summary>
+    /// 3D scenes do not track layer age; always <see cref="TimeSpan.Zero"/>.
+    /// </summary>
+    public TimeSpan GetAge(IEntity child) => TimeSpan.Zero;
+
+    /// <summary>
+    /// Removes <paramref name="child"/> from the scene when it is one of its layers.
+    /// No-op otherwise.
+    /// </summary>
+    public void RemoveEntity(IEntity child)
+    {
+        if (child is Layer3D layer && _layers.Remove(layer))
+            layer.Parent = null;
+    }
+
     /// <summary>
     /// Reports whether <paramref name="child"/> is a layer this scene holds.
     /// </summary>
-    public override Containment GetContainment(IEntity child) =>
+    public Containment GetContainment(IEntity child) =>
         child is Layer3D layer && _layers.Contains(layer)
             ? Containment.Contained
             : Containment.NotContained;

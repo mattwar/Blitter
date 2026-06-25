@@ -2,7 +2,7 @@ namespace Blitter.Blocks;
 
 /// <summary>
 /// The membership state of an entity within a container, as reported by
-/// <see cref="IEntity.GetContainment"/>. The container owns this state;
+/// <see cref="IContainerEntity.GetContainment"/>. The container owns this state;
 /// the child never tracks its own membership.
 /// </summary>
 public enum Containment

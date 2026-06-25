@@ -1,121 +1,94 @@
+using System.Numerics;
+
 namespace Blitter.Blocks2D.Tests;
 
 public class PlayField2DTests
 {
-    private sealed class ReRoleAsBarrierOnUpdate(PlayField2D playfield) : Behavior, IUpdatable
+    private sealed class RemoveSelfOnUpdate : Behavior, IUpdatable
     {
         public Containment ContainmentDuringUpdate { get; private set; }
 
         public void Update(in UpdateContext context)
         {
-            playfield.AddBarrier(Entity!);
+            var playfield = (PlayField2D)Entity!.Parent!;
+            playfield.RemoveEntity(Entity!);
             ContainmentDuringUpdate = playfield.GetContainment(Entity!);
         }
     }
 
     [Fact]
-    public void AddSprite_AcceptsPlainEntity()
+    public void AddEntity_AcceptsPlainEntity()
     {
         var playfield = new PlayField2D();
         var entity = new Entity();
 
-        playfield.AddSprite(entity);
+        playfield.AddEntity(entity);
 
-        Assert.Same(entity, Assert.Single(playfield.Sprites));
+        Assert.Same(entity, Assert.Single(playfield.Entities));
         Assert.Same(playfield, entity.Parent);
-        Assert.True(playfield.TryGetSprite<Entity>(out var found));
+        Assert.True(playfield.TryGetEntity<Entity>(out var found));
         Assert.Same(entity, found);
         Assert.Equal(Containment.Contained, playfield.GetContainment(entity));
 
-        playfield.RemoveSprite(entity);
+        playfield.RemoveEntity(entity);
 
-        Assert.Empty(playfield.Sprites);
+        Assert.Empty(playfield.Entities);
         Assert.Null(entity.Parent);
         Assert.Equal(Containment.NotContained, playfield.GetContainment(entity));
     }
 
     [Fact]
-    public void AddBarrier_AcceptsPlainEntity()
+    public void Barrier2D_IsColliderBarrier()
+    {
+        var barrier = new LineBarrier2D(Vector2.Zero, Vector2.One);
+
+        Assert.IsAssignableFrom<IColliderBarrier2D>(barrier);
+    }
+
+    [Fact]
+    public void AddEntity_DoesNotDuplicateExistingEntity()
     {
         var playfield = new PlayField2D();
         var entity = new Entity();
 
-        playfield.AddBarrier(entity);
+        playfield.AddEntity(entity);
+        playfield.AddEntity(entity);
 
-        Assert.Same(entity, Assert.Single(playfield.Barriers));
+        Assert.Same(entity, Assert.Single(playfield.Entities));
         Assert.Same(playfield, entity.Parent);
-        Assert.Equal(Containment.Contained, playfield.GetContainment(entity));
-
-        playfield.RemoveBarrier(entity);
-
-        Assert.Empty(playfield.Barriers);
-        Assert.Null(entity.Parent);
-        Assert.Equal(Containment.NotContained, playfield.GetContainment(entity));
     }
 
     [Fact]
-    public void AddSprite_RemovesExistingBarrierRole()
+    public void RemoveEntity_RemovesAnyContainedEntity()
     {
         var playfield = new PlayField2D();
         var entity = new Entity();
+        var barrier = new LineBarrier2D(Vector2.Zero, Vector2.One);
 
-        playfield.AddBarrier(entity);
-        playfield.AddSprite(entity);
+        playfield.AddEntity(entity);
+        playfield.AddEntity(barrier);
 
-        Assert.Empty(playfield.Barriers);
-        Assert.Same(entity, Assert.Single(playfield.Sprites));
-        Assert.Same(playfield, entity.Parent);
-        Assert.Equal(Containment.Contained, playfield.GetContainment(entity));
-    }
-
-    [Fact]
-    public void AddBarrier_RemovesExistingSpriteRole()
-    {
-        var playfield = new PlayField2D();
-        var entity = new Entity();
-
-        playfield.AddSprite(entity);
-        playfield.AddBarrier(entity);
-
-        Assert.Empty(playfield.Sprites);
-        Assert.Same(entity, Assert.Single(playfield.Barriers));
-        Assert.Same(playfield, entity.Parent);
-        Assert.Equal(Containment.Contained, playfield.GetContainment(entity));
-    }
-
-    [Fact]
-    public void RemoveEntity_RemovesFromEitherRole()
-    {
-        var playfield = new PlayField2D();
-        var sprite = new Entity();
-        var barrier = new Entity();
-
-        playfield.AddSprite(sprite);
-        playfield.AddBarrier(barrier);
-
-        playfield.RemoveEntity(sprite);
+        playfield.RemoveEntity(entity);
         playfield.RemoveEntity(barrier);
 
-        Assert.Empty(playfield.Sprites);
-        Assert.Empty(playfield.Barriers);
-        Assert.Null(sprite.Parent);
+        Assert.Empty(playfield.Entities);
+        Assert.Null(entity.Parent);
         Assert.Null(barrier.Parent);
     }
 
     [Fact]
-    public void AddBarrier_DuringUpdate_ReRolesSpriteAsContainedBarrier()
+    public void RemoveEntity_DuringUpdate_ReportsRemovingUntilFrameEnd()
     {
         var playfield = new PlayField2D();
         var entity = new Entity();
-        var reRole = new ReRoleAsBarrierOnUpdate(playfield);
-        entity.AddBehavior(reRole);
-        playfield.AddSprite(entity);
+        var removeSelf = new RemoveSelfOnUpdate();
+        entity.AddBehavior(removeSelf);
+        playfield.AddEntity(entity);
 
         playfield.Update(new UpdateContext());
 
-        Assert.Equal(Containment.Contained, reRole.ContainmentDuringUpdate);
-        Assert.Empty(playfield.Sprites);
-        Assert.Same(entity, Assert.Single(playfield.Barriers));
-        Assert.Same(playfield, entity.Parent);
+        Assert.Equal(Containment.Removing, removeSelf.ContainmentDuringUpdate);
+        Assert.Empty(playfield.Entities);
+        Assert.Null(entity.Parent);
     }
 }

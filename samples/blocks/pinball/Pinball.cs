@@ -85,14 +85,15 @@ const float WallInset = 16f;
 const float CenterGapOffset = 111f;
 
 // side walls
-playField.AddBarriers(
-[
+foreach (var barrier in new Barrier2D[]
+{
     new Wall(new Vector2(WallInset, WallInset), new Vector2(WallInset, 820f)), // left
     new Wall(new Vector2(W - WallInset, WallInset), new Vector2(W - WallInset, 820f)), // right
     new Wall(new Vector2(WallInset, WallInset), new Vector2(W - WallInset, WallInset)), // top
     new Wall(new Vector2(WallInset, 820f), new Vector2(W / 2f - CenterGapOffset, 860f)), // bottom left
     new Wall(new Vector2(W - WallInset, 820f), new Vector2(W / 2f + CenterGapOffset, 860f)), // bottom right
-]);
+})
+    playField.AddEntity(barrier);
 
 // Resolve loose asset files next to this source file.
 Application.Current.SetCallerAssetFolder();
@@ -102,18 +103,19 @@ var flipperSound = Sound.Load("flipper.wav");
 var slingshotSound = Sound.Load("slingshot.wav");
 
 // circular bumpers
-playField.AddBarriers(
-[
+foreach (var barrier in new Barrier2D[]
+{
     new Bumper(180f, 280f, 44f) { Tint=new Color(255, 90, 120), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.40f },
     new Bumper(420f, 230f, 44f) { Tint=new Color(90, 200, 255), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.40f },
     new Bumper(300f, 410f, 50f) { Tint=new Color(140, 255, 140), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.50f },
     new Bumper(140f, 580f, 22f) { Tint=new Color(255, 200, 90), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.22f },
     new Bumper(580f, 580f, 22f) { Tint=new Color(255, 200, 90), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.22f },
-]);
+})
+    playField.AddEntity(barrier);
 
 // slingshots: line barriers that bounce on one-side only
-playField.AddBarriers(
-[
+foreach (var barrier in new Barrier2D[]
+{
     // left
     new Slingshot(
         new Vector2(WallInset + 8f, 620f), 
@@ -128,7 +130,8 @@ playField.AddBarriers(
     { 
         HitSound = slingshotSound 
     }
-]);
+})
+    playField.AddEntity(barrier);
 
 // Flippers
 var flipperLeft = new Flipper
@@ -153,7 +156,8 @@ var flipperRight = new Flipper
     SnapDegPerSec = 1900f,
 };
 
-playField.AddBarriers([flipperLeft, flipperRight]);
+playField.AddEntity(flipperLeft);
+playField.AddEntity(flipperRight);
 
 // The "ball"
 var ball = new Pinball
@@ -174,7 +178,7 @@ var ball = new Pinball
     ]
 };
 
-playField.AddSprite(ball);
+playField.AddEntity(ball);
 
 // Scene-wide pinball game controls.
 var gameController = new PinballGameController(window.Input, ball, flipperLeft, flipperRight, plungerSpawn, DrainY);

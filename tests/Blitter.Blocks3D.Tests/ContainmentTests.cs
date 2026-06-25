@@ -4,6 +4,14 @@ namespace Blitter.Tests;
 
 public class ContainmentTests
 {
+    private sealed class EmptyContainer : Entity, IContainerEntity
+    {
+        public IReadOnlyList<IEntity> Entities => [];
+        public void AddEntity(IEntity child) { }
+        public TimeSpan GetAge(IEntity child) => TimeSpan.Zero;
+        public void RemoveEntity(IEntity child) { }
+    }
+
     private static UpdateContext Ctx() => new()
     {
         ElapsedSinceStart = TimeSpan.Zero,
@@ -66,9 +74,9 @@ public class ContainmentTests
     }
 
     [Fact]
-    public void Entity_Default_IsNotContained()
+    public void Container_Default_IsNotContained()
     {
-        var parent = new Sprite3D();
+        IContainerEntity parent = new EmptyContainer();
         var child = new Sprite3D();
 
         Assert.Equal(Containment.NotContained, parent.GetContainment(child));
