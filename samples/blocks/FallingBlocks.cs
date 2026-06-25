@@ -29,7 +29,7 @@ var window = new Window2D(W, H)
 
 var scene = new Scene2D
 {
-    Layers = 
+    Entities = 
     [ 
         new PlayField2D { WorldBounds = new Rect(0, 0, W, H) }, 
         new FallingBlocksHud() 
@@ -55,8 +55,9 @@ sealed class FallingBlocksHud : Layer2D
 {
     protected override void DrawContent(Renderer2D rd)
     {
-        var playField = Scene.GetLayer<PlayField2D>();
-        var spawner = Scene.GetBehavior<IFallingBlocksSpawner>();
+        var container = Container ?? throw new InvalidOperationException("HUD is not attached to a container.");
+        var playField = container.GetEntity<PlayField2D>();
+        var spawner = container.GetCapability<IFallingBlocksSpawner>();
 
         using var _ = rd.PushState();
         rd.Camera = null;
@@ -75,10 +76,10 @@ sealed class PauseOnSpace2D : Behavior, IUpdatable
 
     protected override void OnAttach(IEntity entity)
     {
-        _spawner = entity.GetBehavior<IFallingBlocksSpawner>();
+        _spawner = entity.GetCapability<IFallingBlocksSpawner>();
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var spaceIsDown = Keyboard.IsDown(Key.Space);
         if (spaceIsDown && !_spaceWasDown && _spawner is { } spawner)
@@ -106,7 +107,7 @@ sealed class RemoveBelowBounds2D : Behavior, IUpdatable
 {
     public float Margin { get; set; }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         if (Entity is Sprite2D sprite
             && sprite.TryFindTrait<Bounds2D>(out var bounds)

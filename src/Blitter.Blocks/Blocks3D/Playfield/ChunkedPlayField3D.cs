@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace Blitter.Blocks3D;
 
-public class ChunkedPlayField3D : Layer3D
+public class ChunkedPlayField3D : Layer3D, IUpdatable
 {
     // Reused frame-local scratch — populated each Update, holds every
     // alive sprite in the active range with its current chunk and the
@@ -44,7 +44,7 @@ public class ChunkedPlayField3D : Layer3D
     private bool IsLive(Sprite3D sprite) =>
         ChunkSource.GetContainment(sprite) != Containment.Removing;
 
-    public override void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         ChunkSource.Update(context);
 
@@ -98,7 +98,7 @@ public class ChunkedPlayField3D : Layer3D
         {
             var s = _frameSprites[i].Sprite;
             if (IsLive(s))
-                s.Update(context);
+                Updater.Default.Update(s, in context);
         }
 
         // Phase 3: rebucket sprites that crossed chunk boundaries. Host
@@ -141,7 +141,7 @@ public class ChunkedPlayField3D : Layer3D
         }
     }
 
-    private void RunCollisionPass(in UpdateContext context)
+    private void RunCollisionPass(in EntityUpdateContext context)
     {
         for (int i = 0; i < _frameSprites.Count; i++)
         {
@@ -209,7 +209,7 @@ public class ChunkedPlayField3D : Layer3D
         }
     }
     
-    public override void Draw(Renderer3D renderer)
+    protected override void DrawContent(Renderer3D renderer)
     {
         // Draw opaque geometry seperately from transparent
         Draw(renderer, DrawPass3D.Opaque);
@@ -297,7 +297,7 @@ public interface IChunkSource3D : ISpriteHost3D
     IChunk3D? GetChunk(Vector3 position);
 
     /// <summary>Per-frame source tick (advances the host clock).</summary>
-    void Update(in UpdateContext context);
+    void Update(in EntityUpdateContext context);
 }
 
 /// <summary>
@@ -472,7 +472,7 @@ public abstract class ChunkSource3D : IChunkSource3D
     /// </summary>
     protected virtual void OnChunkUnloaded(IChunk3D chunk) { }
 
-    public virtual void Update(in UpdateContext context)
+    public virtual void Update(in EntityUpdateContext context)
     {
         // Open a new frame: last frame's retired sprites have already been
         // reaped from their chunks, so clear the pending-removal set.
@@ -561,7 +561,7 @@ public interface IChunk3D
     void RemoveBarrier(Barrier3D barrier);
 
     /// <summary>Per-frame chunk update (barrier ticks plus any chunk-scoped work).</summary>
-    void Update(in UpdateContext context);
+    void Update(in EntityUpdateContext context);
 
     /// <summary>Draws the chunk's barriers and live sprites (both passes).</summary>
     void Draw(Renderer3D renderer);
@@ -691,10 +691,10 @@ public class Chunk3D : IChunk3D
     /// remeshing. Sprite ticks, rebucketing, collision, and dead-sprite
     /// reaping are orchestrated by <see cref="ChunkedPlayField3D"/>.
     /// </summary>
-    public virtual void Update(in UpdateContext context)
+    public virtual void Update(in EntityUpdateContext context)
     {
         for (int i = 0; i < _barriers.Count; i++)
-            _barriers[i].Update(context);
+            Updater.Default.Update(_barriers[i], in context);
     }
 
     /// <summary>

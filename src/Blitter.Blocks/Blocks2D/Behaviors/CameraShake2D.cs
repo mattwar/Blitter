@@ -37,7 +37,7 @@ public sealed class CameraShake2D : Behavior, IUpdatable
     public void AddTrauma(float amount) =>
         Trauma = Math.Clamp(Trauma + amount, 0f, 1f);
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var baseline = Camera.Position == _lastWritten
             ? Camera.Position - _lastOffset

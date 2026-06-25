@@ -29,7 +29,7 @@ public abstract class TriggerOnPredicate2D : Behavior, IUpdatable
     /// <summary>Runs when the trigger condition transitions from false to true.</summary>
     protected abstract void OnTriggered(IEntity entity);
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         if (_spent)
             return;

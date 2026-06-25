@@ -127,7 +127,7 @@ public struct ParticleEmitter2D
 /// from their own hit / spawn callbacks. Recycles the oldest live
 /// particle when full.
 /// </summary>
-public sealed class ParticleLayer2D : Layer2D
+public sealed class ParticleLayer2D : Layer2D, IUpdatable
 {
     // Ring buffer in struct-of-arrays form. Iterating arrays beats
     // chasing a list of objects for both cache and draw-batching.
@@ -247,7 +247,7 @@ public sealed class ParticleLayer2D : Layer2D
         }
     }
 
-    public override void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
         if (dt <= 0f)

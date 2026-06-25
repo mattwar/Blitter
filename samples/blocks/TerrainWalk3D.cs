@@ -119,7 +119,7 @@ var hud = new TerrainHud3D(player);
 
 var scene = new Scene3D
 {
-    Layers = [ playField, hud ]
+    Entities = [ playField, hud ]
 };
 
 await scene.RunAsync(window);
@@ -191,7 +191,7 @@ static Mesh<LitVertex3D> BuildTerrainMesh(
 // HUD overlay: controls hint plus the player's position and velocity.
 sealed class TerrainHud3D(Sprite3D player) : Layer3D
 {
-    public override void Draw(Renderer3D rd)
+    protected override void DrawContent(Renderer3D rd)
     {
         DebugDraw.DrawText("WASD walk   SHIFT sprint   SPACE jump   Mouse look   ESC quit",
             18f, 16f);

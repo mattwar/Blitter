@@ -32,6 +32,7 @@ using System.Numerics;
 
 using Blitter;
 using Blitter.Bits;
+using Blitter.Blocks;
 using Blitter.Blocks3D;
 
 const int ChunkVoxelsX = 16;
@@ -197,7 +198,7 @@ chunkSource.AddSprite(player);
 
 // Re-centers the chunk window on the player every frame and evicts
 // anything that's drifted out. Runs as its own layer (before the
-// playfield's update via Scene3D.Layers ordering) so the playfield
+// playfield's update via scene entity ordering) so the playfield
 // always iterates the just-recentered range.
 var streamer = new ChunkStreamerLayer3D(chunkSource, playField, player, LoadRadius);
 
@@ -210,7 +211,7 @@ var skyLayer = new SkyLayer3D(sky);
 
 var scene = new Scene3D
 {
-    Layers = [ skyLayer, streamer, playField, hud ]
+    Entities = [ skyLayer, streamer, playField, hud ]
 };
 
 await scene.RunAsync(window);
@@ -244,9 +245,9 @@ static Bitmap MakeGlassTile()
 
 // Re-centers the chunk window on the player every frame and evicts
 // anything that's drifted out. Update-only, so Draw is a no-op.
-sealed class ChunkStreamerLayer3D(VoxelChunkSource3D chunkSource, ChunkedPlayField3D playField, Sprite3D player, int loadRadius) : Layer3D
+sealed class ChunkStreamerLayer3D(VoxelChunkSource3D chunkSource, ChunkedPlayField3D playField, Sprite3D player, int loadRadius) : Layer3D, IUpdatable
 {
-    public override void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var here = chunkSource.GetChunkCoords(player.Position);
         playField.MinChunk = new ChunkCoord(here.X - loadRadius, 0, here.Z - loadRadius);
@@ -254,13 +255,13 @@ sealed class ChunkStreamerLayer3D(VoxelChunkSource3D chunkSource, ChunkedPlayFie
         chunkSource.TrimChunksOutside(playField.MinChunk, playField.MaxChunk);
     }
 
-    public override void Draw(Renderer3D renderer) { }
+    protected override void DrawContent(Renderer3D renderer) { }
 }
 
 // HUD overlay: player position and chunk-pool statistics.
 sealed class VoxelHud3D(VoxelChunkSource3D chunkSource, Sprite3D player) : Layer3D
 {
-    public override void Draw(Renderer3D rd)
+    protected override void DrawContent(Renderer3D rd)
     {
         var pc = chunkSource.GetChunkCoords(player.Position);
         DebugDraw.DrawText("WASD walk   SHIFT sprint   SPACE jump   Mouse look   ESC quit", 18f, 16f);
@@ -272,7 +273,7 @@ sealed class VoxelHud3D(VoxelChunkSource3D chunkSource, Sprite3D player) : Layer
 // Draws the sky behind everything else each frame.
 sealed class SkyLayer3D(Cubemap sky) : Layer3D
 {
-    public override void Draw(Renderer3D rd) => rd.DrawSkybox(sky);
+    protected override void DrawContent(Renderer3D rd) => rd.DrawSkybox(sky);
 }
 
 // Two-octave value-noise heightmap with a per-cell splotch noise that

@@ -37,7 +37,7 @@ public class Sprite2D : Entity, IDrawable2D
         _transform = this.GetOrAddTrait<Transform2D>();
         _velocity = this.GetOrAddTrait<Velocity2D>();
         _appearance = this.GetOrAddTrait<Appearance2D>();
-        if (!this.TryGetBehavior<IColliderShape2D>(out _))
+        if (!this.TryGetCapability<IColliderShape2D>(out _))
             this.GetOrAddBehavior<DefaultColliderShape2D>();
         base.OnAttach(entity);
     }
@@ -98,13 +98,6 @@ public class Sprite2D : Entity, IDrawable2D
             ?? throw new InvalidOperationException("Sprite is not attached to a PlayField. Access PlayField only while the sprite is a member of one.");
 
     /// <summary>
-    /// The <see cref="Scene2D"/> this sprite's <see cref="PlayField"/>
-    /// belongs to. Throws if the sprite is not in a playfield that is part
-    /// of a running scene.
-    /// </summary>
-    public Scene2D Scene => PlayField.Scene;
-
-    /// <summary>
     /// The sprite's world-space collision shape, provided by its
     /// <see cref="IColliderShape2D"/> behavior. Empty when the sprite has no
     /// collider (e.g. before it is attached to a playfield). Not overridable:
@@ -112,7 +105,7 @@ public class Sprite2D : Entity, IDrawable2D
     /// trait (the collider reads it in preference to the visual's shape).
     /// </summary>
     public PosedHitShape2D HitShape =>
-        this.TryGetBehavior<IColliderShape2D>(out var collider)
+        this.TryGetCapability<IColliderShape2D>(out var collider)
             ? collider.GetShape()
             : new(HitShape2D.None, Transform.Pose);
 

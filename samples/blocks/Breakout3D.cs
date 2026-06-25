@@ -204,7 +204,7 @@ var brickRenderer = new BrickRenderLayer3D(bricks);
 
 var scene = new Scene3D
 {
-    Layers = [ playField, brickRenderer, hud ],
+    Entities = [ playField, brickRenderer, hud ],
     Behaviors = [ controller ],
 };
 
@@ -227,7 +227,7 @@ sealed class Breakout3DHud(
     float arenaHalfW, float arenaHalfH, float ballRadius,
     float arenaMidZ, float arenaLen) : Layer3D
 {
-    public override void Draw(Renderer3D rd)
+    protected override void DrawContent(Renderer3D rd)
     {
         // Paddle as a faint wireframe so it doesn't occlude the arena
         // but the player can see what they're aiming with.
@@ -320,7 +320,7 @@ sealed class Breakout3DHud(
 // Brick rendering layer: each live brick draws itself.
 sealed class BrickRenderLayer3D(List<BrickBarrier3D> bricks) : Layer3D
 {
-    public override void Draw(Renderer3D rd)
+    protected override void DrawContent(Renderer3D rd)
     {
         foreach (var b in bricks)
             b.Draw(rd);
@@ -357,7 +357,7 @@ sealed class Paddle3D : Barrier3D
         _previousCenter = Center;
     }
 
-    public void MoveTo(float x, float y, in UpdateContext context)
+    public void MoveTo(float x, float y, in EntityUpdateContext context)
     {
         x = Math.Clamp(x, XRange.Min, XRange.Max);
         y = Math.Clamp(y, YRange.Min, YRange.Max);
@@ -386,7 +386,7 @@ sealed class Paddle3D : Barrier3D
         return english + _velocity;
     }
 
-    public override void OnHitSprite(Sprite3D hitter, in UpdateContext context)
+    public override void OnHitSprite(Sprite3D hitter, in EntityUpdateContext context)
     {
         Audio.Play(Sounds.Bounce);
     }
@@ -426,7 +426,7 @@ sealed class BrickBarrier3D : Barrier3D
         _visual.Draw(renderer, new Pose3D(Center, Quaternion.Identity, 1f), Color.White, TimeSpan.Zero);
     }
 
-    public override void OnHitSprite(Sprite3D hitter, in UpdateContext context)
+    public override void OnHitSprite(Sprite3D hitter, in EntityUpdateContext context)
     {
         // First contact kills the brick. Score and removal from the
         // playfield are handled by the controller's per-frame sweep.
@@ -447,7 +447,7 @@ sealed class ForwardKickFromPaddle3D : Behavior, IHittable3D
     /// <summary>0..1. Minimum |Vz| / |V| immediately after a paddle hit. 0.5 = Z must hold at least half the speed.</summary>
     public float MinForwardRatio { get; set; } = 0.5f;
 
-    public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
+    public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in EntityUpdateContext context)
     {
         if (Paddle is null || !ReferenceEquals(barrier, Paddle))
             return;
@@ -526,7 +526,7 @@ sealed class Breakout3DController : Behavior, IUpdatable
         SyncCameraToPaddle();
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         // --- Paddle input: arrows + WASD.
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;

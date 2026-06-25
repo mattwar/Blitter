@@ -21,7 +21,7 @@ public sealed class Spin3D : Behavior, IUpdatable
         _transform = entity.GetOrAddTrait<Transform3D>();
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
         if (dt <= 0f || RotationSpeed == 0f)

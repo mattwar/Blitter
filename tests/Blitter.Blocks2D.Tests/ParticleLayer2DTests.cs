@@ -5,7 +5,7 @@ using Blitter.Bits;
 
 public class ParticleLayer2DTests
 {
-    private static UpdateContext Context(double seconds) =>
+    private static EntityUpdateContext Context(double seconds) =>
         new() { ElapsedSinceLastUpdate = TimeSpan.FromSeconds(seconds) };
 
     private static ParticleStyle FixedStyle(float lifetime, float speed) => new()

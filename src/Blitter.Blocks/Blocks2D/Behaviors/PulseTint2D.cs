@@ -34,7 +34,7 @@ public sealed class PulseTint2D : Behavior, IUpdatable
         _appearance = entity.GetOrAddTrait<Appearance2D>();
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var seconds = Period.TotalSeconds;
         if (seconds <= 0)

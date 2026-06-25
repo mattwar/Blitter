@@ -28,7 +28,7 @@ public class BounceInBounds2D : Behavior, IUpdatable
         _transform = entity.GetOrAddTrait<Transform2D>();
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         // Bounds live on an ancestor (the playfield), which isn't reachable
         // when this behavior is attached (the sprite may not be parented

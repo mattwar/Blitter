@@ -165,15 +165,4 @@ public class Entity : IEntity
         return false;
     }
 
-    /// <summary>
-    /// Advances the entity one tick by applying each attached behavior in order.
-    /// </summary>
-    public virtual void Update(in UpdateContext context)
-    {
-        for (int i = 0; i < this.Behaviors.Count; i++)
-        {
-            if (this.Behaviors[i] is IUpdatable updatable)
-                updatable.Update(in context);
-        }
-    }
 }

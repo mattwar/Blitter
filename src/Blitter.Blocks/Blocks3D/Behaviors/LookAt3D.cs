@@ -55,7 +55,7 @@ public abstract class LookAt3D : Behavior, IUpdatable
     /// </summary>
     protected abstract Vector3? SelectTarget();
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         if (ResolveTarget() is not { } point)
             return;

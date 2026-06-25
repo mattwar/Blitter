@@ -28,7 +28,7 @@ public class Motion3D : Behavior, IUpdatable
         _velocity = entity.GetOrAddTrait<Velocity3D>();
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         if (context.ElapsedSinceLastUpdate == TimeSpan.Zero)
             return;

@@ -194,7 +194,7 @@ var hitDebug = new HitDebugLayer(window, rocket, playField);
 
 var scene = new Scene2D
 {
-    Layers = 
+    Entities = 
     [ 
         starsFar, 
         starsMid, 
@@ -295,11 +295,11 @@ sealed class RocketHud(Rocket rocket, Font scoreFont, Font bannerFont, LevelComp
 
 // Debug overlay: outlines the rocket and asteroid HitShapes in world
 // space (toggle with H) so collision registration is visible.
-sealed class HitDebugLayer(Window2D window, Rocket rocket, PlayField2D playField) : Layer2D
+sealed class HitDebugLayer(Window2D window, Rocket rocket, PlayField2D playField) : Layer2D, IUpdatable
 {
     private bool _showHitShape;
 
-    public override void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         if (window.Input.WasJustPressed(Key.H))
             _showHitShape = !_showHitShape;
@@ -337,9 +337,10 @@ sealed class LevelComplete2D(PlayField2D playField, Window2D window, TimeSpan de
 {
     public DateTime? GameOverAt { get; private set; }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
-        if (Entity is not Scene2D scene || scene.RunState != RunState.Running)
+        var runControl = context.RunControl;
+        if (runControl?.RunState != RunState.Running)
             return;
         var remainingTargets = playField.Entities.Count(
             s => s is Asteroid a && a.Kind != AsteriodKind.Radioactive);
@@ -347,12 +348,12 @@ sealed class LevelComplete2D(PlayField2D playField, Window2D window, TimeSpan de
         {
             _ = Audio.PlayAsync(Melodies.LevelUp, volume: .3f);
             GameOverAt = DateTime.UtcNow;
-            scene.ExitWithDelay(delay);
+            runControl.RequestExitAfter(delay);
         }
     }
 }
 
-sealed class Rocket : Sprite2D
+sealed class Rocket : Sprite2D, IUpdatable
 {
     /// <summary>
     /// The flame drawn behind the rocket while thrusting. A separate slot
@@ -394,15 +395,14 @@ sealed class Rocket : Sprite2D
         ];
     }
 
-    public override void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         Elapsed += context.ElapsedSinceLastUpdate;
-        base.Update(context);
     }
 
     private sealed class FaceHeadingUnlessStunned : Behavior, IUpdatable
     {
-        public void Update(in UpdateContext context)
+        public void Update(in EntityUpdateContext context)
         {
             if (Entity is not Sprite2D s || s is Rocket { IsStunned: true })
                 return;
@@ -768,7 +768,7 @@ enum AsteriodKind
     Radioactive
 }
 
-sealed class Asteroid : Sprite2D
+sealed class Asteroid : Sprite2D, IUpdatable
 {
     public static readonly float GoldRarity = 0.25f; // 25% of asteroid shards are gold
     public static readonly float RadioactiveRarity = 0.1f; // 10% of asteroid shards are radioactive
@@ -806,10 +806,9 @@ sealed class Asteroid : Sprite2D
         this.GetOrAddBehavior<BounceInBounds2D>();
     }
 
-    public override void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         Elapsed += context.ElapsedSinceLastUpdate;
-        base.Update(context);
     }
 
     public void Smash()
@@ -900,7 +899,7 @@ sealed class RocketController : Behavior, IUpdatable
 
     protected override void OnAttach(IEntity entity) => _rocket = (Sprite2D)entity;
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var rocket = _rocket;
 

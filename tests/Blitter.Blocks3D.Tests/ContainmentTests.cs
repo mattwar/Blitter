@@ -15,7 +15,7 @@ public class ContainmentTests
         public void Adopt(IEntity child) => _entities.Add(child);
     }
 
-    private static UpdateContext Ctx() => new()
+    private static EntityUpdateContext Ctx() => new()
     {
         ElapsedSinceStart = TimeSpan.Zero,
         ElapsedSinceLastUpdate = TimeSpan.FromSeconds(0.016),
@@ -71,7 +71,7 @@ public class ContainmentTests
     public void Scene_Layer_IsContained()
     {
         var field = new PlayField3D();
-        var scene = new Scene3D { Layers = [field] };
+        var scene = new Scene3D { Entities = [field] };
 
         Assert.Equal(Containment.Contained, scene.GetContainment(field));
     }
@@ -95,7 +95,7 @@ public class ContainmentTests
     {
         public Containment Observed { get; private set; }
 
-        public void Update(in UpdateContext context)
+        public void Update(in EntityUpdateContext context)
         {
             var sprite = (Sprite3D)Entity;
             var field = (PlayField3D)sprite.Container!;

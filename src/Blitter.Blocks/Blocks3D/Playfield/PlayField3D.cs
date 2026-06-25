@@ -4,7 +4,7 @@ namespace Blitter.Blocks3D;
 /// The 3D "world" layer, containing a set of sprites and barriers
 /// that interact with each other.
 /// </summary>
-public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
+public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity, IUpdatable, IUpdateTraversalOwner
 {
     private readonly List<Sprite3D> _sprites = new();
     private readonly List<Barrier3D> _barriers = new();
@@ -223,7 +223,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
     }
 
     /// <inheritdoc/>
-    public override void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         _updating = true;
         try
@@ -238,19 +238,19 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
         ApplyPendingChanges();
     }
 
-    private void RunOneStep(in UpdateContext spriteContext)
+    private void RunOneStep(in EntityUpdateContext spriteContext)
     {
         // Animated barriers tick before sprites so this frame's
         // sprite-vs-barrier pass sees the new geometry.
         for (int i = 0; i < _barriers.Count; i++)
-            _barriers[i].Update(spriteContext);
+            Updater.Default.Update(_barriers[i], in spriteContext);
 
         for (int i = 0; i < _sprites.Count; i++)
         {
             var sprite = _sprites[i];
             if (!IsLive(sprite))
                 continue;
-            sprite.Update(spriteContext);
+            Updater.Default.Update(sprite, in spriteContext);
         }
 
         // sprite-vs-sprite collision
@@ -337,7 +337,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D, IContainerEntity
     }
 
     /// <inheritdoc/>
-    public override void Draw(Renderer3D renderer)
+    protected override void DrawContent(Renderer3D renderer)
     {
         for (int i = 0; i < _barriers.Count; i++)
             _barriers[i].Draw(renderer);

@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 
 
 namespace Blitter.Blocks3D;
@@ -33,9 +33,9 @@ public sealed class BarrierBounce3D : Behavior, IHittable3D
     /// <summary>Optional handler invoked after a successful bounce.</summary>
     public IEventHandler<BarrierBounced3DEventArgs>? Bounced { get; set; }
 
-    public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
+    public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in EntityUpdateContext context)
     {
-        // Normal convention: TryGetContact returns normal from b → a;
+        // Normal convention: TryGetContact returns normal from b ? a;
         // here a = self.HitShape, b = barrier.HitShape, so `contact.Normal`
         // points from the barrier surface toward the sprite.
         if (!self.HitShape.TryGetContact(barrier.HitShape, out var contact))

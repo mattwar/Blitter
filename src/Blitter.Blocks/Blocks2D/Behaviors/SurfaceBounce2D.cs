@@ -73,8 +73,8 @@ public sealed class SurfaceBounce2D : Behavior, IHittable2D
         // Surface velocity at the contact point. Stationary surfaces
         // report zero so this collapses to the textbook reflection;
         // moving surfaces (flippers, etc.) supply an ISurfaceVelocity2D
-        // provider behavior that contributes their motion.
-        var vSurface = other.TryGetBehavior<ISurfaceVelocity2D>(out var surfaceVelocity)
+        // provider that contributes their motion.
+        var vSurface = other.TryGetCapability<ISurfaceVelocity2D>(out var surfaceVelocity)
             ? surfaceVelocity.SurfaceVelocityAt(contact.Point)
             : Vector2.Zero;
         var mat = surface.Material;

@@ -89,7 +89,7 @@ public class WalkController3D : Behavior, IHittable3D, IUpdatable
         _velocity = entity.GetOrAddTrait<Velocity3D>();
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         _elapsed += context.ElapsedSinceLastUpdate;
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
@@ -181,7 +181,7 @@ public class WalkController3D : Behavior, IHittable3D, IUpdatable
         }
     }
 
-    public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
+    public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in EntityUpdateContext context)
     {
         if (!self.HitShape.TryGetContact(barrier.HitShape, out var contact))
             return;

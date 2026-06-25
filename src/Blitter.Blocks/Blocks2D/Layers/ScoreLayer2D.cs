@@ -8,7 +8,7 @@ namespace Blitter.Blocks2D;
 /// (optionally) forwards a "+N" popup to a paired
 /// <see cref="FloatingTextLayer2D"/>.
 /// </summary>
-public sealed class ScoreLayer2D : Layer2D
+public sealed class ScoreLayer2D : Layer2D, IUpdatable
 {
     /// <summary>Font used for the HUD readout.</summary>
     public required Font Font { get; init; }
@@ -98,7 +98,7 @@ public sealed class ScoreLayer2D : Layer2D
         Changed?.Invoke(old, Score);
     }
 
-    public override void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         if (_sincePulse < PulseDuration)
             _sincePulse += context.ElapsedSinceLastUpdate;

@@ -146,12 +146,12 @@ public sealed class Collider2D
 
     /// <summary>
     /// Resolves an entity's world-space hit shape from its
-    /// <see cref="IColliderShape2D"/> behavior. Returns <c>false</c> when the
+    /// <see cref="IColliderShape2D"/> capability. Returns <c>false</c> when the
     /// entity carries no collider.
     /// </summary>
     public static bool TryGetHitShape(IEntity entity, out PosedHitShape2D shape)
     {
-        if (entity.TryGetBehavior<IColliderShape2D>(out var collider))
+        if (entity.TryGetCapability<IColliderShape2D>(out var collider))
         {
             shape = collider.GetShape();
             return true;

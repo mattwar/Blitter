@@ -23,7 +23,7 @@ public sealed class Gravity2D : Behavior, IUpdatable
 
     private Velocity2D? _velocity;
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         if (this.Entity is not IEntity entity)
             return;

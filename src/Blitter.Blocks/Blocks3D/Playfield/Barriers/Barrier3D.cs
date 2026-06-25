@@ -5,7 +5,7 @@ namespace Blitter.Blocks3D;
 /// <summary>
 /// A static, non-sprite obstacle in a <see cref="PlayField3D"/>.
 /// </summary>
-public abstract class Barrier3D : Entity, IDrawable3D
+public abstract class Barrier3D : Entity, IDrawable3D, IUpdatable
 {
     /// <summary>
     /// Optional visual
@@ -44,7 +44,7 @@ public abstract class Barrier3D : Entity, IDrawable3D
     /// <summary>
     /// Called by <see cref="PlayField3D"/> once per frame.
     /// </summary>
-    public override void Update(in UpdateContext context) { }
+    public virtual void Update(in EntityUpdateContext context) { }
 
     /// <summary>
     /// Render this barrier. Default draws <see cref="Visual"/> at the
@@ -69,7 +69,7 @@ public abstract class Barrier3D : Entity, IDrawable3D
     }
 
     /// <summary>Called when a sprite collides with this barrier.</summary>
-    public virtual void OnHitSprite(Sprite3D hitter, in UpdateContext context) { }
+    public virtual void OnHitSprite(Sprite3D hitter, in EntityUpdateContext context) { }
 
     /// <summary>
     /// Physical characteristics of this barrier.

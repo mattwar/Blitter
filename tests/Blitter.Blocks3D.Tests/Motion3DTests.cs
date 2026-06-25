@@ -4,7 +4,7 @@ namespace Blitter.Tests;
 
 public class Motion3DTests
 {
-    private static UpdateContext Ctx(double dt) => new()
+    private static EntityUpdateContext Ctx(double dt) => new()
     {
         ElapsedSinceStart = TimeSpan.FromSeconds(dt),
         ElapsedSinceLastUpdate = TimeSpan.FromSeconds(dt),

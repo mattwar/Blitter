@@ -8,7 +8,7 @@ public class PlayField2DTests
     {
         public Containment ContainmentDuringUpdate { get; private set; }
 
-        public void Update(in UpdateContext context)
+        public void Update(in EntityUpdateContext context)
         {
             var playfield = (PlayField2D)Entity!.Container!;
             playfield.RemoveEntity(Entity!);
@@ -84,7 +84,7 @@ public class PlayField2DTests
         var removeSelf = entity.GetOrAddBehavior<RemoveSelfOnUpdate>();
         playfield.AddEntity(entity);
 
-        playfield.Update(new UpdateContext());
+        playfield.Update(new EntityUpdateContext());
 
         Assert.Equal(Containment.Removing, removeSelf.ContainmentDuringUpdate);
         Assert.Empty(playfield.Entities);

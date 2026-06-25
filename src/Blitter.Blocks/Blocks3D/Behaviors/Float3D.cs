@@ -25,7 +25,7 @@ public sealed class Float3D : Behavior, IUpdatable
         _transform = entity.GetOrAddTrait<Transform3D>();
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var time = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
         var newY = _transform.Position.Y + (MathF.Sin(time * Frequency) * Amplitude);

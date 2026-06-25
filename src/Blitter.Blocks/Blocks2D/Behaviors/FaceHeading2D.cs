@@ -24,7 +24,7 @@ public class FaceHeading2D : Behavior, IUpdatable
         _velocity = entity.GetOrAddTrait<Velocity2D>();
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         _transform.Rotation = _velocity.Heading + RotationOffset;           
     }

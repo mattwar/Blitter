@@ -47,7 +47,7 @@ var window = new Window2D
 // the scene to run 
 var scene = new Scene2D
 {
-    Layers =
+    Entities =
     [
         // camera layer responsible for giving the scene/renderer a camera.
         new CameraLayer2D(),
@@ -163,7 +163,7 @@ public class SpacemanController : Behavior, IUpdatable
         this.input = input;
     }
 
-    public void Update(in UpdateContext ctx)
+    public void Update(in EntityUpdateContext ctx)
     {
         var self = (Sprite2D)this.Entity;
         if (self is not Spaceman spaceman) 
@@ -214,7 +214,7 @@ public class SpacemanController : Behavior, IUpdatable
 /// The shadow layer for the spaceman.
 /// Draws a drop-shadow below the spaceman.
 /// </summary>
-public class SpacemanShadowLayer : Layer2D
+public class SpacemanShadowLayer : Layer2D, IUpdatable
 {
     private Spaceman _spaceman = null!;
 
@@ -224,10 +224,12 @@ public class SpacemanShadowLayer : Layer2D
     protected override void OnAttach(IEntity entity)
     {
         base.OnAttach(entity);
-        _spaceman = Scene.GetLayer<PlayField2D>().GetEntity<Spaceman>();
+        _spaceman = (Container ?? throw new InvalidOperationException("Shadow is not attached to a container."))
+            .GetEntity<PlayField2D>()
+            .GetEntity<Spaceman>();
     }
 
-    public override void Update(in UpdateContext context) { }
+    public void Update(in EntityUpdateContext context) { }
 
     protected override void DrawContent(Renderer2D rd)
     {

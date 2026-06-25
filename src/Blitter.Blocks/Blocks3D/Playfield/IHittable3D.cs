@@ -12,13 +12,13 @@ public interface IHittable3D
     /// Invoked when <paramref name="self"/>'s <see cref="Sprite3D.HitSphere"/>
     /// overlaps another sprite's during the playfield's collision pass.
     /// </summary>
-    void OnHitSprite(Sprite3D self, Sprite3D other, in UpdateContext context) { }
+    void OnHitSprite(Sprite3D self, Sprite3D other, in EntityUpdateContext context) { }
 
     /// <summary>
     /// Invoked when <paramref name="self"/>'s <see cref="Sprite3D.HitSphere"/>
     /// overlaps a <see cref="Barrier3D"/> during the playfield's collision pass.
     /// </summary>
-    void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context) { }
+    void OnHitBarrier(Sprite3D self, Barrier3D barrier, in EntityUpdateContext context) { }
 }
 
 /// <summary>
@@ -27,7 +27,7 @@ public interface IHittable3D
 /// </summary>
 internal static class HitDispatch3D
 {
-    public static void SpriteHit(Sprite3D self, Sprite3D other, in UpdateContext context)
+    public static void SpriteHit(Sprite3D self, Sprite3D other, in EntityUpdateContext context)
     {
         var behaviors = self.Behaviors;
         for (int i = 0; i < behaviors.Count; i++)
@@ -35,7 +35,7 @@ internal static class HitDispatch3D
                 handler.OnHitSprite(self, other, in context);
     }
 
-    public static void BarrierHit(Sprite3D self, Barrier3D barrier, in UpdateContext context)
+    public static void BarrierHit(Sprite3D self, Barrier3D barrier, in EntityUpdateContext context)
     {
         var behaviors = self.Behaviors;
         for (int i = 0; i < behaviors.Count; i++)

@@ -45,7 +45,7 @@ public abstract class SeekTarget2D : Behavior, IUpdatable
     /// <summary>Returns the current world-space target, or <c>null</c> to stop steering this tick.</summary>
     protected abstract Vector2? ResolveTarget();
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         if (ResolveTarget() is not Vector2 dest)
             return;

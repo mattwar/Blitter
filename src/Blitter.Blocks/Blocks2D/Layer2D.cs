@@ -4,35 +4,28 @@ using System.Numerics;
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// A stacked drawable layer in a <see cref="Scene2D"/>. Scenes
+/// A stacked drawable layer in a 2D entity container. Entity runners
 /// composite layers back-to-front each tick: every <see cref="Enabled"/>
 /// layer is updated, every <see cref="Visible"/> layer is drawn.
 /// Concrete layers manage their own contents (see
 /// <see cref="PlayField2D"/> for sprites + barriers).
 /// </summary>
-public abstract class Layer2D : Entity, IDrawable2D
+public abstract class Layer2D : Entity, IDrawable2D, IUpdateEnabled, INamedEntity
 {
     /// <summary>
     /// Optional scene-unique name. When set, other nodes can resolve this
-    /// layer through <see cref="Scene2D.GetLayer{T}(string)"/> in their
+    /// entity through <see cref="EntityExtensions.GetEntity{T}(IContainerEntity, string)"/> in their
     /// <c>OnAttach</c> hook instead of capturing it in a local variable.
     /// </summary>
     public string? Name { get; set; }
 
     /// <summary>
-    /// The <see cref="Scene2D"/> this layer belongs to.
-    /// </summary>
-    public Scene2D Scene =>
-        this.Container as Scene2D 
-            ?? throw new InvalidOperationException("Layer is not attached to a Scene. Access Scene only while the layer is part of a running scene.");
-
-    /// <summary>
-    /// When false the scene skips this layer's update.
+    /// When false the updater skips this layer's update.
     /// </summary>
     public bool Enabled { get; set; } = true;
 
     /// <summary>
-    /// When false the scene skips this layer's draw.
+    /// When false the drawer skips this layer's draw.
     /// </summary>
     public bool Visible { get; set; } = true;
 
@@ -53,6 +46,9 @@ public abstract class Layer2D : Entity, IDrawable2D
     /// </summary>
     public void Draw(Renderer2D renderer)
     {
+        if (!Visible)
+            return;
+
         if (renderer.Camera is { } main && ParallaxFactor != Vector2.One)
         {
             using var _ = renderer.PushState();

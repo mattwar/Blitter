@@ -2,14 +2,13 @@ namespace Blitter.Blocks2D.Tests;
 
 public class SceneLookupTests
 {
-    // Wires layers' Scene back-references the way the scene's attach walk
-    // does, without needing a window/renderer.
-    private static Scene2D SceneWith(params Layer2D[] layers)
+    // Wires layers into a root container without needing a window/renderer.
+    private static ContainerEntity SceneWith(params Layer2D[] layers)
     {
-        var scene = new Scene2D();
+        var scene = new ContainerEntity();
         foreach (var layer in layers)
         {
-            scene.AddLayer(layer);
+            scene.AddEntity(layer);
         }
         return scene;
     }
@@ -20,7 +19,7 @@ public class SceneLookupTests
         var camera = new CameraLayer2D();
         var scene = SceneWith(camera, new PlayField2D());
 
-        Assert.Same(camera, scene.GetLayer<CameraLayer2D>());
+        Assert.Same(camera, scene.GetEntity<CameraLayer2D>());
     }
 
     [Fact]
@@ -30,21 +29,21 @@ public class SceneLookupTests
         var world = new CameraLayer2D { Name = "world" };
         var scene = SceneWith(hud, world);
 
-        Assert.Same(world, scene.GetLayer<CameraLayer2D>("world"));
+        Assert.Same(world, scene.GetEntity<CameraLayer2D>("world"));
     }
 
     [Fact]
     public void GetLayer_ByType_AmbiguousThrows()
     {
         var scene = SceneWith(new CameraLayer2D(), new CameraLayer2D());
-        Assert.Throws<InvalidOperationException>(() => scene.GetLayer<CameraLayer2D>());
+        Assert.Throws<InvalidOperationException>(() => scene.GetEntity<CameraLayer2D>());
     }
 
     [Fact]
-    public void TryGetLayer_ByName_MissingReturnsFalse()
+    public void TryGetEntity_ByName_MissingReturnsFalse()
     {
         var scene = SceneWith(new CameraLayer2D { Name = "main" });
-        Assert.False(scene.TryGetLayer<CameraLayer2D>("nope", out var layer));
+        Assert.False(scene.TryGetEntity<CameraLayer2D>("nope", out var layer));
         Assert.Null(layer);
     }
 
@@ -52,7 +51,7 @@ public class SceneLookupTests
     public void GetLayer_ByName_WrongTypeThrows()
     {
         var scene = SceneWith(new CameraLayer2D { Name = "main" });
-        Assert.Throws<InvalidOperationException>(() => scene.GetLayer<PlayField2D>("main"));
+        Assert.Throws<InvalidOperationException>(() => scene.GetEntity<PlayField2D>("main"));
     }
 
     [Fact]
@@ -65,7 +64,7 @@ public class SceneLookupTests
         playfield.AddEntity(sprite);
         SceneWith(cameraLayer, playfield);
 
-        sprite.Update(new UpdateContext());
+        Updater.Default.UpdateEntity(sprite, new EntityUpdateContext());
 
         Assert.Same(cameraLayer.Camera, follow.Camera);
     }
@@ -82,7 +81,7 @@ public class SceneLookupTests
         playfield.AddEntity(sprite);
         SceneWith(world, hud, playfield);
 
-        sprite.Update(new UpdateContext());
+        Updater.Default.UpdateEntity(sprite, new EntityUpdateContext());
 
         Assert.Same(world.Camera, follow.Camera);
     }
@@ -99,7 +98,7 @@ public class SceneLookupTests
         playfield.AddEntity(sprite);
         SceneWith(cameraLayer, playfield);
 
-        sprite.Update(new UpdateContext());
+        Updater.Default.UpdateEntity(sprite, new EntityUpdateContext());
 
         Assert.Same(explicitCamera, follow.Camera);
     }

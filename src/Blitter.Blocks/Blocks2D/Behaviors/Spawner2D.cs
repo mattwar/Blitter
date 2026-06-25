@@ -61,10 +61,10 @@ public abstract class Spawner2D : Behavior, IUpdatable
     /// <summary>Resolves the playfield that receives spawned sprites.</summary>
     protected virtual PlayField2D ResolveTarget()
     {
-        if (Entity is Scene2D scene)
-            return scene.GetLayer<PlayField2D>();
+        if (Entity is IContainerEntity container)
+            return container.GetEntity<PlayField2D>();
 
-        throw new InvalidOperationException("Spawner2D must be attached to a Scene2D or override ResolveTarget().");
+        throw new InvalidOperationException("Spawner2D must be attached to an IContainerEntity or override ResolveTarget().");
     }
 
     /// <summary>Returns whether <paramref name="sprite"/> counts toward <see cref="MaxAlive"/>.</summary>
@@ -89,7 +89,7 @@ public abstract class Spawner2D : Behavior, IUpdatable
         return spawned;
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         if (!_initialized)
         {

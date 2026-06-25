@@ -50,7 +50,7 @@ public sealed class Timer : Behavior, IUpdatable
         _initialized = true;
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         if (!_initialized)
         {

@@ -24,7 +24,7 @@ public class Motion2D : Behavior, IUpdatable
         _transform = entity.GetOrAddTrait<Transform2D>();
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         if (context.ElapsedSinceLastUpdate == TimeSpan.Zero)
             return;

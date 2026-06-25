@@ -14,7 +14,7 @@ public sealed class FadeAndExpire2D : Behavior, IUpdatable
 
     private TimeSpan _elapsed;
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var entity = this.Entity;
         _elapsed += context.ElapsedSinceLastUpdate;

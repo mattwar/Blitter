@@ -38,7 +38,7 @@ public sealed class Shake2D : Behavior, IUpdatable
         _transform = entity.GetOrAddTrait<Transform2D>();
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         // Roll back last frame's shake before recomputing.
         _transform.Position -= _lastOffset;

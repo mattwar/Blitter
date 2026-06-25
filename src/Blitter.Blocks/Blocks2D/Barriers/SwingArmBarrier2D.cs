@@ -17,7 +17,7 @@ namespace Blitter.Blocks2D;
 /// <see cref="SnapDegPerSec"/>. <see cref="SurfaceBounce2D"/>
 /// reads the angular velocity to add a surface kick to the ball.
 /// </remarks>
-public class SwingArmBarrier2D : Barrier2D
+public class SwingArmBarrier2D : Barrier2D, IUpdatable
 {
     public Vector2 Pivot { get; init; }
     public float Length { get; init; }
@@ -69,11 +69,11 @@ public class SwingArmBarrier2D : Barrier2D
         Transform.Rotation = float.IsNaN(CurrentAngleDeg) ? RestAngleDeg : CurrentAngleDeg;
         // Expose the swing's surface velocity to SurfaceBounce2D via a
         // capability behavior instead of a barrier-template method.
-        if (!this.TryGetBehavior<ISurfaceVelocity2D>(out _))
+        if (!this.TryGetCapability<ISurfaceVelocity2D>(out _))
             this.GetOrAddBehavior<SurfaceVelocityProvider>();
     }
 
-    public override void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         // NaN doubles as a "first frame" flag: on initial Update we
         // seed CurrentAngleDeg and skip edge detection so an arm
@@ -117,13 +117,13 @@ public class SwingArmBarrier2D : Barrier2D
     /// <c>false</c> to <c>true</c>. Override to play a sound, emit
     /// particles, etc.
     /// </summary>
-    protected virtual void OnPressed(in UpdateContext context) { }
+    protected virtual void OnPressed(in EntityUpdateContext context) { }
 
     /// <summary>
     /// Called once on the frame <see cref="Pressed"/> transitions from
     /// <c>true</c> to <c>false</c>.
     /// </summary>
-    protected virtual void OnReleased(in UpdateContext context) { }
+    protected virtual void OnReleased(in EntityUpdateContext context) { }
 
     /// <summary>
     /// Provider behavior that exposes the swinging capsule's surface velocity

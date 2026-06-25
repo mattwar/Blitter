@@ -164,9 +164,9 @@ var controller = new BreakoutController(window.Input, window.Renderer, ball, pad
 
 var hud = new BreakoutHud(controller, hudFont, bannerFont, W, H);
 
-var scene = new Scene2D
+var scene = new ContainerEntity
 {
-    Layers  = [ playField, popups, scoreboard, hud ],
+    Entities  = [ playField, popups, scoreboard, hud ],
     Behaviors = [ controller ],
 };
 
@@ -276,7 +276,7 @@ sealed class SpeedClamp2D : Behavior, IUpdatable
 
     protected override void OnAttach(IEntity entity) => _target = (Sprite2D)entity;
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var target = _target;
         if (target.Speed > 0f && target.Speed < Min)
@@ -323,7 +323,7 @@ sealed class Paddle : Barrier2D
         void IHittable2D.OnHit(in Hit2D hit) => _host.OnHit(_host, hit.Other);
     }
 
-    public void MoveTo(float x, in UpdateContext context)
+    public void MoveTo(float x, in EntityUpdateContext context)
     {
         var clamped = Math.Clamp(x, XMin, XMax);
         _previousCenter = Center;
@@ -555,10 +555,8 @@ sealed class BreakoutController : Behavior, IUpdatable
         _launchSpeed = launchSpeed;
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
-        var scene = (Scene2D)this.Entity;
-
         // --- Paddle: mouse delta drives the target; arrows nudge it.
         // RelativeMouseMode hides the cursor and pins it, so absolute
         // MousePosition is useless here. We accumulate MouseDelta and
@@ -652,7 +650,8 @@ sealed class BreakoutController : Behavior, IUpdatable
         _ball.Speed = 0f;
         _ball.Center = new Vector2(
             _paddle.Center.X,
-            _paddle.Center.Y - _paddle.HalfHeight - _ball.Radius - 2f);
+            _paddle.Center.Y - _paddle.HalfHeight - _ball.Radius - 2f
+            );
     }
 
     private void LaunchBall()
@@ -663,7 +662,7 @@ sealed class BreakoutController : Behavior, IUpdatable
         float deg = ((float)_rng.NextDouble() * 2f - 1f) * 35f;
         float rad = deg * MathF.PI / 180f;
         var v = new Vector2(MathF.Sin(rad), -MathF.Cos(rad)) * _launchSpeed;
-        (_ball.Speed, _ball.Heading) = Sprite2D.GetSpeedAndHeading(v);
+        _ball.Velocity.Vector = v;
         Audio.Play(Sounds.Select, 0.5f);
     }
 

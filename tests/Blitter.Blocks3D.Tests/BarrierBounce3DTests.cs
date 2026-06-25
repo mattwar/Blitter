@@ -4,7 +4,7 @@ namespace Blitter.Tests;
 
 public class BarrierBounce3DTests
 {
-    private static readonly UpdateContext Ctx = new()
+    private static readonly EntityUpdateContext Ctx = new()
     {
         ElapsedSinceStart = TimeSpan.FromSeconds(0.1),
         ElapsedSinceLastUpdate = TimeSpan.FromSeconds(0.1),

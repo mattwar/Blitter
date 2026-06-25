@@ -6,7 +6,7 @@ namespace Blitter.Blocks2D;
 /// The 2D world layer: owns a flat entity list, updates and draws live
 /// children, and runs 2D collision over those entities.
 /// </summary>
-public class PlayField2D : Layer2D, IContainerEntity
+public class PlayField2D : Layer2D, IContainerEntity, IUpdatable, IUpdateTraversalOwner
 {
     private readonly List<IEntity> _entities = new();
     private readonly List<IEntity> _pendingAddEntities = new();
@@ -191,10 +191,9 @@ public class PlayField2D : Layer2D, IContainerEntity
     public int MaxSubsteps { get; set; } = 8;
 
     /// <inheritdoc/>
-    public override void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         _bounds.Rect = WorldBounds
-            ?? (this.Container as Scene2D)?.RendererOrNull?.LogicalBounds
             ?? _bounds.Rect;
 
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
@@ -252,13 +251,13 @@ public class PlayField2D : Layer2D, IContainerEntity
         return Math.Clamp(n, 1, MaxSubsteps);
     }
 
-    private void RunOneStep(in UpdateContext context)
+    private void RunOneStep(in EntityUpdateContext context)
     {
         for (int i = 0; i < _entities.Count; i++)
         {
             var entity = _entities[i];
             if (IsLive(entity))
-                entity.Update(context);
+                Updater.Default.Update(entity, in context);
         }
 
         _collider.Collide(_entities);

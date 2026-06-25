@@ -40,7 +40,7 @@ public sealed class SurfaceStop2D : Behavior, IHittable2D, IUpdatable
         _velocity = entity.GetTrait<Velocity2D>();
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         IsGrounded = _floorContactSeen;
         _floorContactSeen = false;

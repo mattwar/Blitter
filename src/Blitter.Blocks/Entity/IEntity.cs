@@ -31,9 +31,15 @@ public interface IEntity
     /// or creates and adds a new one if absent.
     /// </summary>
     T GetOrAddTrait<T>() where T : Trait, new();
+}
 
+/// <summary>
+/// An entity that can be resolved by a container-local name.
+/// </summary>
+public interface INamedEntity : IEntity
+{
     /// <summary>
-    /// Advance this entity one tick.
+    /// Optional container-local name.
     /// </summary>
-    void Update(in UpdateContext context);
+    string? Name { get; }
 }

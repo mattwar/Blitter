@@ -75,7 +75,7 @@ public class CameraFollow2D : Behavior, IUpdatable
         _target = entity.GetOrAddTrait<Transform2D>();
     }
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         // The camera lives on a sibling layer reached through the scene,
         // which isn't reachable when this behavior is attached (the sprite
@@ -138,18 +138,18 @@ public class CameraFollow2D : Behavior, IUpdatable
     /// <summary>
     /// Resolves <see cref="Camera"/> from a <see cref="CameraLayer2D"/> when
     /// it was not assigned explicitly: by <see cref="CameraName"/> if set,
-    /// otherwise the scene's single camera layer. A no-op until the entity
-    /// is a sprite that is part of a running scene.
+    /// otherwise the containing tree's single camera layer. A no-op until the
+    /// entity is a sprite that is part of a running entity tree.
     /// </summary>
     private void ResolveCamera()
     {
-        if (_entity is Sprite2D { Container: PlayField2D playfield } && playfield.Container is Scene2D scene)
+        if (_entity is Sprite2D { Container: PlayField2D playfield } && playfield.Container is IContainerEntity container)
         {
             CameraLayer2D? cameraLayer;
             if (CameraName is null)
-                scene.TryGetLayer(out cameraLayer);
+                container.TryGetEntity(out cameraLayer);
             else
-                scene.TryGetLayer(CameraName, out cameraLayer);
+                container.TryGetEntity(CameraName, out cameraLayer);
 
             if (cameraLayer is not null)
                 Camera = cameraLayer.Camera;

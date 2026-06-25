@@ -18,7 +18,7 @@ public abstract class Barrier2D : Entity, IColliderBarrier2D, IDrawable2D
     {
         _transform = this.GetOrAddTrait<Transform2D>();
         this.GetOrAddTrait<Surface2D>();
-        if (!this.TryGetBehavior<IColliderShape2D>(out _))
+        if (!this.TryGetCapability<IColliderShape2D>(out _))
             this.GetOrAddBehavior<DefaultColliderShape2D>();
         base.OnAttach(entity);
     }
@@ -31,7 +31,7 @@ public abstract class Barrier2D : Entity, IColliderBarrier2D, IDrawable2D
     /// this directly.
     /// </summary>
     public PosedHitShape2D HitShape =>
-        this.TryGetBehavior<IColliderShape2D>(out var collider)
+        this.TryGetCapability<IColliderShape2D>(out var collider)
             ? collider.GetShape()
             : new(HitShape2D.None, Transform.Pose);
 

@@ -193,7 +193,7 @@ var hud = new PinballHud(gameController, scoreFont, H);
 // The scene puts it all togther.
 var scene = new Scene2D
 {
-    Layers = 
+    Entities = 
     [ 
         drainBand, 
         playField, 
@@ -448,7 +448,7 @@ sealed class Flipper : SwingArmBarrier2D
 {
     public Sound? HitSound { get; set;}
 
-    protected override void OnPressed(in UpdateContext context)
+    protected override void OnPressed(in EntityUpdateContext context)
     {
         if (this.HitSound is {} sound)
             Audio.Play(sound, 0.5f);
@@ -504,10 +504,8 @@ sealed class PinballGameController : Behavior, IUpdatable
 
     private readonly Random _rng = new();
 
-    public void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
-        var scene = (Scene2D)this.Entity;
-
         // Flippers: each frame, drive Pressed off the shift keys.
         // The barriers handle slewing and surface velocity.
         _flipperLeft.Pressed = _input.IsDown(Key.LShift);
