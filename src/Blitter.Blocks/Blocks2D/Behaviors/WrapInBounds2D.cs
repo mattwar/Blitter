@@ -36,7 +36,9 @@ public class WrapInBounds2D : Behavior, IUpdatable
         if (_bounds is null)
             return;
 
-        var b = _bounds.Rect;
+        if (_bounds.Rect is not Rect b)
+            return;
+
         if (b.Width <= 0f || b.Height <= 0f)
             return;
 

@@ -91,20 +91,14 @@ public class PlayField2D : Entity, IDrawable2D, IContainer, ICollisionSpace2D, I
 
     /// <summary>
     /// Optional world rectangle larger (or smaller) than the visible viewport.
-    /// When set, behaviors can resolve this rectangle as their
-    /// <see cref="Bounds2D"/> trait instead of the renderer's viewport.
+    /// Backed by this entity's <see cref="Bounds2D"/> trait so behaviors can
+    /// resolve it by walking up the entity tree.
     /// </summary>
-    public Rect? WorldBounds { get; set; }
-
-    /// <summary>
-    /// When true and <see cref="WorldBounds"/> is set, the playfield draws the world boundary.
-    /// </summary>
-    public bool ShowWorldBounds { get; set; }
-
-    /// <summary>
-    /// Color used by <see cref="ShowWorldBounds"/> for the boundary outline.
-    /// </summary>
-    public Color WorldBoundsColor { get; set; } = new Color(0, 200, 255, 255);
+    public Rect? WorldBounds
+    {
+        get => _bounds.Rect;
+        set => _bounds.Rect = value;
+    }
 
     /// <inheritdoc/>
     public void AddEntity(IEntity child)
@@ -199,9 +193,6 @@ public class PlayField2D : Entity, IDrawable2D, IContainer, ICollisionSpace2D, I
     /// <inheritdoc/>
     public void Update(in EntityUpdateContext context)
     {
-        _bounds.Rect = WorldBounds
-            ?? _bounds.Rect;
-
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
         int substeps = ComputeSubstepCount(dt);
         var subContext = substeps > 1
@@ -292,8 +283,6 @@ public class PlayField2D : Entity, IDrawable2D, IContainer, ICollisionSpace2D, I
 
     public void Draw(Renderer2D renderer)
     {
-        DrawBackground(renderer);
-
         for (int i = 0; i < _entities.Count; i++)
         {
             var entity = _entities[i];
@@ -301,41 +290,5 @@ public class PlayField2D : Entity, IDrawable2D, IContainer, ICollisionSpace2D, I
                 drawable.Draw(renderer);
         }
 
-        if (ShowWorldBounds && WorldBounds is not null)
-            DrawWorldBoundsOutline(renderer);
-
-        DrawForeground(renderer);
-    }
-
-    /// <summary>
-    /// Draws the <see cref="WorldBounds"/> overlay. Override to customize
-    /// the style (thicker lines, dashed, animated, etc.). Only called
-    /// when <see cref="WorldBounds"/> is non-null.
-    /// </summary>
-    protected virtual void DrawWorldBoundsOutline(Renderer2D renderer)
-    {
-        if (WorldBounds is not Rect wb)
-            return;
-        using var _ = renderer.PushState();
-        renderer.DrawColor = WorldBoundsColor;
-        var inset = 1f / (renderer.Camera?.Zoom ?? 1f);
-        var x0 = wb.X;
-        var y0 = wb.Y;
-        var x1 = wb.X + wb.Width - inset;
-        var y1 = wb.Y + wb.Height - inset;
-        renderer.DrawLine(x0, y0, x1, y0);
-        renderer.DrawLine(x1, y0, x1, y1);
-        renderer.DrawLine(x1, y1, x0, y1);
-        renderer.DrawLine(x0, y1, x0, y0);
-    }
-
-    /// <summary>Hook to draw before the entity pass.</summary>
-    protected virtual void DrawBackground(Renderer2D renderer)
-    {
-    }
-
-    /// <summary>Hook to draw after the entity pass.</summary>
-    protected virtual void DrawForeground(Renderer2D renderer)
-    {
     }
 }

@@ -142,7 +142,7 @@ var starsMid = new StarField2D(250, midBounds, seed: 2)
 var playField = new PlayField2D([..asteroids, rocket])
 {
     WorldBounds = worldBounds,
-    ShowWorldBounds = true,
+    Behaviors = [new DrawWorldBounds2D()],
 };
 
 // Ends the run when every target is cleared (or V is pressed). The HUD

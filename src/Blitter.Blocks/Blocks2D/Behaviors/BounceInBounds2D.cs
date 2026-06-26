@@ -37,7 +37,9 @@ public class BounceInBounds2D : Behavior, IUpdatable
         if (_bounds is null)
             return;
 
-        var bounds = _bounds.Rect;
+        if (_bounds.Rect is not Rect bounds)
+            return;
+
         var v = Sprite2D.GetVelocity(_velocity.Speed, _velocity.Heading);
         var bounced = false;
 
