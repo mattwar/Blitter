@@ -8,21 +8,25 @@ public readonly struct EntityUpdateContext : IUpdateContext
     public EntityUpdateContext(
         TimeSpan elapsedSinceStart,
         TimeSpan elapsedSinceLastUpdate,
+        FrameInput? input = null,
         IEntityRunControl? runControl = null)
     {
         ElapsedSinceStart = elapsedSinceStart;
         ElapsedSinceLastUpdate = elapsedSinceLastUpdate;
+        Input = input;
         RunControl = runControl;
     }
 
-    public EntityUpdateContext(IUpdateContext context, IEntityRunControl? runControl = null)
-        : this(context.ElapsedSinceStart, context.ElapsedSinceLastUpdate, runControl)
+    public EntityUpdateContext(IUpdateContext context, IEntityRunControl? runControl = null, FrameInput? input = null)
+        : this(context.ElapsedSinceStart, context.ElapsedSinceLastUpdate, input, runControl)
     {
     }
 
     public TimeSpan ElapsedSinceStart { get; init; }
 
     public TimeSpan ElapsedSinceLastUpdate { get; init; }
+
+    public FrameInput? Input { get; init; }
 
     public IEntityRunControl? RunControl { get; init; }
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 
 namespace Blitter.Blocks2D;
@@ -17,7 +18,7 @@ public enum MinimapShape
 
 /// <summary>
 /// Per-entity minimap symbol spec returned by
-/// <see cref="MinimapLayer2D.MarkerSelector"/>.
+/// <see cref="MinimapLayer2D.GetMarker"/>.
 /// </summary>
 /// <param name="Color">Fill color.</param>
 /// <param name="Radius">Half-extent in minimap pixels (size scales linearly with this).</param>
@@ -32,14 +33,30 @@ public readonly record struct MinimapMarker(
 /// <summary>
 /// Screen-locked overhead view of a <see cref="PlayField2D"/>. Draws
 /// a background panel, per-sprite markers selected by
-/// <see cref="MarkerSelector"/>, and (optionally) an outline of the
+/// <see cref="GetMarker"/>, and (optionally) an outline of the
 /// active camera's viewport. The minimap does not scroll with the
 /// world — the layer detaches the camera while drawing.
 /// </summary>
-public sealed class MinimapLayer2D : Entity, IDrawable2D
+public class MinimapLayer2D : Entity, IDrawable2D
 {
-    /// <summary>Playfield whose sprites and world bounds are displayed.</summary>
-    public required PlayField2D Source { get; init; }
+    private PlayField2D? _source;
+    private string? _sourceName;
+
+    /// <summary>
+    /// Optional name of the sibling <see cref="PlayField2D"/> to display. When
+    /// unset, the minimap resolves the single sibling playfield by type.
+    /// </summary>
+    public string? SourceName
+    {
+        get => _sourceName;
+        set
+        {
+            if (_sourceName == value)
+                return;
+            _sourceName = value;
+            _source = null;
+        }
+    }
 
     /// <summary>Where on the screen the minimap is drawn, in renderer pixels.</summary>
     public Rect ScreenRect { get; set; }
@@ -57,19 +74,13 @@ public sealed class MinimapLayer2D : Entity, IDrawable2D
     public Color BorderColor { get; set; } = new Color(255, 255, 255, 96);
 
     /// <summary>
-    /// Selects how a sprite-role entity is drawn on the minimap, or returns
-    /// <c>null</c> to hide it. Keeps the layer ignorant of
-    /// game-specific entity types.
-    /// </summary>
-    public Func<IEntity, MinimapMarker?> MarkerSelector { get; set; } = _ => null;
-
-    /// <summary>
-    /// When set together with <see cref="ViewportSize"/>, draws an outline
-    /// showing what part of the world the camera is currently looking at.
+    /// Optional camera used to draw the viewport outline. When unset, the
+    /// minimap resolves the nearest <see cref="ICamera2D"/> capability in its
+    /// entity tree.
     /// </summary>
     public Camera2D? ViewportCamera { get; set; }
 
-    /// <summary>Logical viewport size in world units. Pairs with <see cref="ViewportCamera"/>.</summary>
+    /// <summary>Logical viewport size in world units. Used when drawing the viewport outline.</summary>
     public Vector2 ViewportSize { get; set; }
 
     /// <summary>Outline color for the viewport rectangle. Set alpha 0 to skip.</summary>
@@ -80,7 +91,10 @@ public sealed class MinimapLayer2D : Entity, IDrawable2D
 
     public void Draw(Renderer2D renderer)
     {
-        var world = WorldRect ?? Source.WorldBounds ?? ScreenRect;
+        if (!TryResolveSource(out var source))
+            return;
+
+        var world = WorldRect ?? source.WorldBounds ?? ScreenRect;
         if (world.Width <= 0 || world.Height <= 0)
             return;
 
@@ -105,11 +119,11 @@ public sealed class MinimapLayer2D : Entity, IDrawable2D
             ScreenRect.X + (worldPos.X - world.X) * sx,
             ScreenRect.Y + (worldPos.Y - world.Y) * sy);
 
-        foreach (var sprite in Source.Entities)
+        foreach (var sprite in source.Entities)
         {
             if (sprite is IColliderBarrier2D) continue;
-            if (Source.GetContainment(sprite) == Containment.Removing) continue;
-            if (MarkerSelector(sprite) is not { } m) continue;
+            if (source.GetContainment(sprite) == Containment.Removing) continue;
+            if (GetMarker(sprite) is not { } m) continue;
             if (m.Radius <= 0f || m.Color.A == 0) continue;
             if (!sprite.TryGetTrait<Transform2D>(out var transform)) continue;
 
@@ -117,7 +131,7 @@ public sealed class MinimapLayer2D : Entity, IDrawable2D
             DrawMarker(renderer, c, m);
         }
 
-        if (ViewportCamera is { } cam && ViewportColor.A != 0 && ViewportSize != Vector2.Zero)
+        if (ResolveViewportCamera() is { } cam && ViewportColor.A != 0 && ViewportSize != Vector2.Zero)
         {
             var topLeft = ToMini(cam.Position - ViewportSize * 0.5f);
             var size = new Vector2(ViewportSize.X * sx, ViewportSize.Y * sy);
@@ -150,6 +164,44 @@ public sealed class MinimapLayer2D : Entity, IDrawable2D
                 new(ScreenRect.X,                     ScreenRect.Y),
             });
         }
+    }
+
+    /// <summary>
+    /// Selects how an entity is drawn on the minimap, or returns <c>null</c>
+    /// to hide it.
+    /// </summary>
+    protected virtual MinimapMarker? GetMarker(IEntity entity) => null;
+
+    private bool TryResolveSource([NotNullWhen(true)] out PlayField2D? source)
+    {
+        if (_source is not null)
+        {
+            source = _source;
+            return true;
+        }
+
+        if (Container is not { } container)
+        {
+            source = null;
+            return false;
+        }
+
+        var found = container.TryGetEntity(_sourceName, out source);
+
+        if (found)
+            _source = source;
+
+        return found;
+    }
+
+    private Camera2D? ResolveViewportCamera()
+    {
+        if (ViewportCamera is { } camera)
+            return camera;
+
+        return this.TryFindCapability<ICamera2D>(out var capability)
+            ? capability.Camera
+            : null;
     }
 
     private static void DrawMarker(Renderer2D renderer, Vector2 center, MinimapMarker m)

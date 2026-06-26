@@ -22,12 +22,6 @@ public class PlayField2D : Entity, IDrawable2D, IContainer, ICollisionSpace2D, I
         _collider = new Collider2D(IsLive);
     }
 
-    public PlayField2D(IEnumerable<IEntity> entities)
-        : this()
-    {
-        AdoptEntities(entities);
-    }
-
     private static void SetContainer(IEntity child, IContainer? container)
     {
         if (child is Entity entity)

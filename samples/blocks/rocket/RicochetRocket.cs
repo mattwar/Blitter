@@ -8,6 +8,7 @@
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
 
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using Blitter;
 using Blitter.Bits;
@@ -92,8 +93,9 @@ var rocket = new Rocket
     Heading = 45f,
     Behaviors = 
     [ 
-        new RocketController(window.Input),
+        new RocketController(),
         new AsteroidSmasher(scoreboard),
+        new CameraFollow2D{ ViewportSize = new Vector2(DesignW, DesignH), MarginFraction = 0.3f },
     ]
 };
 
@@ -101,12 +103,6 @@ var rocket = new Rocket
 // the rocket so the first frame isn't a snap from the world origin.
 var camera = new Camera2D { Position = rocket.Center };
 var attachedCamera = new AttachedCamera2D { Camera = camera };
-
-var worldBounds = new Rect(0, 0, WorldW, WorldH);
-var cameraFollow = rocket.GetOrAddBehavior<CameraFollow2D>();
-cameraFollow.ViewportSize = new Vector2(DesignW, DesignH);
-cameraFollow.MarginFraction = 0.3f;
-cameraFollow.WorldBounds = worldBounds;
 
 // Parallax star field. The rocket is buzzing around an asteroid
 // field, not zooming between stars, so both layers stay nearly
@@ -139,56 +135,45 @@ var starsMid = new StarField2D(250, midBounds, seed: 2)
 };
 
 // The playfield includes the asteriods and the rocket.
-var playField = new PlayField2D([..asteroids, rocket])
+var playField = new PlayField2D
 {
-    WorldBounds = worldBounds,
+    Entities = [..asteroids, rocket],
+    Traits = [new Bounds2D { Rect = new Rect(0, 0, WorldW, WorldH) }],
     Behaviors = [new DrawWorldBounds2D()],
 };
 
 // Ends the run when every target is cleared (or V is pressed). The HUD
 // layer reads GameOverAt to draw a "GAME OVER" banner during exit-delay.
-var levelComplete = new LevelComplete2D(playField, window, gameOverDuration);
+var levelComplete = new LevelComplete2D { Delay = gameOverDuration };
 
 // HUD overlay: speed readout and the game-over banner.
-var hud = new RocketHud(rocket, scoreFont, bannerFont, levelComplete, DesignW, DesignH);
+var hud = new RocketHud
+{
+    ScoreFont = scoreFont,
+    BannerFont = bannerFont,
+    DesignSize = new Vector2(DesignW, DesignH),
+};
 
 // Overhead minimap so the player can see asteroids beyond the
 // viewport. Sized to the upper-right corner; markers are scaled
 // by asteroid size and colored by kind.
-var minimap = new MinimapLayer2D
+var minimap = new RocketMinimapLayer
 {
-    Source = playField,
     // 16:9 to match the world (3840x2160) so the viewport overlay
     // and asteroid positions aren't stretched.
     ScreenRect = new Rect(DesignW - 340, 20, 320, 180),
     // Slightly translucent so asteroids passing behind the minimap
     // are still readable through the panel.
     BackgroundColor = new Color(0, 0, 0, 100),
-    ViewportCamera = camera,
     ViewportSize = new Vector2(DesignW, DesignH),
     ViewportColor = new Color(0,0,0,0), // no outline
-    MarkerSelector = s => s switch
-    {
-        Rocket r => new MinimapMarker(
-            Color.Red,
-            Radius: 6f,
-            Shape: MinimapShape.Triangle,
-            // Use Rotation (not Heading) so the marker spins with the
-            // rocket during stun, when the two diverge.
-            Rotation: r.Rotation),
-        Asteroid { Kind: AsteriodKind.Gold } g =>
-            new MinimapMarker(new Color(255, 215, 0), Radius: 2f + g.Scale * 4f, Shape: MinimapShape.Circle),
-        Asteroid { Kind: AsteriodKind.Radioactive } x =>
-            new MinimapMarker(new Color(120, 255, 120), Radius: 2f + x.Scale * 4f, Shape: MinimapShape.Square, Rotation: 45f),
-        Asteroid a =>
-            new MinimapMarker(new Color(210, 180, 140), Radius: 1.5f + a.Scale * 3.5f, Shape: MinimapShape.Circle),
-        _ => null,
-    },
 };
 
 // Debug overlay: outlines the rocket's HitShape in world space so
 // we can see exactly where collisions register. Toggle with H.
-var hitDebug = new HitDebugLayer(window, rocket, playField);
+var hitDebug = new HitDebugLayer
+{
+};
 
 var scene = new Scene2D
 {
@@ -257,12 +242,49 @@ static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
     return asteroids;
 }
 
+sealed class RocketMinimapLayer : MinimapLayer2D
+{
+    protected override MinimapMarker? GetMarker(IEntity entity) => entity switch
+    {
+        Rocket r => new MinimapMarker(
+            Color.Red,
+            Radius: 6f,
+            Shape: MinimapShape.Triangle,
+            // Use Rotation (not Heading) so the marker spins with the
+            // rocket during stun, when the two diverge.
+            Rotation: r.Rotation),
+        Asteroid { Kind: AsteriodKind.Gold } g =>
+            new MinimapMarker(new Color(255, 215, 0), Radius: 2f + g.Scale * 4f, Shape: MinimapShape.Circle),
+        Asteroid { Kind: AsteriodKind.Radioactive } x =>
+            new MinimapMarker(new Color(120, 255, 120), Radius: 2f + x.Scale * 4f, Shape: MinimapShape.Square, Rotation: 45f),
+        Asteroid a =>
+            new MinimapMarker(new Color(210, 180, 140), Radius: 1.5f + a.Scale * 3.5f, Shape: MinimapShape.Circle),
+        _ => null,
+    };
+}
+
 // HUD overlay: flashing speed readout plus the "GAME OVER" banner that
 // LevelComplete2D triggers during the exit delay.
-sealed class RocketHud(Rocket rocket, Font scoreFont, Font bannerFont, LevelComplete2D levelComplete, int designW, int designH) : Entity, IDrawable2D
+sealed class RocketHud : Entity, IDrawable2D
 {
+    private Rocket? _rocket;
+    private LevelComplete2D? _levelComplete;
+
+    public string? RocketName { get; init; }
+
+    public string? LevelCompleteName { get; init; }
+
+    public required Font ScoreFont { get; init; }
+
+    public required Font BannerFont { get; init; }
+
+    public Vector2 DesignSize { get; init; }
+
     public void Draw(Renderer2D rd)
     {
+        if (!TryResolveRocket(out var rocket))
+            return;
+
         using var _ = rd.PushState();
         rd.Camera = null; // detach camera so HUD is screen-locked
 
@@ -278,38 +300,94 @@ sealed class RocketHud(Rocket rocket, Font scoreFont, Font bannerFont, LevelComp
             var speedColor = tooSlow
                 ? new Color(255, 140, 80)  // orange = too slow
                 : new Color(120, 255, 120); // green = smashing speed
-            scoreFont.DrawText(rd, $"SPEED {rocket.Speed:0}", speedColor, 20f, 120f);
+            ScoreFont.DrawText(rd, $"SPEED {rocket.Speed:0}", speedColor, 20f, 120f);
         }
 
-        if (levelComplete.GameOverAt is not null)
+        if (TryResolveLevelComplete(out var levelComplete) && levelComplete.GameOverAt is not null)
         {
             const string banner = "GAME OVER";
-            var size = bannerFont.Measure(banner);
-            float x = (designW - size.X) / 2f;
-            float y = (designH - size.Y) / 2f;
-            bannerFont.DrawText(rd, banner, Color.White, x, y);
+            var size = BannerFont.Measure(banner);
+            float x = (DesignSize.X - size.X) / 2f;
+            float y = (DesignSize.Y - size.Y) / 2f;
+            BannerFont.DrawText(rd, banner, Color.White, x, y);
         }
+    }
+
+    private bool TryResolveRocket([NotNullWhen(true)] out Rocket? rocket)
+    {
+        if (_rocket is not null)
+        {
+            rocket = _rocket;
+            return true;
+        }
+
+        if (Container is not { } container || !container.TryGetEntity<PlayField2D>(out var playfield))
+        {
+            rocket = null;
+            return false;
+        }
+
+        var found = playfield.TryGetEntity(RocketName, out rocket);
+
+        if (found)
+            _rocket = rocket;
+
+        return found;
+    }
+
+    private bool TryResolveLevelComplete([NotNullWhen(true)] out LevelComplete2D? levelComplete)
+    {
+        if (_levelComplete is not null)
+        {
+            levelComplete = _levelComplete;
+            return true;
+        }
+
+        if (Container is not { } container)
+        {
+            levelComplete = null;
+            return false;
+        }
+
+        var found = LevelCompleteName is null
+            ? container.TryGetBehavior(out levelComplete)
+            : container.TryGetCapability(LevelCompleteName, out levelComplete);
+
+        if (found)
+            _levelComplete = levelComplete;
+
+        return found;
     }
 }
 
 // Debug overlay: outlines the rocket and asteroid HitShapes in world
 // space (toggle with H) so collision registration is visible.
-sealed class HitDebugLayer(Window2D window, Rocket rocket, PlayField2D playField) : Entity, IDrawable2D, IUpdatable
+sealed class HitDebugLayer : Entity, IDrawable2D, IUpdatable
 {
+    private readonly HitShapeDebug2D _hitShapeDebug = new();
+    private PlayField2D? _playField;
+    private Rocket? _rocket;
     private bool _showHitShape;
+
+    public string? PlayFieldName { get; init; }
+
+    public string? RocketName { get; init; }
 
     public void Update(in EntityUpdateContext context)
     {
-        if (window.Input.WasJustPressed(Key.H))
+        if (context.Input?.WasJustPressed(Key.H) == true)
             _showHitShape = !_showHitShape;
     }
 
     public void Draw(Renderer2D rd)
     {
         if (!_showHitShape) return;
+        if (!TryResolvePlayField(out var playField) || !TryResolveRocket(playField, out var rocket)) return;
+
         using var _ = rd.PushState();
+
         rd.DrawColor = new Color(0, 255, 120, 220);
-        rocket.HitShape.Visit(HitShapeDebug2D.Draw(rd));
+        _hitShapeDebug.Draw(rd, rocket.HitShape);
         // Also outline the bounding circle in a dimmer color
         // so we can see when the cheap reject would skip.
         rd.DrawColor = new Color(0, 200, 255, 90);
@@ -317,23 +395,65 @@ sealed class HitDebugLayer(Window2D window, Rocket rocket, PlayField2D playField
 
         // Same treatment for every asteroid currently on the field:
         // magenta hit shape outline + dim bounding circle.
-        var hitVisitor = HitShapeDebug2D.Draw(rd);
         foreach (var sprite in playField.Entities)
         {
             if (sprite is not Asteroid asteroid) continue;
             rd.DrawColor = new Color(255, 80, 200, 220);
-            asteroid.HitShape.Visit(hitVisitor);
+            _hitShapeDebug.Draw(rd, asteroid.HitShape);
             rd.DrawColor = new Color(255, 120, 220, 70);
             HitShapeDebug2D.DrawCircleOutline(rd, asteroid.HitShape.BoundingCircle.Center, asteroid.HitShape.BoundingCircle.Radius);
         }
+    }
+
+    private bool TryResolvePlayField([NotNullWhen(true)] out PlayField2D? playField)
+    {
+        if (_playField is not null)
+        {
+            playField = _playField;
+            return true;
+        }
+
+        if (Container is not { } container)
+        {
+            playField = null;
+            return false;
+        }
+
+        var found = container.TryGetEntity(PlayFieldName, out playField);
+        if (found)
+            _playField = playField;
+
+        return found;
+    }
+
+    private bool TryResolveRocket(PlayField2D playField, [NotNullWhen(true)] out Rocket? rocket)
+    {
+        if (_rocket is not null)
+        {
+            rocket = _rocket;
+            return true;
+        }
+
+        var found = playField.TryGetEntity(RocketName, out rocket);
+        if (found)
+            _rocket = rocket;
+
+        return found;
     }
 }
 
 // Ends the run when every non-radioactive target is cleared (or V is
 // pressed). The HUD reads GameOverAt to draw the "GAME OVER" banner.
-sealed class LevelComplete2D(PlayField2D playField, Window2D window, TimeSpan delay)
-    : Behavior, IUpdatable
+sealed class LevelComplete2D : Behavior, IUpdatable, ICapability
 {
+    private PlayField2D? _playField;
+
+    public string? Name { get; init; }
+
+    public TimeSpan Delay { get; init; }
+
+    public string? PlayFieldName { get; init; }
+
     public DateTime? GameOverAt { get; private set; }
 
     public void Update(in EntityUpdateContext context)
@@ -341,14 +461,38 @@ sealed class LevelComplete2D(PlayField2D playField, Window2D window, TimeSpan de
         var runControl = context.RunControl;
         if (runControl?.RunState != RunState.Running)
             return;
+        if (!TryResolvePlayField(out var playField))
+            return;
+
         var remainingTargets = playField.Entities.Count(
             s => s is Asteroid a && a.Kind != AsteriodKind.Radioactive);
-        if (remainingTargets == 0 || window.Input.WasJustPressed(Key.V))
+        if (remainingTargets == 0 || context.Input?.WasJustPressed(Key.V) == true)
         {
             _ = Audio.PlayAsync(Melodies.LevelUp, volume: .3f);
             GameOverAt = DateTime.UtcNow;
-            runControl.RequestExitAfter(delay);
+            runControl.RequestExitAfter(Delay);
         }
+    }
+
+    private bool TryResolvePlayField([NotNullWhen(true)] out PlayField2D? playField)
+    {
+        if (_playField is not null)
+        {
+            playField = _playField;
+            return true;
+        }
+
+        if (Entity.Container is not { } container)
+        {
+            playField = null;
+            return false;
+        }
+
+        var found = container.TryGetEntity(PlayFieldName, out playField);
+        if (found)
+            _playField = playField;
+
+        return found;
     }
 }
 
@@ -878,8 +1022,6 @@ sealed class Asteroid : Sprite2D, IUpdatable
 
 sealed class RocketController : Behavior, IUpdatable
 {
-    private readonly FrameInput _input;
-
     // Turn feel tuning.
     private const float MaxTurnRateDegPerSec = 240f;
     private const float TurnAccelDegPerSec2 = 1200f;
@@ -888,11 +1030,6 @@ sealed class RocketController : Behavior, IUpdatable
 
     // Signed turn rate in deg/s. Negative = left, positive = right.
     private float _turnRateDegPerSec;
-
-    public RocketController(FrameInput input)
-    {
-        _input = input;
-    } 
 
     private Sprite2D _rocket = null!;
 
@@ -913,8 +1050,12 @@ sealed class RocketController : Behavior, IUpdatable
         if (dt <= 0f)
             return;
 
-        var leftDown = _input.IsDown(Key.Left);
-        var rightDown = _input.IsDown(Key.Right);
+        var input = context.Input;
+        if (input is null)
+            return;
+
+        var leftDown = input.IsDown(Key.Left);
+        var rightDown = input.IsDown(Key.Right);
 
         float targetTurnRate = 0f;
         if (leftDown && !rightDown)
@@ -927,22 +1068,22 @@ sealed class RocketController : Behavior, IUpdatable
         _turnRateDegPerSec = MoveToward(_turnRateDegPerSec, targetTurnRate, maxStep);
 
         // Tap response: a short press injects an immediate turn kick.
-        if (_input.WasJustPressed(Key.Left))
+        if (input.WasJustPressed(Key.Left))
             _turnRateDegPerSec -= TapTurnKickDegPerSec;
-        if (_input.WasJustPressed(Key.Right))
+        if (input.WasJustPressed(Key.Right))
             _turnRateDegPerSec += TapTurnKickDegPerSec;
 
         _turnRateDegPerSec = Math.Clamp(_turnRateDegPerSec, -MaxTurnRateDegPerSec, MaxTurnRateDegPerSec);
         rocket.Heading = WrapDegrees(rocket.Heading + _turnRateDegPerSec * dt);
 
-        if (_input.WasJustPressed(Key.Up))
+        if (input.WasJustPressed(Key.Up))
         {
             rocket.Speed = Math.Clamp(rocket.Speed + 50f, 0f, 1000f);
             if (rocket is Rocket r)
                 r.ShowFlameFor(Sounds.RoarUp.Duration);
             Audio.Play(Sounds.RoarUp, volume: .25f);
         }
-        if (_input.WasJustPressed(Key.Down))
+        if (input.WasJustPressed(Key.Down))
         {
             rocket.Speed = Math.Clamp(rocket.Speed - 50f, 0f, 1000f);
             Audio.Play(Sounds.RoarDown, volume: .25f);
@@ -963,76 +1104,3 @@ sealed class RocketController : Behavior, IUpdatable
     }
 }
 
-/// <summary>
-/// Tiny helper that turns a HitShape's live primitives into Renderer2D
-/// line draws. Lives in the sample so the engine doesn't pull in a
-/// rendering dependency for collision debug.
-/// </summary>
-static class HitShapeDebug2D
-{
-    // Build an action that draws each primitive. Returned delegate is
-    // fresh each call but a debug overlay isn't on the hot path.
-    public static HitPrimitiveAction2D Draw(Renderer2D rd) => (in HitPrimitive2D p) =>
-    {
-        switch (p.Kind)
-        {
-            case HitKind2D.Circle:
-                DrawCircleOutline(rd, p.P0, p.R);
-                break;
-            case HitKind2D.Capsule:
-                DrawCapsuleOutline(rd, p.P0, p.P1, p.R);
-                break;
-        }
-    };
-
-    public static void DrawCircleOutline(Renderer2D rd, Vector2 center, float radius, int segments = 32)
-    {
-        Span<Vector2> pts = stackalloc Vector2[segments + 1];
-        var step = MathF.Tau / segments;
-        for (int i = 0; i <= segments; i++)
-        {
-            var a = i * step;
-            pts[i] = new Vector2(center.X + MathF.Cos(a) * radius, center.Y + MathF.Sin(a) * radius);
-        }
-        rd.DrawLines(pts);
-    }
-
-    public static void DrawCapsuleOutline(Renderer2D rd, Vector2 a, Vector2 b, float radius, int capSegments = 12)
-    {
-        var axis = b - a;
-        var len = axis.Length();
-        // Degenerate capsule: just a circle.
-        if (len <= float.Epsilon)
-        {
-            DrawCircleOutline(rd, a, radius, capSegments * 2);
-            return;
-        }
-        var d = axis / len;
-        var n = new Vector2(-d.Y, d.X) * radius;
-
-        // Outline: side1 (A+n → B+n), B-cap arc, side2 (B-n → A-n),
-        // A-cap arc, close. Drawn as one connected polyline.
-        var totalPts = 1 + 1 + (capSegments + 1) + 1 + (capSegments + 1);
-        Span<Vector2> pts = stackalloc Vector2[totalPts];
-        int k = 0;
-        pts[k++] = a + n;
-        pts[k++] = b + n;
-        // Cap at B: rotate +n around B by π in the +d half-plane.
-        var startB = MathF.Atan2(n.Y, n.X);
-        for (int i = 1; i <= capSegments + 1; i++)
-        {
-            var ang = startB - MathF.PI * i / capSegments;
-            pts[k++] = b + new Vector2(MathF.Cos(ang), MathF.Sin(ang)) * radius;
-        }
-        // Now at b - n; walk back to a - n.
-        pts[k++] = a - n;
-        // Cap at A: continue the rotation another π so we land back at a + n.
-        var startA = MathF.Atan2(-n.Y, -n.X);
-        for (int i = 1; i <= capSegments + 1; i++)
-        {
-            var ang = startA - MathF.PI * i / capSegments;
-            pts[k++] = a + new Vector2(MathF.Cos(ang), MathF.Sin(ang)) * radius;
-        }
-        rd.DrawLines(pts[..k]);
-    }
-}

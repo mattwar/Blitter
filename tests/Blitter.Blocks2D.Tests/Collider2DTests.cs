@@ -17,8 +17,8 @@ public class Collider2DTests
         {
             Entities =
             [
-                new PlayField2D([firstA, firstB]),
-                new PlayField2D([secondA, secondB]),
+                new PlayField2D { Entities = [firstA, firstB] },
+                new PlayField2D { Entities = [secondA, secondB] },
             ]
         };
 
@@ -39,8 +39,8 @@ public class Collider2DTests
         {
             Entities =
             [
-                new PlayField2D([first]),
-                new PlayField2D([second]),
+                new PlayField2D { Entities = [first] },
+                new PlayField2D { Entities = [second] },
             ]
         };
 

@@ -40,7 +40,7 @@ public sealed class EntityRunner3D : IEntityRunControl
                 shouldExit: () => RunState == RunState.Exited || (shouldExit?.Invoke() ?? false),
                 renderFrame: rd =>
                 {
-                    var context = new EntityUpdateContext(rd.GetUpdateContext(), this);
+                    var context = new EntityUpdateContext(rd.GetUpdateContext(), this, window.Input);
                     update(in context);
                     EvaluateExitConditions(in context);
                     draw(rd);

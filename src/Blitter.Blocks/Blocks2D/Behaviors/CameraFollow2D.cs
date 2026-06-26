@@ -9,7 +9,8 @@ using System.Numerics;
 /// the target stays within the central dead zone; once the target
 /// enters the margin, the camera shifts just enough to push the
 /// target back to the dead-zone edge. Optionally clamped so the
-/// viewport never extends outside <see cref="WorldBounds"/>.
+/// viewport never extends outside <see cref="WorldBounds"/> or the nearest
+/// ancestor <see cref="Bounds2D"/> trait.
 /// </summary>
 public class CameraFollow2D : Behavior, IUpdatable
 {
@@ -49,9 +50,10 @@ public class CameraFollow2D : Behavior, IUpdatable
 
     /// <summary>
     /// Optional world rectangle the visible viewport is clamped
-    /// inside. When set, the camera will not scroll past the world
-    /// edges; if an axis of the world is smaller than the viewport,
-    /// the camera centers on that axis.
+    /// inside. When unset, falls back to the nearest ancestor
+    /// <see cref="Bounds2D"/> trait. When bounds are available, the camera
+    /// will not scroll past the world edges; if an axis of the world is
+    /// smaller than the viewport, the camera centers on that axis.
     /// </summary>
     public Rect? WorldBounds { get; set; }
 
@@ -66,6 +68,7 @@ public class CameraFollow2D : Behavior, IUpdatable
     private IEntity _entity = null!;
     private Transform2D _target = null!;
     private ICamera2D? _camera;
+    private Bounds2D? _bounds;
     private string? _cameraName;
 
     protected override void OnAttach(IEntity entity)
@@ -113,7 +116,7 @@ public class CameraFollow2D : Behavior, IUpdatable
         // Clamp so the viewport never shows outside the world. If an
         // axis of the world is smaller than the viewport, center on it
         // instead of clamping (would otherwise produce an empty range).
-        if (WorldBounds is Rect wb)
+        if (ResolveWorldBounds() is Rect wb)
         {
             var halfView = viewWorld * 0.5f;
             if (FollowX)
@@ -131,6 +134,15 @@ public class CameraFollow2D : Behavior, IUpdatable
         }
 
         cam.Position = p;
+    }
+
+    private Rect? ResolveWorldBounds()
+    {
+        if (WorldBounds is Rect bounds)
+            return bounds;
+
+        _bounds ??= _entity.TryFindTrait<Bounds2D>(out var found) ? found : null;
+        return _bounds?.Rect;
     }
 
     /// <summary>

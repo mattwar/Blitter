@@ -64,6 +64,17 @@ public class SceneLookupTests
     }
 
     [Fact]
+    public void TryGetEntity_ByNullableName_NullFallsBackToTypeLookup()
+    {
+        var expected = new TestNamedEntity { Name = "player" };
+        var scene = SceneWith(expected);
+
+        Assert.True(scene.TryGetEntity<TestNamedEntity>(null, out var entity));
+
+        Assert.Same(expected, entity);
+    }
+
+    [Fact]
     public void CameraFollow2D_ResolvesCameraByType()
     {
         var attachedCamera = new AttachedCamera2D();
@@ -133,5 +144,29 @@ public class SceneLookupTests
         Updater.Default.Update(target, new EntityUpdateContext());
 
         Assert.Equal(Vector2.Zero, sibling.GetCapability<ICamera2D>().Camera.Position);
+    }
+
+    [Fact]
+    public void CameraFollow2D_ClampsToAncestorBoundsTrait()
+    {
+        var attachedCamera = new AttachedCamera2D();
+        var target = new Entity();
+        target.GetOrAddTrait<Transform2D>().Position = new Vector2(200f, 0f);
+        var follow = target.GetOrAddBehavior<CameraFollow2D>();
+        follow.ViewportSize = new Vector2(100f, 100f);
+        follow.MarginFraction = 0.5f;
+        follow.FollowY = false;
+        var playfield = new PlayField2D { WorldBounds = new Rect(0f, 0f, 120f, 100f) };
+        playfield.AddEntity(target);
+        _ = new Container { Behaviors = [attachedCamera], Entities = [playfield] };
+
+        Updater.Default.Update(target, new EntityUpdateContext());
+
+        Assert.Equal(new Vector2(70f, 0f), attachedCamera.Camera.Position);
+    }
+
+    private sealed class TestNamedEntity : Entity, INamedEntity
+    {
+        public string? Name { get; init; }
     }
 }

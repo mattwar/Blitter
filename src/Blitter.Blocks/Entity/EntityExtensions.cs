@@ -275,13 +275,16 @@ public static class EntityExtensions
 
     /// <summary>
     /// Tries to resolve the child entity named <paramref name="name"/> as a
-    /// <typeparamref name="T"/>. Returns <c>false</c> if no child has that
-    /// name. Throws if the name is duplicated or the named entity is a
-    /// different type.
+    /// <typeparamref name="T"/>. When <paramref name="name"/> is <c>null</c>,
+    /// resolves the single child assignable to <typeparamref name="T"/> by
+    /// type. Returns <c>false</c> if no matching child exists. Throws if the
+    /// name is duplicated or the named entity is a different type.
     /// </summary>
-    public static bool TryGetEntity<T>(this IContainer container, string name, [NotNullWhen(true)] out T? entity) where T : class
+    public static bool TryGetEntity<T>(this IContainer container, string? name, [NotNullWhen(true)] out T? entity) where T : class
     {
-        ArgumentNullException.ThrowIfNull(name);
+        if (name is null)
+            return container.TryGetEntity(out entity);
+
         IEntity? named = null;
         foreach (var candidate in container.Entities)
         {
@@ -309,6 +312,6 @@ public static class EntityExtensions
     /// <typeparamref name="T"/>. Throws if no such entity exists or it is a
     /// different type.
     /// </summary>
-    public static T GetEntity<T>(this IContainer container, string name) where T : class =>
-        container.TryGetEntity<T>(name, out var entity) ? entity : throw new InvalidOperationException($"No entity named '{name}'.");
+    public static T GetEntity<T>(this IContainer container, string? name) where T : class =>
+        container.TryGetEntity<T>(name, out var entity) ? entity : throw new InvalidOperationException(name is null ? $"No entity of type {typeof(T).Name}." : $"No entity named '{name}'.");
 }
