@@ -7,35 +7,19 @@ public class UpdaterTests
     {
         var root = new TestContainer();
         var child = new TestEntity();
-        var rootBehavior = root.GetOrAddBehavior<TestBehavior>();
         var childBehavior = child.GetOrAddBehavior<TestBehavior>();
         root.AddEntity(child);
 
         Updater.Default.Update(root, new EntityUpdateContext());
 
-        Assert.Equal(1, root.Updates);
-        Assert.Equal(1, rootBehavior.Updates);
         Assert.Equal(1, child.Updates);
         Assert.Equal(1, childBehavior.Updates);
     }
 
     [Fact]
-    public void UpdateEntity_DoesNotWalkChildren()
+    public void Update_DoesNotWalkChildrenWhenContainerIsUpdatable()
     {
-        var root = new TestContainer();
-        var child = new TestEntity();
-        root.AddEntity(child);
-
-        Updater.Default.UpdateEntity(root, new EntityUpdateContext());
-
-        Assert.Equal(1, root.Updates);
-        Assert.Equal(0, child.Updates);
-    }
-
-    [Fact]
-    public void Update_DoesNotWalkChildrenWhenContainerOwnsTraversal()
-    {
-        var root = new TraversalOwnerContainer();
+        var root = new TestUpdatableContainer();
         var child = new TestEntity();
         root.AddEntity(child);
 
@@ -55,7 +39,7 @@ public class UpdaterTests
         }
     }
 
-    private class TestContainer : TestEntity, IContainer
+    private class TestContainer : Entity, IContainer
     {
         private readonly List<IEntity> _entities = new();
 
@@ -75,8 +59,14 @@ public class UpdaterTests
         }
     }
 
-    private sealed class TraversalOwnerContainer : TestContainer, IUpdateTraversalOwner
+    private sealed class TestUpdatableContainer : TestContainer, IUpdatable
     {
+        public int Updates { get; private set; }
+
+        public void Update(in EntityUpdateContext context)
+        {
+            Updates++;
+        }
     }
 
     private sealed class TestBehavior : Behavior, IUpdatable

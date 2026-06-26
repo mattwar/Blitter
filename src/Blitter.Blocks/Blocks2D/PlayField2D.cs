@@ -6,7 +6,7 @@ namespace Blitter.Blocks2D;
 /// The 2D world layer: owns a flat entity list, updates and draws live
 /// children, and runs 2D collision over those entities.
 /// </summary>
-public class PlayField2D : Layer2D, IContainer, IUpdatable, IUpdateTraversalOwner
+public class PlayField2D : Entity, IDrawable2D, IContainer, ICollisionSpace2D, IUpdatable
 {
     private readonly List<IEntity> _entities = new();
     private readonly List<IEntity> _pendingAddEntities = new();
@@ -58,6 +58,9 @@ public class PlayField2D : Layer2D, IContainer, IUpdatable, IUpdateTraversalOwne
         get => _entities;
         init => AdoptEntities(value);
     }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IEntity> CollisionEntities => _entities;
 
     /// <summary>
     /// Tries to resolve the single entity assignable to <typeparamref name="T"/>
@@ -162,6 +165,9 @@ public class PlayField2D : Layer2D, IContainer, IUpdatable, IUpdateTraversalOwne
     }
 
     private bool IsLive(IEntity entity) => !_pendingRemoveEntities.Contains(entity);
+
+    /// <inheritdoc/>
+    public bool IsCollisionLive(IEntity entity) => IsLive(entity);
 
     private bool IsEntityMember(IEntity entity) =>
         _entities.Contains(entity) || _pendingAddEntities.Contains(entity);
@@ -284,7 +290,7 @@ public class PlayField2D : Layer2D, IContainer, IUpdatable, IUpdateTraversalOwne
         }
     }
 
-    protected override void DrawContent(Renderer2D renderer)
+    public void Draw(Renderer2D renderer)
     {
         DrawBackground(renderer);
 

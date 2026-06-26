@@ -100,11 +100,10 @@ var rocket = new Rocket
 // Camera scrolls the world to keep the rocket in view. Start it on
 // the rocket so the first frame isn't a snap from the world origin.
 var camera = new Camera2D { Position = rocket.Center };
-window.Renderer.Camera = camera;
+var attachedCamera = new AttachedCamera2D { Camera = camera };
 
 var worldBounds = new Rect(0, 0, WorldW, WorldH);
 var cameraFollow = rocket.GetOrAddBehavior<CameraFollow2D>();
-cameraFollow.Camera = camera;
 cameraFollow.ViewportSize = new Vector2(DesignW, DesignH);
 cameraFollow.MarginFraction = 0.3f;
 cameraFollow.WorldBounds = worldBounds;
@@ -130,13 +129,12 @@ var midBounds = new Rect(
 
 var starsFar = new StarField2D(500, farBounds, seed: 1)
 {
-    ParallaxFactor = Vector2.Zero,
     StarColor = new Color(180, 180, 220, 255),
 };
 
 var starsMid = new StarField2D(250, midBounds, seed: 2)
 {
-    ParallaxFactor = new Vector2(MidParallax, MidParallax),
+    Behaviors = [new Parallax2D { Factor = new Vector2(MidParallax, MidParallax) }],
     StarColor = new Color(220, 220, 255, 255),
 };
 
@@ -208,6 +206,7 @@ var scene = new Scene2D
     ],
     Behaviors =
     [
+        attachedCamera,
         levelComplete,
     ],
 };
@@ -260,9 +259,9 @@ static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
 
 // HUD overlay: flashing speed readout plus the "GAME OVER" banner that
 // LevelComplete2D triggers during the exit delay.
-sealed class RocketHud(Rocket rocket, Font scoreFont, Font bannerFont, LevelComplete2D levelComplete, int designW, int designH) : Layer2D
+sealed class RocketHud(Rocket rocket, Font scoreFont, Font bannerFont, LevelComplete2D levelComplete, int designW, int designH) : Entity, IDrawable2D
 {
-    protected override void DrawContent(Renderer2D rd)
+    public void Draw(Renderer2D rd)
     {
         using var _ = rd.PushState();
         rd.Camera = null; // detach camera so HUD is screen-locked
@@ -295,7 +294,7 @@ sealed class RocketHud(Rocket rocket, Font scoreFont, Font bannerFont, LevelComp
 
 // Debug overlay: outlines the rocket and asteroid HitShapes in world
 // space (toggle with H) so collision registration is visible.
-sealed class HitDebugLayer(Window2D window, Rocket rocket, PlayField2D playField) : Layer2D, IUpdatable
+sealed class HitDebugLayer(Window2D window, Rocket rocket, PlayField2D playField) : Entity, IDrawable2D, IUpdatable
 {
     private bool _showHitShape;
 
@@ -305,7 +304,7 @@ sealed class HitDebugLayer(Window2D window, Rocket rocket, PlayField2D playField
             _showHitShape = !_showHitShape;
     }
 
-    protected override void DrawContent(Renderer2D rd)
+    public void Draw(Renderer2D rd)
     {
         if (!_showHitShape) return;
         using var _ = rd.PushState();

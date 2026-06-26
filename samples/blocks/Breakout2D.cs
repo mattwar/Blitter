@@ -189,9 +189,9 @@ sealed class PlayBounceSound : IEventHandler<SurfaceBounced2DEventArgs>
 }
 
 // HUD overlay: lives counter and the win/lose banner with key hint.
-sealed class BreakoutHud(BreakoutController controller, Font hudFont, Font bannerFont, int w, int h) : Layer2D
+sealed class BreakoutHud(BreakoutController controller, Font hudFont, Font bannerFont, int w, int h) : Entity, IDrawable2D
 {
-    protected override void DrawContent(Renderer2D rd)
+    public void Draw(Renderer2D rd)
     {
         using var _ = rd.PushState();
         rd.Camera = null;

@@ -36,7 +36,7 @@ public interface IEntity
 /// <summary>
 /// An entity that can be resolved by a container-local name.
 /// </summary>
-public interface INamedEntity : IEntity
+public interface INamedEntity
 {
     /// <summary>
     /// Optional container-local name.

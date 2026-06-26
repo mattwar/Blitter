@@ -47,11 +47,13 @@ var window = new Window2D
 // the scene to run 
 var scene = new Scene2D
 {
+    Behaviors =
+    [
+        // applies the scene camera before child entities draw.
+        new AttachedCamera2D(),
+    ],
     Entities =
     [
-        // camera layer responsible for giving the scene/renderer a camera.
-        new CameraLayer2D(),
-
         // The background with parallax plates.
         new ParallaxBackground2D
         {
@@ -214,7 +216,7 @@ public class SpacemanController : Behavior, IUpdatable
 /// The shadow layer for the spaceman.
 /// Draws a drop-shadow below the spaceman.
 /// </summary>
-public class SpacemanShadowLayer : Layer2D, IUpdatable
+public class SpacemanShadowLayer : Entity, IDrawable2D, IUpdatable
 {
     private Spaceman _spaceman = null!;
 
@@ -231,7 +233,7 @@ public class SpacemanShadowLayer : Layer2D, IUpdatable
 
     public void Update(in EntityUpdateContext context) { }
 
-    protected override void DrawContent(Renderer2D rd)
+    public void Draw(Renderer2D rd)
     {
         float airFraction = Math.Min(1f, -_spaceman.JumpOffsetY / 120f);
         float shadowScale = 1f - 0.55f * airFraction;

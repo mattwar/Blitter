@@ -119,6 +119,69 @@ public static class EntityExtensions
     }
 
     /// <summary>
+    /// Finds the named capability of type <typeparamref name="T"/> provided by
+    /// <paramref name="entity"/> itself or by one of its behaviors.
+    /// </summary>
+    public static bool TryGetCapability<T>(this IEntity entity, string name, [NotNullWhen(true)] out T? capability) where T : class, ICapability
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        if (entity is T self && self.Name == name)
+        {
+            capability = self;
+            return true;
+        }
+
+        for (int i = 0; i < entity.Behaviors.Count; i++)
+        {
+            if (entity.Behaviors[i] is T match && match.Name == name)
+            {
+                capability = match;
+                return true;
+            }
+        }
+
+        capability = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Finds a capability of type <typeparamref name="T"/> on
+    /// <paramref name="entity"/>, or failing that, the nearest ancestor
+    /// that has one.
+    /// </summary>
+    public static bool TryFindCapability<T>(this IEntity entity, [NotNullWhen(true)] out T? capability) where T : class
+    {
+        for (IEntity? current = entity; current is not null; current = current.Container)
+        {
+            if (current.TryGetCapability(out capability))
+                return true;
+        }
+
+        capability = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Finds the named capability of type <typeparamref name="T"/> on
+    /// <paramref name="entity"/>, or failing that, the nearest ancestor
+    /// that has one.
+    /// </summary>
+    public static bool TryFindCapability<T>(this IEntity entity, string name, [NotNullWhen(true)] out T? capability) where T : class, ICapability
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        for (IEntity? current = entity; current is not null; current = current.Container)
+        {
+            if (current.TryGetCapability(name, out capability))
+                return true;
+        }
+
+        capability = null;
+        return false;
+    }
+
+    /// <summary>
     /// Returns a capability of type <typeparamref name="T"/> provided by
     /// <paramref name="entity"/> itself or by one of its behaviors.
     /// </summary>
@@ -127,6 +190,62 @@ public static class EntityExtensions
             ? capability
             : throw new InvalidOperationException(
                 $"Entity has no capability of type {typeof(T).Name}.");
+
+    /// <summary>
+    /// Tries to resolve the single direct child entity providing
+    /// <typeparamref name="T"/>. The container itself is considered before
+    /// its children. Returns <c>false</c> if none. Throws if more than one
+    /// matches.
+    /// </summary>
+    public static bool TryGetEntityWithCapability<T>(this IContainer container, [NotNullWhen(true)] out IEntity? entity) where T : class
+    {
+        IEntity? match = null;
+        TryCapture(container, ref match);
+        foreach (var candidate in container.Entities)
+        {
+            TryCapture(candidate, ref match);
+        }
+        entity = match;
+        return match is not null;
+
+        static void TryCapture(IEntity candidate, ref IEntity? match)
+        {
+            if (!candidate.TryGetCapability<T>(out _))
+                return;
+            if (match is not null)
+                throw new InvalidOperationException($"More than one entity provides capability {typeof(T).Name}; resolve it by name instead.");
+            match = candidate;
+        }
+    }
+
+    /// <summary>
+    /// Tries to resolve the single direct child entity providing the named
+    /// <typeparamref name="T"/>. The container itself is considered before
+    /// its children. Returns <c>false</c> if none. Throws if more than one
+    /// matches.
+    /// </summary>
+    public static bool TryGetEntityWithCapability<T>(this IContainer container, string name, [NotNullWhen(true)] out IEntity? entity) where T : class, ICapability
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        IEntity? match = null;
+        TryCapture(container, name, ref match);
+        foreach (var candidate in container.Entities)
+        {
+            TryCapture(candidate, name, ref match);
+        }
+        entity = match;
+        return match is not null;
+
+        static void TryCapture(IEntity candidate, string name, ref IEntity? match)
+        {
+            if (!candidate.TryGetCapability<T>(name, out _))
+                return;
+            if (match is not null)
+                throw new InvalidOperationException($"More than one entity provides capability {typeof(T).Name} named '{name}'.");
+            match = candidate;
+        }
+    }
 
     /// <summary>
     /// Tries to resolve the single child entity assignable to <typeparamref name="T"/>.
@@ -163,14 +282,14 @@ public static class EntityExtensions
     public static bool TryGetEntity<T>(this IContainer container, string name, [NotNullWhen(true)] out T? entity) where T : class
     {
         ArgumentNullException.ThrowIfNull(name);
-        INamedEntity? named = null;
+        IEntity? named = null;
         foreach (var candidate in container.Entities)
         {
-            if (candidate is not INamedEntity namedCandidate || namedCandidate.Name != name)
+            if (!candidate.TryGetCapability<INamedEntity>(out var namedCandidate) || namedCandidate.Name != name)
                 continue;
             if (named is not null)
                 throw new InvalidOperationException($"More than one entity is named '{name}'.");
-            named = namedCandidate;
+            named = candidate;
         }
         if (named is null)
         {

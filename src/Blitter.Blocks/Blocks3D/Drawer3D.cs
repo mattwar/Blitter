@@ -15,6 +15,9 @@ public sealed class Drawer3D
     /// </summary>
     public void Draw(IEntity entity, Renderer3D renderer)
     {
+        if (entity.TryGetCapability<IVisibility>(out var visibility) && !visibility.Visible)
+            return;
+
         if (entity is IDrawable3D drawable)
         {
             drawable.Draw(renderer);
@@ -28,7 +31,9 @@ public sealed class Drawer3D
             return;
 
         for (int i = 0; i < container.Entities.Count; i++)
+        {
             Draw(container.Entities[i], renderer);
+        }
     }
 
     private static void DrawBehaviors(IEntity entity, Renderer3D renderer)

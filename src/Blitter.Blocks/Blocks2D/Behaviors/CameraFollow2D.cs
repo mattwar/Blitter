@@ -14,24 +14,21 @@ using System.Numerics;
 public class CameraFollow2D : Behavior, IUpdatable
 {
     /// <summary>
-    /// The camera being driven. If <c>null</c>, the behavior does
-    /// nothing — set this to the same <see cref="Camera2D"/> assigned
-    /// to <see cref="Renderer2D.Camera"/>.
+    /// Optional name of the <see cref="ICamera2D"/> capability to drive. When
+    /// unset, the behavior resolves the nearest <see cref="ICamera2D"/> in
+    /// the entity's ancestor chain.
     /// </summary>
-    /// <remarks>
-    /// May be left unset and resolved automatically at attach time from a
-    /// <see cref="CameraLayer2D"/> in the scene — see <see cref="CameraName"/>.
-    /// </remarks>
-    public Camera2D? Camera { get; set; }
-
-    /// <summary>
-    /// Optional name of the <see cref="CameraLayer2D"/> to drive. When
-    /// <see cref="Camera"/> is left unset, the behavior resolves its camera
-    /// at attach time: by this name if given, otherwise the scene's single
-    /// <see cref="CameraLayer2D"/>. An explicitly assigned
-    /// <see cref="Camera"/> always wins.
-    /// </summary>
-    public string? CameraName { get; set; }
+    public string? CameraName
+    {
+        get => _cameraName;
+        set
+        {
+            if (_cameraName == value)
+                return;
+            _cameraName = value;
+            _camera = null;
+        }
+    }
 
     /// <summary>
     /// Viewport size in viewport pixels (typically the renderer's
@@ -68,6 +65,8 @@ public class CameraFollow2D : Behavior, IUpdatable
 
     private IEntity _entity = null!;
     private Transform2D _target = null!;
+    private ICamera2D? _camera;
+    private string? _cameraName;
 
     protected override void OnAttach(IEntity entity)
     {
@@ -77,14 +76,13 @@ public class CameraFollow2D : Behavior, IUpdatable
 
     public void Update(in EntityUpdateContext context)
     {
-        // The camera lives on a sibling layer reached through the scene,
-        // which isn't reachable when this behavior is attached (the sprite
-        // may not be in a scene yet). Resolve it opportunistically once the
-        // entity is part of a scene; retry each tick until it succeeds.
-        if (Camera is null)
+        // The camera may live on this entity or any containing scope. Resolve
+        // opportunistically once the entity is part of a tree; retry each tick
+        // until it succeeds.
+        if (_camera is null)
             ResolveCamera();
 
-        var cam = Camera;
+        var cam = _camera?.Camera;
         if (cam is null)
             return;
 
@@ -136,23 +134,24 @@ public class CameraFollow2D : Behavior, IUpdatable
     }
 
     /// <summary>
-    /// Resolves <see cref="Camera"/> from a <see cref="CameraLayer2D"/> when
+    /// Resolves the camera from an <see cref="ICamera2D"/> when
     /// it was not assigned explicitly: by <see cref="CameraName"/> if set,
-    /// otherwise the containing tree's single camera layer. A no-op until the
-    /// entity is a sprite that is part of a running entity tree.
+    /// otherwise the nearest containing scope's single camera behavior. A no-op
+    /// until the entity is part of a running entity tree.
     /// </summary>
     private void ResolveCamera()
     {
-        if (_entity is Sprite2D { Container: PlayField2D playfield } && playfield.Container is IContainer container)
+        ICamera2D? camera;
+        if (_cameraName is not null)
         {
-            CameraLayer2D? cameraLayer;
-            if (CameraName is null)
-                container.TryGetEntity(out cameraLayer);
-            else
-                container.TryGetEntity(CameraName, out cameraLayer);
-
-            if (cameraLayer is not null)
-                Camera = cameraLayer.Camera;
+            if (!_entity.TryFindCapability(_cameraName, out camera))
+                return;
         }
+        else if (!_entity.TryFindCapability(out camera))
+        {
+            return;
+        }
+
+        _camera = camera;
     }
 }

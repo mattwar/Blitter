@@ -34,10 +34,9 @@ public readonly record struct MinimapMarker(
 /// a background panel, per-sprite markers selected by
 /// <see cref="MarkerSelector"/>, and (optionally) an outline of the
 /// active camera's viewport. The minimap does not scroll with the
-/// world; <see cref="Layer2D.ParallaxFactor"/> is ignored — the layer
-/// detaches the camera while drawing.
+/// world — the layer detaches the camera while drawing.
 /// </summary>
-public sealed class MinimapLayer2D : Layer2D
+public sealed class MinimapLayer2D : Entity, IDrawable2D
 {
     /// <summary>Playfield whose sprites and world bounds are displayed.</summary>
     public required PlayField2D Source { get; init; }
@@ -79,7 +78,7 @@ public sealed class MinimapLayer2D : Layer2D
     /// <summary>Clip markers to <see cref="ScreenRect"/> so they can't bleed past the border.</summary>
     public bool ClipToBounds { get; set; } = true;
 
-    protected override void DrawContent(Renderer2D renderer)
+    public void Draw(Renderer2D renderer)
     {
         var world = WorldRect ?? Source.WorldBounds ?? ScreenRect;
         if (world.Width <= 0 || world.Height <= 0)

@@ -6,7 +6,7 @@ namespace Blitter.Blocks2D;
 /// Scene layer that draws short-lived drifting text labels.
 /// Use for score popups, damage numbers, pickup names, status callouts.
 /// </summary>
-public sealed class FloatingTextLayer2D : Layer2D, IUpdatable
+public sealed class FloatingTextLayer2D : Entity, IDrawable2D, IUpdatable
 {
     /// <summary>Font all popups are drawn with.</summary>
     public required Font Font { get; init; }
@@ -101,7 +101,7 @@ public sealed class FloatingTextLayer2D : Layer2D, IUpdatable
         }
     }
 
-    protected override void DrawContent(Renderer2D renderer)
+    public void Draw(Renderer2D renderer)
     {
         if (_items.Count == 0) return;
 

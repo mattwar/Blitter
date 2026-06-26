@@ -19,7 +19,33 @@ public sealed class Collider2D
     private readonly List<IEntity> _sprites = new();
     private readonly List<IEntity> _barriers = new();
 
+    public Collider2D()
+        : this(static _ => true)
+    {
+    }
+
     public Collider2D(Func<IEntity, bool> isLive) => _isLive = isLive;
+
+    /// <summary>
+    /// Walks an entity tree and runs collision independently for each
+    /// <see cref="ICollisionSpace2D"/> it finds.
+    /// </summary>
+    public void Collide(IEntity root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+
+        if (root.TryGetCapability<ICollisionSpace2D>(out var space))
+        {
+            Collide(space.CollisionEntities, space.IsCollisionLive);
+            return;
+        }
+
+        if (root is not IContainer container)
+            return;
+
+        for (int i = 0; i < container.Entities.Count; i++)
+            Collide(container.Entities[i]);
+    }
 
     /// <summary>
     /// Detects overlaps among non-barrier colliders and between those colliders
@@ -27,13 +53,23 @@ public sealed class Collider2D
     /// collide with each other. Shapes are re-read between dispatches so a
     /// handler that moves an entity is reflected immediately.
     /// </summary>
-    public void Collide(IReadOnlyList<IEntity> entities)
+    public void Collide(IReadOnlyList<IEntity> entities) =>
+        Collide(entities, _isLive);
+
+    /// <summary>
+    /// Detects overlaps in <paramref name="entities"/> using
+    /// <paramref name="isLive"/> to ignore entities removed during the pass.
+    /// </summary>
+    public void Collide(IReadOnlyList<IEntity> entities, Func<IEntity, bool> isLive)
     {
-        Partition(entities);
-        CollidePartitioned(_sprites, _barriers);
+        ArgumentNullException.ThrowIfNull(entities);
+        ArgumentNullException.ThrowIfNull(isLive);
+
+        Partition(entities, isLive);
+        CollidePartitioned(_sprites, _barriers, isLive);
     }
 
-    private void Partition(IReadOnlyList<IEntity> entities)
+    private void Partition(IReadOnlyList<IEntity> entities, Func<IEntity, bool> isLive)
     {
         _sprites.Clear();
         _barriers.Clear();
@@ -41,7 +77,7 @@ public sealed class Collider2D
         for (int i = 0; i < entities.Count; i++)
         {
             var entity = entities[i];
-            if (!_isLive(entity))
+            if (!isLive(entity))
                 continue;
             if (!TryGetHitShape(entity, out var shape) || shape.BoundingCircle.IsEmpty)
                 continue;
@@ -53,24 +89,24 @@ public sealed class Collider2D
         }
     }
 
-    private void CollidePartitioned(IReadOnlyList<IEntity> sprites, IReadOnlyList<IEntity> barriers)
+    private void CollidePartitioned(IReadOnlyList<IEntity> sprites, IReadOnlyList<IEntity> barriers, Func<IEntity, bool> isLive)
     {
         // sprite-vs-sprite
         for (int i = 0; i < sprites.Count; i++)
         {
             var a = sprites[i];
-            if (!_isLive(a))
+            if (!isLive(a))
                 continue;
             if (!TryGetHitShape(a, out var aShape) || aShape.BoundingCircle.Radius <= 0f)
                 continue;
 
             for (int j = i + 1; j < sprites.Count; j++)
             {
-                if (!_isLive(a))
+                if (!isLive(a))
                     break;
 
                 var b = sprites[j];
-                if (!_isLive(b))
+                if (!isLive(b))
                     continue;
                 if (!TryGetHitShape(b, out var bShape) || bShape.BoundingCircle.Radius <= 0f)
                     continue;
@@ -81,7 +117,7 @@ public sealed class Collider2D
                 var hasContact = aShape.TryGetContact(bShape, out var contact);
                 var hitForA = new Hit2D(b, contact, hasContact);
                 HitDispatch2D.Dispatch(a, in hitForA);
-                if (_isLive(a) && _isLive(b))
+                if (isLive(a) && isLive(b))
                 {
                     var hitForB = new Hit2D(a, hasContact ? contact.Flipped() : default, hasContact);
                     HitDispatch2D.Dispatch(b, in hitForB);
@@ -96,14 +132,14 @@ public sealed class Collider2D
         for (int s = 0; s < sprites.Count; s++)
         {
             var sprite = sprites[s];
-            if (!_isLive(sprite))
+            if (!isLive(sprite))
                 continue;
             if (!TryGetHitShape(sprite, out var spriteShape) || spriteShape.BoundingCircle.IsEmpty)
                 continue;
 
             for (int k = 0; k < barriers.Count; k++)
             {
-                if (!_isLive(sprite))
+                if (!isLive(sprite))
                     break;
                 var barrier = barriers[k];
                 // Re-read each time: the previous barrier handler
@@ -125,7 +161,7 @@ public sealed class Collider2D
                     barrierHas ? barrierContact.Flipped() : default,
                     barrierHas);
                 HitDispatch2D.Dispatch(barrier, in barrierHit);
-                if (!_isLive(sprite))
+                if (!isLive(sprite))
                     continue;
 
                 // Recompute fresh for the sprite: the barrier handler

@@ -2,8 +2,10 @@ namespace Blitter.Blocks2D.Tests;
 
 public class SceneTests
 {
-    private sealed class FakeLayer : Layer2D, IUpdatable
+    private sealed class FakeLayer : Entity, IDrawable2D, IUpdatable, IUpdatability
     {
+        public bool Enabled { get; set; } = true;
+
         public int UpdateCount { get; private set; }
         public int RenderCount { get; private set; }
 
@@ -12,7 +14,7 @@ public class SceneTests
             UpdateCount++;
         }
 
-        protected override void DrawContent(Renderer2D renderer)
+        public void Draw(Renderer2D renderer)
         {
             RenderCount++;
         }
@@ -44,6 +46,17 @@ public class SceneTests
         Assert.Equal(1, b.UpdateCount);
     }
 
+        [Fact]
+        public void Update_SkipsDisabledSubtree()
+        {
+            var child = new FakeLayer();
+            var root = new FakeContainer { Enabled = false, Entities = [child] };
+
+            Updater.Default.Update(root, new EntityUpdateContext());
+
+            Assert.Equal(0, child.UpdateCount);
+        }
+
     [Fact]
     public void Layers_AddAfterConstructionTicksTheLayer()
     {
@@ -72,4 +85,9 @@ public class SceneTests
         Assert.Equal(0, a.UpdateCount);
         Assert.Equal(1, b.UpdateCount);
     }
+
+        private sealed class FakeContainer : Container, IUpdatability
+        {
+            public bool Enabled { get; init; } = true;
+        }
 }

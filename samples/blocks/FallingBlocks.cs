@@ -51,9 +51,9 @@ var scene = new Scene2D
 await scene.RunAsync(window);
 
 // HUD overlay: live sprite/spawn counts and the pause hint.
-sealed class FallingBlocksHud : Layer2D
+sealed class FallingBlocksHud : Entity, IDrawable2D
 {
-    protected override void DrawContent(Renderer2D rd)
+    public void Draw(Renderer2D rd)
     {
         var container = Container ?? throw new InvalidOperationException("HUD is not attached to a container.");
         var playField = container.GetEntity<PlayField2D>();

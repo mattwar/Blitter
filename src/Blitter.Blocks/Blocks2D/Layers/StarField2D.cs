@@ -4,11 +4,11 @@ namespace Blitter.Blocks2D;
 
 /// <summary>
 /// A layer that scatters single-pixel stars across a rectangular region. 
-/// Combine multiple instances at different <see cref="Layer2D.ParallaxFactor"/> values to build a parallax star field.
-/// Default parallax is <c>(0, 0)</c> — screen-locked — which suits a space backdrop; 
+/// Combine multiple instances with different <see cref="Parallax2D.Factor"/> values to build a parallax star field.
+/// Default parallax is <c>(0, 0)</c> — screen-locked — which suits a space backdrop;
 /// raise it for nearer layers that drift with the camera.
 /// </summary>
-public class StarField2D : Layer2D
+public class StarField2D : Entity, IDrawable2D
 {
     private readonly Vector2[] _positions;
     private readonly byte[] _brightness;
@@ -20,7 +20,7 @@ public class StarField2D : Layer2D
     /// Creates a star field with <paramref name="count"/> stars
     /// scattered uniformly inside <paramref name="bounds"/>.
     /// <paramref name="bounds"/> is in the layer's local coordinate
-    /// space — i.e. after <see cref="Layer2D.ParallaxFactor"/> has been
+    /// space — i.e. after <see cref="Parallax2D.Factor"/> has been
     /// applied to the camera — not in foreground world coordinates.
     /// For a screen-locked field (parallax <c>(0, 0)</c>) pass a
     /// viewport-sized rect centered on the origin.
@@ -30,7 +30,7 @@ public class StarField2D : Layer2D
         if (count < 0)
             throw new ArgumentOutOfRangeException(nameof(count));
 
-        ParallaxFactor = Vector2.Zero;
+        GetOrAddBehavior<Parallax2D>().Factor = Vector2.Zero;
 
         _positions = new Vector2[count];
         _brightness = new byte[count];
@@ -47,7 +47,7 @@ public class StarField2D : Layer2D
         }
     }
 
-    protected override void DrawContent(Renderer2D renderer)
+    public void Draw(Renderer2D renderer)
     {
         if (_positions.Length == 0)
             return;

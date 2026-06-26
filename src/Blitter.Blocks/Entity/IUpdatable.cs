@@ -12,16 +12,10 @@ public interface IUpdatable
 }
 
 /// <summary>
-/// Allows entity operations to skip disabled entities.
+/// Allows entity operations to skip disabled entities and their subtrees.
 /// </summary>
-public interface IUpdateEnabled
+public interface IUpdatability
 {
     bool Enabled { get; }
 }
 
-/// <summary>
-/// Implemented by containers whose update implementation owns child traversal.
-/// </summary>
-public interface IUpdateTraversalOwner
-{
-}

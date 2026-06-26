@@ -297,9 +297,9 @@ static Bitmap MakeChromeBall(int size)
 }
 
 // Background layer for the drain band beneath the playfield.
-sealed class DrainBandLayer(float wallInset, float drainY, int w, int h) : Layer2D
+sealed class DrainBandLayer(float wallInset, float drainY, int w, int h) : Entity, IDrawable2D
 {
-    protected override void DrawContent(Renderer2D rd)
+    public void Draw(Renderer2D rd)
     {
         rd.DrawColor = new Color(70, 20, 30);
         rd.DrawFillRect(new Rect(wallInset, drainY, w - 2f * wallInset, h - drainY));
@@ -307,9 +307,9 @@ sealed class DrainBandLayer(float wallInset, float drainY, int w, int h) : Layer
 }
 
 // HUD overlay: ball status text and the key hint line.
-sealed class PinballHud(PinballGameController gameController, Font scoreFont, int h) : Layer2D
+sealed class PinballHud(PinballGameController gameController, Font scoreFont, int h) : Entity, IDrawable2D
 {
-    protected override void DrawContent(Renderer2D rd)
+    public void Draw(Renderer2D rd)
     {
         using var _ = rd.PushState();
         rd.Camera = null;

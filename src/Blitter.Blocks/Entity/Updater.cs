@@ -16,9 +16,13 @@ public sealed class Updater
     /// </summary>
     public void Update(IEntity entity, in EntityUpdateContext context)
     {
+        if (entity.TryGetCapability<IUpdatability>(out var updatability) && !updatability.Enabled)
+            return;
+
+        var ownsTraversal = entity is IUpdatable;
         UpdateEntity(entity, in context);
 
-        if (entity is IUpdateTraversalOwner)
+        if (ownsTraversal)
             return;
 
         if (entity is not IContainer container)
@@ -36,9 +40,6 @@ public sealed class Updater
     /// </summary>
     private void UpdateEntity(IEntity entity, in EntityUpdateContext context)
     {
-        if (entity is IUpdateEnabled { Enabled: false })
-            return;
-
         if (entity is IUpdatable updatable)
             updatable.Update(in context);
 

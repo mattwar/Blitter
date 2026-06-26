@@ -19,7 +19,7 @@ public class BehaviorTests
         var sprite = new Sprite2D { Center = new Vector2(-10, 50) };
         sprite.GetOrAddTrait<Bounds2D>().Rect = new Rect(0, 0, 100, 100);
         sprite.GetOrAddBehavior<WrapInBounds2D>();
-        Updater.Default.UpdateEntity(sprite, Context(0));
+        Updater.Default.Update(sprite, Context(0));
         Assert.Equal(new Vector2(90, 50), sprite.Center);
     }
 
@@ -29,7 +29,7 @@ public class BehaviorTests
         var sprite = new Sprite2D { Center = new Vector2(50, 110) };
         sprite.GetOrAddTrait<Bounds2D>().Rect = new Rect(0, 0, 100, 100);
         sprite.GetOrAddBehavior<WrapInBounds2D>();
-        Updater.Default.UpdateEntity(sprite, Context(0));
+        Updater.Default.Update(sprite, Context(0));
         Assert.Equal(new Vector2(50, 10), sprite.Center);
     }
 
@@ -39,7 +39,7 @@ public class BehaviorTests
         var sprite = new Sprite2D { Center = new Vector2(50, 50) };
         sprite.GetOrAddTrait<Bounds2D>().Rect = new Rect(0, 0, 100, 100);
         sprite.GetOrAddBehavior<WrapInBounds2D>();
-        Updater.Default.UpdateEntity(sprite, Context(0));
+        Updater.Default.Update(sprite, Context(0));
         Assert.Equal(new Vector2(50, 50), sprite.Center);
     }
 
@@ -50,7 +50,7 @@ public class BehaviorTests
         var sprite = new Sprite2D { Center = new Vector2(-1, 50) };
         sprite.GetOrAddTrait<Bounds2D>().Rect = new Rect(0, 0, 100, 100);
         sprite.GetOrAddBehavior<WrapInBounds2D>().Wrapped = recorder;
-        Updater.Default.UpdateEntity(sprite, Context(0));
+        Updater.Default.Update(sprite, Context(0));
         Assert.Equal(1, recorder.Count);
     }
 
@@ -64,9 +64,9 @@ public class BehaviorTests
             Center = Vector2.Zero,
             Behaviors = [new TestSeekTarget2D { Target = new Vector2(0, -100), Acceleration = 50, MaxSpeed = 80, MaxTurnRate = 360 }],
         };
-        Updater.Default.UpdateEntity(sprite, Context(1.0));
+        Updater.Default.Update(sprite, Context(1.0));
         Assert.Equal(50f, sprite.Speed, 3);
-        Updater.Default.UpdateEntity(sprite, Context(1.0));
+        Updater.Default.Update(sprite, Context(1.0));
         Assert.Equal(80f, sprite.Speed, 3);
     }
 
@@ -80,7 +80,7 @@ public class BehaviorTests
             Behaviors = [new TestSeekTarget2D { Target = new Vector2(100, 0), MaxTurnRate = 30 }],
         };
         // Desired heading is 90 (right). With MaxTurnRate=30 and 1s dt, heading = 30.
-        Updater.Default.UpdateEntity(sprite, Context(1.0));
+        Updater.Default.Update(sprite, Context(1.0));
         Assert.Equal(30f, sprite.Heading, 3);
     }
 
@@ -93,7 +93,7 @@ public class BehaviorTests
             Heading = 45,
             Behaviors = [new TestSeekTarget2D { Target = null, Acceleration = 100 }],
         };
-        Updater.Default.UpdateEntity(sprite, Context(1.0));
+        Updater.Default.Update(sprite, Context(1.0));
         Assert.Equal(10f, sprite.Speed);
         Assert.Equal(45f, sprite.Heading);
     }
@@ -106,7 +106,7 @@ public class BehaviorTests
             Center = Vector2.Zero,
             Behaviors = [new TestSeekTarget2D { Target = new Vector2(5, 0), Acceleration = 100, ArriveRadius = 10 }],
         };
-        Updater.Default.UpdateEntity(sprite, Context(1.0));
+        Updater.Default.Update(sprite, Context(1.0));
         Assert.Equal(0f, sprite.Speed);
     }
 
@@ -193,7 +193,7 @@ public class BehaviorTests
     public void Shake_NoTrauma_LeavesCenterAlone()
     {
         var sprite = new Sprite2D { Center = new Vector2(10, 20), Behaviors = [new Shake2D()] };
-        Updater.Default.UpdateEntity(sprite, Context(0.016));
+        Updater.Default.Update(sprite, Context(0.016));
         Assert.Equal(new Vector2(10, 20), sprite.Center);
     }
 
@@ -204,7 +204,7 @@ public class BehaviorTests
         shake.AddTrauma(1f);
         var sprite = new Sprite2D { Behaviors = [shake] };
         // 2 seconds at decay 1/s should fully drain trauma.
-        Updater.Default.UpdateEntity(sprite, Context(2.0));
+        Updater.Default.Update(sprite, Context(2.0));
         Assert.Equal(0f, shake.Trauma, 3);
     }
 
@@ -215,7 +215,7 @@ public class BehaviorTests
         shake.AddTrauma(1f);
         var sprite = new Sprite2D { Center = new Vector2(50, 50), Behaviors = [shake] };
         // Drain completely.
-        Updater.Default.UpdateEntity(sprite, Context(10.0));
+        Updater.Default.Update(sprite, Context(10.0));
         Assert.Equal(new Vector2(50, 50), sprite.Center);
     }
 
@@ -226,7 +226,7 @@ public class BehaviorTests
     {
         var cam = new Camera2D { Position = new Vector2(10, 20) };
         var sprite = new Sprite2D { Behaviors = [new CameraShake2D { Camera = cam }] };
-        Updater.Default.UpdateEntity(sprite, Context(0.016));
+        Updater.Default.Update(sprite, Context(0.016));
         Assert.Equal(new Vector2(10, 20), cam.Position);
     }
 
@@ -238,10 +238,10 @@ public class BehaviorTests
         shake.AddTrauma(1f);
         var sprite = new Sprite2D { Behaviors = [shake] };
 
-        Updater.Default.UpdateEntity(sprite, Context(0.016));
+        Updater.Default.Update(sprite, Context(0.016));
         // External writer moves camera between ticks:
         cam.Position = new Vector2(100, 100);
-        Updater.Default.UpdateEntity(sprite, Context(0.016));
+        Updater.Default.Update(sprite, Context(0.016));
         // With MaxOffset=0 the shake adds nothing, so camera should be at baseline.
         Assert.Equal(new Vector2(100, 100), cam.Position);
     }

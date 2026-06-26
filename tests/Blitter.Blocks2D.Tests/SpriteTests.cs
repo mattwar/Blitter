@@ -12,8 +12,8 @@ public class SpriteTests
     {
         var sprite = new Sprite2D { Center = new Vector2(100, 100) };
 
-        Updater.Default.UpdateEntity(sprite, Context(0));
-        Updater.Default.UpdateEntity(sprite, Context(1.0 / 60.0));
+        Updater.Default.Update(sprite, Context(0));
+        Updater.Default.Update(sprite, Context(1.0 / 60.0));
 
         Assert.Equal(new Vector2(100, 100), sprite.Center);
     }
@@ -23,9 +23,9 @@ public class SpriteTests
     {
         // Heading 0 = up (negative Y), per GetVelocity (heading - 90 → cos/sin).
         var sprite = new Sprite2D { Heading = 0f, Speed = 100f, Behaviors = [new Motion2D()] };
-        Updater.Default.UpdateEntity(sprite, Context(0));
+        Updater.Default.Update(sprite, Context(0));
 
-        Updater.Default.UpdateEntity(sprite, Context(1.0));
+        Updater.Default.Update(sprite, Context(1.0));
         Assert.Equal(0f, sprite.Center.X, 3);
         Assert.Equal(-100f, sprite.Center.Y, 3);
     }
@@ -34,9 +34,9 @@ public class SpriteTests
     public void Update_Heading90_MovesRight()
     {
         var sprite = new Sprite2D { Heading = 90f, Speed = 50f, Behaviors = [new Motion2D()] };
-        Updater.Default.UpdateEntity(sprite, Context(0));
+        Updater.Default.Update(sprite, Context(0));
 
-        Updater.Default.UpdateEntity(sprite, Context(2.0));
+        Updater.Default.Update(sprite, Context(2.0));
         Assert.Equal(100f, sprite.Center.X, 3);
         Assert.Equal(0f, sprite.Center.Y, 3);
     }
@@ -45,9 +45,9 @@ public class SpriteTests
     public void Update_Heading180_MovesDown()
     {
         var sprite = new Sprite2D { Heading = 180f, Speed = 10f, Behaviors = [new Motion2D()] };
-        Updater.Default.UpdateEntity(sprite, Context(0));
+        Updater.Default.Update(sprite, Context(0));
 
-        Updater.Default.UpdateEntity(sprite, Context(1.0));
+        Updater.Default.Update(sprite, Context(1.0));
         Assert.Equal(0f, sprite.Center.X, 3);
         Assert.Equal(10f, sprite.Center.Y, 3);
     }
@@ -56,9 +56,9 @@ public class SpriteTests
     public void Update_AccumulatesRotation_AndWrapsAt360()
     {
         var sprite = new Sprite2D { Rotation = 350f, RotationSpeed = 30f, Behaviors = [new Motion2D()] };
-        Updater.Default.UpdateEntity(sprite, Context(0));
+        Updater.Default.Update(sprite, Context(0));
 
-        Updater.Default.UpdateEntity(sprite, Context(1.0)); // +30° → 380 % 360 → 20
+        Updater.Default.Update(sprite, Context(1.0)); // +30° → 380 % 360 → 20
         Assert.Equal(20f, sprite.Rotation, 3);
     }
 
@@ -66,8 +66,8 @@ public class SpriteTests
     public void Update_MovesSpritePosition()
     {
         var sprite = new Sprite2D { Heading = 90f, Speed = 1f, Behaviors = [new Motion2D()] };
-        Updater.Default.UpdateEntity(sprite, Context(0));
-        Updater.Default.UpdateEntity(sprite, Context(1.0));
+        Updater.Default.Update(sprite, Context(0));
+        Updater.Default.Update(sprite, Context(1.0));
         Assert.Equal(1f, sprite.Center.X, 3);
     }
 

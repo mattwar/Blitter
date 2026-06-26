@@ -8,7 +8,7 @@ namespace Blitter.Blocks3D;
 /// Its collection of behaviors defines its logic: movement, collision
 /// response, and so on. The 3D analog of <c>Blitter.Blocks2D.Sprite2D</c>.
 /// </summary>
-public class Sprite3D : Entity, IDrawable3D
+public class Sprite3D : Entity, IDrawable3D, IVisibility
 {
     private Transform3D? _transform = null;
     private Velocity3D? _velocity = null;
