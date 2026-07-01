@@ -111,7 +111,8 @@ sealed class RemoveBelowBounds2D : Behavior, IUpdatable
     {
         if (Entity is Sprite2D sprite
             && sprite.TryFindTrait<Bounds2D>(out var bounds)
-            && sprite.Center.Y - Margin > bounds.Rect.Height)
+            && bounds.Rect is { } rect
+            && sprite.Center.Y - Margin > rect.Height)
             sprite.RemoveFromContainer();
     }
 }
