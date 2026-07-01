@@ -1103,4 +1103,3 @@ sealed class RocketController : Behavior, IUpdatable
         return deg < 0f ? deg + 360f : deg;
     }
 }
-

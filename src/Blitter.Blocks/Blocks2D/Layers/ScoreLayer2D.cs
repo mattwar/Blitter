@@ -3,9 +3,10 @@ using System.Numerics;
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// Anchored HUD score readout. Owns the running total via
-/// <see cref="Score"/>, briefly pulses when the value changes, and
-/// (optionally) forwards a "+N" popup to a paired
+/// Anchored HUD score readout. 
+/// Owns the running total via <see cref="Score"/>, 
+/// briefly pulses when the value changes, 
+/// and (optionally) forwards a "+N" popup to a paired
 /// <see cref="FloatingTextLayer2D"/>.
 /// </summary>
 public sealed class ScoreLayer2D : Entity, IDrawable2D, IUpdatable
