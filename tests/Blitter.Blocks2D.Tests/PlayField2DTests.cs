@@ -1,5 +1,7 @@
 using System.Numerics;
 
+using Blitter.Bits;
+
 namespace Blitter.Blocks2D.Tests;
 
 public class PlayField2DTests
@@ -84,10 +86,32 @@ public class PlayField2DTests
         var removeSelf = entity.GetOrAddBehavior<RemoveSelfOnUpdate>();
         playfield.AddEntity(entity);
 
-        playfield.Update(new EntityUpdateContext());
+        Updater.Default.Update(playfield, new EntityUpdateContext());
 
         Assert.Equal(Containment.Removing, removeSelf.ContainmentDuringUpdate);
         Assert.Empty(playfield.Entities);
         Assert.Null(entity.Container);
+    }
+
+    [Fact]
+    public void CollisionSpaceBehavior_ComputesSubstepsForPlayfield()
+    {
+        var playfield = new PlayField2D();
+        var entity = new TestCollider();
+        entity.GetOrAddTrait<Velocity2D>().Speed = 100f;
+        playfield.AddEntity(entity);
+
+        Assert.True(playfield.TryGetCapability<ICollisionSpace>(out var collisionSpace));
+        Assert.Equal(8, collisionSpace.GetCollisionSubstepCount(new EntityUpdateContext
+        {
+            ElapsedSinceLastUpdate = TimeSpan.FromSeconds(1),
+        }));
+    }
+
+    private sealed class TestCollider : Entity, IColliderShape2D
+    {
+        private readonly PosedHitShape2D _shape = new(new CircleHitShape2D(Vector2.Zero, 10f), Pose2D.Identity);
+
+        public PosedHitShape2D GetShape() => _shape;
     }
 }

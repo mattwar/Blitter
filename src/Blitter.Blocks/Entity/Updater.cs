@@ -7,7 +7,7 @@ namespace Blitter.Blocks;
 public sealed class Updater
 {
     /// <summary>
-    /// Shared stateless updater used by built-in scene and playfield operations.
+    /// Shared updater used by built-in scene and playfield operations.
     /// </summary>
     public static Updater Default { get; } = new();
 
@@ -20,18 +20,66 @@ public sealed class Updater
             return;
 
         var ownsTraversal = entity is IUpdatable;
-        UpdateEntity(entity, in context);
-
         if (ownsTraversal)
+        {
+            UpdateEntity(entity, in context);
             return;
+        }
 
-        if (entity is not IContainer container)
+        if (entity is IContainer collisionContainer 
+            && entity.TryGetCapability<ICollisionSpace>(out var collisionSpace))
+        {
+            UpdateCollisionSpace(collisionContainer, collisionSpace, in context);
+            UpdateBehaviors(entity, in context);
             return;
+        }
 
+        UpdateBehaviors(entity, in context);
+
+        if (entity is IContainer container)
+            UpdateChildren(container, in context);
+    }
+
+    private void UpdateCollisionSpace(IContainer container, ICollisionSpace collisionSpace, in EntityUpdateContext context)
+    {
+        var substeps = Math.Max(1, collisionSpace.GetCollisionSubstepCount(in context));
+        var subContext = substeps > 1
+            ? context with { ElapsedSinceLastUpdate = context.ElapsedSinceLastUpdate / substeps }
+            : context;
+
+        var deferredContainer = container as IDeferredMutationContainer;
+        if (deferredContainer is not null)
+            deferredContainer.BeginMutationBuffer();
+
+        try
+        {
+            for (int i = 0; i < substeps; i++)
+            {
+                UpdateCollisionSpaceChildren(container, in subContext);
+                collisionSpace.ResolveCollisions();
+            }
+        }
+        finally
+        {
+            if (deferredContainer is not null)
+                deferredContainer.EndMutationBuffer();
+        }
+    }
+
+    private void UpdateCollisionSpaceChildren(IContainer container, in EntityUpdateContext context)
+    {
         for (int i = 0; i < container.Entities.Count; i++)
         {
-            Update(container.Entities[i], in context);
+            var entity = container.Entities[i];
+            if (container.Contains(entity))
+                Update(entity, in context);
         }
+    }
+
+    private void UpdateChildren(IContainer container, in EntityUpdateContext context)
+    {
+        for (int i = 0; i < container.Entities.Count; i++)
+            Update(container.Entities[i], in context);
     }
 
     /// <summary>

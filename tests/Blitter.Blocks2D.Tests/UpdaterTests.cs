@@ -29,6 +29,18 @@ public class UpdaterTests
         Assert.Equal(0, child.Updates);
     }
 
+    [Fact]
+    public void Update_CollisionSpaceUsesCollisionSubsteps()
+    {
+        var root = new TestCollisionSpaceContainer { Substeps = 3 };
+        var child = new TestEntity();
+        root.AddEntity(child);
+
+        Updater.Default.Update(root, new EntityUpdateContext());
+
+        Assert.Equal(3, child.Updates);
+    }
+
     private class TestEntity : Entity, IUpdatable
     {
         public int Updates { get; private set; }
@@ -67,6 +79,15 @@ public class UpdaterTests
         {
             Updates++;
         }
+    }
+
+    private sealed class TestCollisionSpaceContainer : TestContainer, ICollisionSpace
+    {
+        public int Substeps { get; init; } = 1;
+
+        public int GetCollisionSubstepCount(in EntityUpdateContext context) => Substeps;
+
+        public void ResolveCollisions() { }
     }
 
     private sealed class TestBehavior : Behavior, IUpdatable

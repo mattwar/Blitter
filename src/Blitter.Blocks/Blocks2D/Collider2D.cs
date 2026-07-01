@@ -27,27 +27,6 @@ public sealed class Collider2D
     public Collider2D(Func<IEntity, bool> isLive) => _isLive = isLive;
 
     /// <summary>
-    /// Walks an entity tree and runs collision independently for each
-    /// <see cref="ICollisionSpace2D"/> it finds.
-    /// </summary>
-    public void Collide(IEntity root)
-    {
-        ArgumentNullException.ThrowIfNull(root);
-
-        if (root.TryGetCapability<ICollisionSpace2D>(out var space))
-        {
-            Collide(space.CollisionEntities, space.IsCollisionLive);
-            return;
-        }
-
-        if (root is not IContainer container)
-            return;
-
-        for (int i = 0; i < container.Entities.Count; i++)
-            Collide(container.Entities[i]);
-    }
-
-    /// <summary>
     /// Detects overlaps among non-barrier colliders and between those colliders
     /// and barrier colliders, dispatching hits as it goes. Barriers never
     /// collide with each other. Shapes are re-read between dispatches so a

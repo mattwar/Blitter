@@ -7,67 +7,18 @@ namespace Blitter.Blocks2D.Tests;
 public class Collider2DTests
 {
     [Fact]
-    public void Collide_RootEntity_CollidesEachCollisionSpaceIndependently()
-    {
-        var firstA = new TestCollider(new Vector2(0, 0));
-        var firstB = new TestCollider(new Vector2(0, 0));
-        var secondA = new TestCollider(new Vector2(0, 0));
-        var secondB = new TestCollider(new Vector2(0, 0));
-        var root = new Container
-        {
-            Entities =
-            [
-                new PlayField2D { Entities = [firstA, firstB] },
-                new PlayField2D { Entities = [secondA, secondB] },
-            ]
-        };
-
-        new Collider2D().Collide(root);
-
-        Assert.Equal(1, firstA.Hits);
-        Assert.Equal(1, firstB.Hits);
-        Assert.Equal(1, secondA.Hits);
-        Assert.Equal(1, secondB.Hits);
-    }
-
-    [Fact]
-    public void Collide_RootEntity_DoesNotCollideAcrossSiblingCollisionSpaces()
+    public void ResolveCollisions_CollidesSpaceMembers()
     {
         var first = new TestCollider(new Vector2(0, 0));
         var second = new TestCollider(new Vector2(0, 0));
-        var root = new Container
+        var container = new Container
         {
-            Entities =
-            [
-                new PlayField2D { Entities = [first] },
-                new PlayField2D { Entities = [second] },
-            ]
+            Entities = [first, second],
+            Behaviors = [new CollisionSpace2D()],
         };
 
-        new Collider2D().Collide(root);
-
-        Assert.Equal(0, first.Hits);
-        Assert.Equal(0, second.Hits);
-    }
-
-    [Fact]
-    public void Collide_RootEntity_UsesCollisionSpaceBehavior()
-    {
-        var first = new TestCollider(new Vector2(0, 0));
-        var second = new TestCollider(new Vector2(0, 0));
-        var root = new Container
-        {
-            Entities =
-            [
-                new Container
-                {
-                    Entities = [first, second],
-                    Behaviors = [new CollisionSpace2D()],
-                }
-            ]
-        };
-
-        new Collider2D().Collide(root);
+        Assert.True(container.TryGetCapability<ICollisionSpace>(out var space));
+        space.ResolveCollisions();
 
         Assert.Equal(1, first.Hits);
         Assert.Equal(1, second.Hits);
