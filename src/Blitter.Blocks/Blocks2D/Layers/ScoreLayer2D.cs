@@ -1,15 +1,15 @@
-using Blitter.Bits;
 using System.Numerics;
 
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// Anchored HUD score readout. Owns the running total via
-/// <see cref="Score"/>, briefly pulses when the value changes, and
-/// (optionally) forwards a "+N" popup to a paired
+/// Anchored HUD score readout. 
+/// Owns the running total via <see cref="Score"/>, 
+/// briefly pulses when the value changes, 
+/// and (optionally) forwards a "+N" popup to a paired
 /// <see cref="FloatingTextLayer2D"/>.
 /// </summary>
-public sealed class ScoreLayer2D : Layer2D
+public sealed class ScoreLayer2D : Entity, IDrawable2D, IUpdatable
 {
     /// <summary>Font used for the HUD readout.</summary>
     public required Font Font { get; init; }
@@ -99,13 +99,13 @@ public sealed class ScoreLayer2D : Layer2D
         Changed?.Invoke(old, Score);
     }
 
-    public override void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         if (_sincePulse < PulseDuration)
             _sincePulse += context.ElapsedSinceLastUpdate;
     }
 
-    protected override void DrawContent(Renderer2D renderer)
+    public void Draw(Renderer2D renderer)
     {
         using var _ = renderer.PushState();
         renderer.Camera = null;

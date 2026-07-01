@@ -1,14 +1,13 @@
 using System.Numerics;
 
 namespace Blitter.Blocks3D;
-using Bits;
 
 /// <summary>
 /// Rotates the entity continuously around its vertical axis (Y-axis). 
 /// This is useful for items like spinning coins, rotating signs, or 
 /// other objects that need a constant rotation effect.
 /// </summary>
-public sealed class Spin3D : Behavior
+public sealed class Spin3D : Behavior, IUpdatable
 {
     /// <summary>
     /// The speed of the spin in radians per second.
@@ -22,7 +21,7 @@ public sealed class Spin3D : Behavior
         _transform = entity.GetOrAddTrait<Transform3D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var dt = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
         if (dt <= 0f || RotationSpeed == 0f)

@@ -1,13 +1,13 @@
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// A <see cref="Layer2D"/> that draws a single image tiled
+/// A drawable entity that draws a single image tiled
 /// horizontally to cover the viewport. Pair with
-/// <see cref="Layer2D.ParallaxFactor"/> to build a parallax
+/// <see cref="Parallax2D"/> to build a parallax
 /// background stack: each layer at a different factor scrolls at a
 /// different speed relative to the camera.
 /// </summary>
-public sealed class RepeatingImageLayer2D : Layer2D
+public sealed class RepeatingImageLayer2D : Entity, IDrawable2D
 {
     private readonly Texture2D _image;
 
@@ -42,16 +42,15 @@ public sealed class RepeatingImageLayer2D : Layer2D
     public Color Tint { get; set; } = Color.White;
 
     /// <inheritdoc/>
-    protected override void DrawContent(Renderer2D renderer)
+    public void Draw(Renderer2D renderer)
     {
         float tileW = _image.Width;
         float tileH = _image.Height;
         float topY = BottomY - tileH;
 
         // Figure out which world-X range the viewport currently shows
-        // so we know how many tile copies to emit. Layer2D has already
-        // swapped in a parallax-adjusted camera by the time we draw,
-        // so reading renderer.Camera here is correct per layer.
+        // so we know how many tile copies to emit. Drawable setup behaviors
+        // have already adjusted renderer state by the time we draw.
         var cam = renderer.Camera;
         if (!RepeatX || tileW <= 0f || cam is null)
         {

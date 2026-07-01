@@ -8,6 +8,7 @@
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
 
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using Blitter;
 using Blitter.Bits;
@@ -66,9 +67,6 @@ var scoreboard = new ScoreLayer2D
     NegativePopupColor = new Color(120, 255, 120),
 };
 
-// Set by the exit behavior when the run ends. The HUD layer reads
-// this to draw a "GAME OVER" banner during the exit-delay window.
-DateTime? gameOverAt = null;
 var gameOverDuration = TimeSpan.FromSeconds(3);
 
 
@@ -95,24 +93,16 @@ var rocket = new Rocket
     Heading = 45f,
     Behaviors = 
     [ 
-        new RocketController(window.Input),
+        new RocketController(),
         new AsteroidSmasher(scoreboard),
+        new CameraFollow2D{ ViewportSize = new Vector2(DesignW, DesignH), MarginFraction = 0.3f },
     ]
 };
 
 // Camera scrolls the world to keep the rocket in view. Start it on
 // the rocket so the first frame isn't a snap from the world origin.
 var camera = new Camera2D { Position = rocket.Center };
-window.Renderer.Camera = camera;
-
-var worldBounds = new Rect(0, 0, WorldW, WorldH);
-rocket.AddBehavior(new CameraFollow2D
-{
-    Camera = camera,
-    ViewportSize = new Vector2(DesignW, DesignH),
-    MarginFraction = 0.3f,
-    WorldBounds = worldBounds,
-});
+var attachedCamera = new AttachedCamera2D { Camera = camera };
 
 // Parallax star field. The rocket is buzzing around an asteroid
 // field, not zooming between stars, so both layers stay nearly
@@ -135,139 +125,59 @@ var midBounds = new Rect(
 
 var starsFar = new StarField2D(500, farBounds, seed: 1)
 {
-    ParallaxFactor = Vector2.Zero,
     StarColor = new Color(180, 180, 220, 255),
 };
 
 var starsMid = new StarField2D(250, midBounds, seed: 2)
 {
-    ParallaxFactor = new Vector2(MidParallax, MidParallax),
+    Behaviors = [new Parallax2D { Factor = new Vector2(MidParallax, MidParallax) }],
     StarColor = new Color(220, 220, 255, 255),
 };
 
 // The playfield includes the asteriods and the rocket.
-var playField = new PlayField2D([..asteroids, rocket])
+var playField = new PlayField2D
 {
-    WorldBounds = worldBounds,
-    ShowWorldBounds = true,
+    Entities = [..asteroids, rocket],
+    Traits = [new Bounds2D { Rect = new Rect(0, 0, WorldW, WorldH) }],
+    Behaviors = [new DrawWorldBounds2D()],
 };
 
-// Custom layer for overlay text
-var hud = new CustomLayer2D
+// Ends the run when every target is cleared (or V is pressed). The HUD
+// layer reads GameOverAt to draw a "GAME OVER" banner during exit-delay.
+var levelComplete = new LevelComplete2D { Delay = gameOverDuration };
+
+// HUD overlay: speed readout and the game-over banner.
+var hud = new RocketHud
 {
-    OnRender = rd =>
-    {
-        using var _ = rd.PushState();
-        rd.Camera = null; // detach camera so HUD is screen-locked
-
-        // Speed readout under the score. The delegate runs every
-        // frame, so just reading rocket.Speed here keeps the HUD
-        // live — no separate update step needed. Below the smash
-        // threshold the readout flashes to nag the player.
-        const float SmashSpeed = 500f;
-        bool tooSlow = rocket.Speed < SmashSpeed;
-        bool flashOn = !tooSlow
-            || ((int)(Environment.TickCount / 250) & 1) == 0;
-        if (flashOn)
-        {
-            var speedColor = tooSlow
-                ? new Color(255, 140, 80)  // orange = too slow
-                : new Color(120, 255, 120); // green = smashing speed
-            scoreFont.DrawText(rd, $"SPEED {rocket.Speed:0}", speedColor, 20f, 120f);
-        }
-
-#if false
-        rd.DrawColor = Color.White;
-        var asteriodCount = playField.Sprites.Count(s => s is Asteroid);
-        rd.DrawDebugText(
-            0, 10,
-            $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.Center.X:#} y: {rocket.Center.Y:#} asteriods: {asteriodCount}",
-            scale: 2f);
-#endif
-
-        if (gameOverAt is not null)
-        {
-            const string banner = "GAME OVER";
-            var size = bannerFont.Measure(banner);
-            float x = (DesignW - size.X) / 2f;
-            float y = (DesignH - size.Y) / 2f;
-            bannerFont.DrawText(rd, banner, Color.White, x, y);
-        }
-    }
+    ScoreFont = scoreFont,
+    BannerFont = bannerFont,
+    DesignSize = new Vector2(DesignW, DesignH),
 };
 
 // Overhead minimap so the player can see asteroids beyond the
 // viewport. Sized to the upper-right corner; markers are scaled
 // by asteroid size and colored by kind.
-var minimap = new MinimapLayer2D
+var minimap = new RocketMinimapLayer
 {
-    Source = playField,
     // 16:9 to match the world (3840x2160) so the viewport overlay
     // and asteroid positions aren't stretched.
     ScreenRect = new Rect(DesignW - 340, 20, 320, 180),
     // Slightly translucent so asteroids passing behind the minimap
     // are still readable through the panel.
     BackgroundColor = new Color(0, 0, 0, 100),
-    ViewportCamera = camera,
     ViewportSize = new Vector2(DesignW, DesignH),
     ViewportColor = new Color(0,0,0,0), // no outline
-    MarkerSelector = s => s switch
-    {
-        Rocket r => new MinimapMarker(
-            Color.Red,
-            Radius: 6f,
-            Shape: MinimapShape.Triangle,
-            // Use Rotation (not Heading) so the marker spins with the
-            // rocket during stun, when the two diverge.
-            Rotation: r.Rotation),
-        Asteroid { Kind: AsteriodKind.Gold } g =>
-            new MinimapMarker(new Color(255, 215, 0), Radius: 2f + g.Scale * 4f, Shape: MinimapShape.Circle),
-        Asteroid { Kind: AsteriodKind.Radioactive } x =>
-            new MinimapMarker(new Color(120, 255, 120), Radius: 2f + x.Scale * 4f, Shape: MinimapShape.Square, Rotation: 45f),
-        Asteroid a =>
-            new MinimapMarker(new Color(210, 180, 140), Radius: 1.5f + a.Scale * 3.5f, Shape: MinimapShape.Circle),
-        _ => null,
-    },
 };
 
 // Debug overlay: outlines the rocket's HitShape in world space so
 // we can see exactly where collisions register. Toggle with H.
-bool showHitShape = false;
-var hitDebug = new CustomLayer2D
+var hitDebug = new HitDebugLayer
 {
-    OnUpdate = ctx =>
-    {
-        if (window.Input.WasJustPressed(Key.H))
-            showHitShape = !showHitShape;
-    },
-    OnRender = rd =>
-    {
-        if (!showHitShape) return;
-        using var _ = rd.PushState();
-        rd.DrawColor = new Color(0, 255, 120, 220);
-        rocket.HitShape.Visit(HitShapeDebug2D.Draw(rd));
-        // Also outline the bounding circle in a dimmer color
-        // so we can see when the cheap reject would skip.
-        rd.DrawColor = new Color(0, 200, 255, 90);
-        HitShapeDebug2D.DrawCircleOutline(rd, rocket.HitShape.BoundingCircle.Center, rocket.HitShape.BoundingCircle.Radius);
-
-        // Same treatment for every asteroid currently on the field:
-        // magenta hit shape outline + dim bounding circle.
-        var hitVisitor = HitShapeDebug2D.Draw(rd);
-        foreach (var sprite in playField.Sprites)
-        {
-            if (sprite is not Asteroid asteroid) continue;
-            rd.DrawColor = new Color(255, 80, 200, 220);
-            asteroid.HitShape.Visit(hitVisitor);
-            rd.DrawColor = new Color(255, 120, 220, 70);
-            HitShapeDebug2D.DrawCircleOutline(rd, asteroid.HitShape.BoundingCircle.Center, asteroid.HitShape.BoundingCircle.Radius);
-        }
-    },
 };
 
 var scene = new Scene2D
 {
-    Layers = 
+    Entities = 
     [ 
         starsFar, 
         starsMid, 
@@ -281,21 +191,8 @@ var scene = new Scene2D
     ],
     Behaviors =
     [
-        new CustomSceneBehavior2D()
-        {
-            OnApply = (s, in ctx) =>
-            {
-                if (s.RunState != RunState.Running)
-                    return;
-                var remainingTargets = playField.Sprites.Count(s => s is Asteroid a && a.Kind != AsteriodKind.Radioactive);
-                if (remainingTargets == 0 || window.Input.WasJustPressed(Key.V))
-                {
-                    var task = Audio.PlayAsync(Melodies.LevelUp, volume: .3f);
-                    gameOverAt = DateTime.UtcNow;
-                    s.ExitWithDelay(gameOverDuration);
-                }
-            }
-        }
+        attachedCamera,
+        levelComplete,
     ],
 };
 
@@ -345,20 +242,276 @@ static List<Asteroid> CreateAsteroidField(int count, Bitmap image)
     return asteroids;
 }
 
-sealed class Rocket : Sprite2D
+sealed class RocketMinimapLayer : MinimapLayer2D
+{
+    protected override MinimapMarker? GetMarker(IEntity entity) => entity switch
+    {
+        Rocket r => new MinimapMarker(
+            Color.Red,
+            Radius: 6f,
+            Shape: MinimapShape.Triangle,
+            // Use Rotation (not Heading) so the marker spins with the
+            // rocket during stun, when the two diverge.
+            Rotation: r.Rotation),
+        Asteroid { Kind: AsteriodKind.Gold } g =>
+            new MinimapMarker(new Color(255, 215, 0), Radius: 2f + g.Scale * 4f, Shape: MinimapShape.Circle),
+        Asteroid { Kind: AsteriodKind.Radioactive } x =>
+            new MinimapMarker(new Color(120, 255, 120), Radius: 2f + x.Scale * 4f, Shape: MinimapShape.Square, Rotation: 45f),
+        Asteroid a =>
+            new MinimapMarker(new Color(210, 180, 140), Radius: 1.5f + a.Scale * 3.5f, Shape: MinimapShape.Circle),
+        _ => null,
+    };
+}
+
+// HUD overlay: flashing speed readout plus the "GAME OVER" banner that
+// LevelComplete2D triggers during the exit delay.
+sealed class RocketHud : Entity, IDrawable2D
+{
+    private Rocket? _rocket;
+    private LevelComplete2D? _levelComplete;
+
+    public string? RocketName { get; init; }
+
+    public string? LevelCompleteName { get; init; }
+
+    public required Font ScoreFont { get; init; }
+
+    public required Font BannerFont { get; init; }
+
+    public Vector2 DesignSize { get; init; }
+
+    public void Draw(Renderer2D rd)
+    {
+        if (!TryResolveRocket(out var rocket))
+            return;
+
+        using var _ = rd.PushState();
+        rd.Camera = null; // detach camera so HUD is screen-locked
+
+        // Speed readout under the score. Reading rocket.Speed here each
+        // frame keeps the HUD live. Below the smash threshold the
+        // readout flashes to nag the player.
+        const float SmashSpeed = 500f;
+        bool tooSlow = rocket.Speed < SmashSpeed;
+        bool flashOn = !tooSlow
+            || ((int)(Environment.TickCount / 250) & 1) == 0;
+        if (flashOn)
+        {
+            var speedColor = tooSlow
+                ? new Color(255, 140, 80)  // orange = too slow
+                : new Color(120, 255, 120); // green = smashing speed
+            ScoreFont.DrawText(rd, $"SPEED {rocket.Speed:0}", speedColor, 20f, 120f);
+        }
+
+        if (TryResolveLevelComplete(out var levelComplete) && levelComplete.GameOverAt is not null)
+        {
+            const string banner = "GAME OVER";
+            var size = BannerFont.Measure(banner);
+            float x = (DesignSize.X - size.X) / 2f;
+            float y = (DesignSize.Y - size.Y) / 2f;
+            BannerFont.DrawText(rd, banner, Color.White, x, y);
+        }
+    }
+
+    private bool TryResolveRocket([NotNullWhen(true)] out Rocket? rocket)
+    {
+        if (_rocket is not null)
+        {
+            rocket = _rocket;
+            return true;
+        }
+
+        if (Container is not { } container || !container.TryGetEntity<PlayField2D>(out var playfield))
+        {
+            rocket = null;
+            return false;
+        }
+
+        var found = playfield.TryGetEntity(RocketName, out rocket);
+
+        if (found)
+            _rocket = rocket;
+
+        return found;
+    }
+
+    private bool TryResolveLevelComplete([NotNullWhen(true)] out LevelComplete2D? levelComplete)
+    {
+        if (_levelComplete is not null)
+        {
+            levelComplete = _levelComplete;
+            return true;
+        }
+
+        if (Container is not { } container)
+        {
+            levelComplete = null;
+            return false;
+        }
+
+        var found = LevelCompleteName is null
+            ? container.TryGetBehavior(out levelComplete)
+            : container.TryGetCapability(LevelCompleteName, out levelComplete);
+
+        if (found)
+            _levelComplete = levelComplete;
+
+        return found;
+    }
+}
+
+// Debug overlay: outlines the rocket and asteroid HitShapes in world
+// space (toggle with H) so collision registration is visible.
+sealed class HitDebugLayer : Entity, IDrawable2D, IUpdatable
+{
+    private readonly HitShapeDebug2D _hitShapeDebug = new();
+    private PlayField2D? _playField;
+    private Rocket? _rocket;
+    private bool _showHitShape;
+
+    public string? PlayFieldName { get; init; }
+
+    public string? RocketName { get; init; }
+
+    public void Update(in EntityUpdateContext context)
+    {
+        if (context.Input?.WasJustPressed(Key.H) == true)
+            _showHitShape = !_showHitShape;
+    }
+
+    public void Draw(Renderer2D rd)
+    {
+        if (!_showHitShape) return;
+        if (!TryResolvePlayField(out var playField) || !TryResolveRocket(playField, out var rocket)) return;
+
+        using var _ = rd.PushState();
+
+        rd.DrawColor = new Color(0, 255, 120, 220);
+        _hitShapeDebug.Draw(rd, rocket.HitShape);
+        // Also outline the bounding circle in a dimmer color
+        // so we can see when the cheap reject would skip.
+        rd.DrawColor = new Color(0, 200, 255, 90);
+        HitShapeDebug2D.DrawCircleOutline(rd, rocket.HitShape.BoundingCircle.Center, rocket.HitShape.BoundingCircle.Radius);
+
+        // Same treatment for every asteroid currently on the field:
+        // magenta hit shape outline + dim bounding circle.
+        foreach (var sprite in playField.Entities)
+        {
+            if (sprite is not Asteroid asteroid) continue;
+            rd.DrawColor = new Color(255, 80, 200, 220);
+            _hitShapeDebug.Draw(rd, asteroid.HitShape);
+            rd.DrawColor = new Color(255, 120, 220, 70);
+            HitShapeDebug2D.DrawCircleOutline(rd, asteroid.HitShape.BoundingCircle.Center, asteroid.HitShape.BoundingCircle.Radius);
+        }
+    }
+
+    private bool TryResolvePlayField([NotNullWhen(true)] out PlayField2D? playField)
+    {
+        if (_playField is not null)
+        {
+            playField = _playField;
+            return true;
+        }
+
+        if (Container is not { } container)
+        {
+            playField = null;
+            return false;
+        }
+
+        var found = container.TryGetEntity(PlayFieldName, out playField);
+        if (found)
+            _playField = playField;
+
+        return found;
+    }
+
+    private bool TryResolveRocket(PlayField2D playField, [NotNullWhen(true)] out Rocket? rocket)
+    {
+        if (_rocket is not null)
+        {
+            rocket = _rocket;
+            return true;
+        }
+
+        var found = playField.TryGetEntity(RocketName, out rocket);
+        if (found)
+            _rocket = rocket;
+
+        return found;
+    }
+}
+
+// Ends the run when every non-radioactive target is cleared (or V is
+// pressed). The HUD reads GameOverAt to draw the "GAME OVER" banner.
+sealed class LevelComplete2D : Behavior, IUpdatable, ICapability
+{
+    private PlayField2D? _playField;
+
+    public string? Name { get; init; }
+
+    public TimeSpan Delay { get; init; }
+
+    public string? PlayFieldName { get; init; }
+
+    public DateTime? GameOverAt { get; private set; }
+
+    public void Update(in EntityUpdateContext context)
+    {
+        var runControl = context.RunControl;
+        if (runControl?.RunState != RunState.Running)
+            return;
+        if (!TryResolvePlayField(out var playField))
+            return;
+
+        var remainingTargets = playField.Entities.Count(
+            s => s is Asteroid a && a.Kind != AsteriodKind.Radioactive);
+        if (remainingTargets == 0 || context.Input?.WasJustPressed(Key.V) == true)
+        {
+            _ = Audio.PlayAsync(Melodies.LevelUp, volume: .3f);
+            GameOverAt = DateTime.UtcNow;
+            runControl.RequestExitAfter(Delay);
+        }
+    }
+
+    private bool TryResolvePlayField([NotNullWhen(true)] out PlayField2D? playField)
+    {
+        if (_playField is not null)
+        {
+            playField = _playField;
+            return true;
+        }
+
+        if (Entity.Container is not { } container)
+        {
+            playField = null;
+            return false;
+        }
+
+        var found = container.TryGetEntity(PlayFieldName, out playField);
+        if (found)
+            _playField = playField;
+
+        return found;
+    }
+}
+
+sealed class Rocket : Sprite2D, IUpdatable
 {
     /// <summary>
     /// The flame drawn behind the rocket while thrusting. A separate slot
     /// from <see cref="Sprite2D.Image"/> so it can be composited with its own
-    /// blend mode. Assign a path; read <see cref="ImageSource.Visual"/> to draw.
+    /// blend mode. Assign a path; call <see cref="ImageSource.GetComposedVisual"/> to draw.
     /// </summary>
     public ImageSource Flame { get; set; } = new();
 
+    public TimeSpan Elapsed { get; private set; }
+
     public TimeSpan FlameUntil { get; private set; }
-    public bool IsFlameVisible => Age < FlameUntil;
+    public bool IsFlameVisible => Elapsed < FlameUntil;
 
     public TimeSpan ShieldUntil { get; private set; }
-    public bool IsShieldVisible => Age < ShieldUntil;
+    public bool IsShieldVisible => Elapsed < ShieldUntil;
 
     private const int ShieldVisualSize = 256;
     private const float ShieldDrawDiameterScale = 2.35f;
@@ -368,10 +521,10 @@ sealed class Rocket : Sprite2D
     private static readonly Visual2D ShieldVisual = MakeShieldVisual(ShieldVisualSize);
 
     // Set by SmashAsteroidBehavior on a radioactive hit. While
-    // Age < StunUntil the rocket spins freely, ignores input, and
+    // Elapsed < StunUntil the rocket spins freely, ignores input, and
     // bounces off asteroids instead of smashing them.
     public TimeSpan StunUntil { get; set; }
-    public bool IsStunned => Age < StunUntil;
+    public bool IsStunned => Elapsed < StunUntil;
 
     public Rocket()
     {
@@ -380,31 +533,41 @@ sealed class Rocket : Sprite2D
             new Motion2D(),  // move with simple 2D physics
             // Face direction of travel, except while stunned — then
             // let RotationSpeed drive the spin freely.
-            new CustomSpriteBehavior2D
-            {
-                OnApply = (s, in _) =>
-                {
-                    if (s is Rocket { IsStunned: true })
-                        return;
-                    s.Rotation = s.Heading;
-                },
-            },
-            new BounceInBounds2D  // bounce off the walls
-            {
-                OnBounce = e =>
-                {
-                    if (e is not Sprite2D s)
-                        return;
-                    s.Heading = (s.Heading + Random.Shared.Next(-10, 10) + 360f) % 360f;
-                    Audio.Play(Sounds.Boing, volume: .2f);
-                },
-            },
+            new FaceHeadingUnlessStunned(),
+            new BounceInBounds2D { Bounced = new BounceJitter() },  // bounce off the walls
         ];
+    }
+
+    public void Update(in EntityUpdateContext context)
+    {
+        Elapsed += context.ElapsedSinceLastUpdate;
+    }
+
+    private sealed class FaceHeadingUnlessStunned : Behavior, IUpdatable
+    {
+        public void Update(in EntityUpdateContext context)
+        {
+            if (Entity is not Sprite2D s || s is Rocket { IsStunned: true })
+                return;
+            s.Rotation = s.Heading;
+        }
+    }
+
+    // On a wall bounce, nudge the heading randomly and play a boing.
+    private sealed class BounceJitter : IEventHandler<BoundsBounced2DEventArgs>
+    {
+        public void OnEvent(in BoundsBounced2DEventArgs e)
+        {
+            if (e.Self is not Sprite2D s)
+                return;
+            s.Heading = (s.Heading + Random.Shared.Next(-10, 10) + 360f) % 360f;
+            Audio.Play(Sounds.Boing, volume: .2f);
+        }
     }
 
     public void Stun(TimeSpan duration)
     {
-        StunUntil = Age + duration;
+        StunUntil = Elapsed + duration;
         // Random direction & rate for the spin.
         var rate = Random.Shared.Next(240, 540);
         if (Random.Shared.Next(2) == 0) rate = -rate;
@@ -416,7 +579,7 @@ sealed class Rocket : Sprite2D
         if (duration <= TimeSpan.Zero)
             return;
 
-        var until = Age + duration;
+        var until = Elapsed + duration;
         if (until > FlameUntil)
             FlameUntil = until;
     }
@@ -426,7 +589,7 @@ sealed class Rocket : Sprite2D
         if (duration == default)
             duration = TimeSpan.FromMilliseconds(150);
 
-        var until = Age + duration;
+        var until = Elapsed + duration;
         if (until > ShieldUntil)
             ShieldUntil = until;
     }
@@ -436,21 +599,21 @@ sealed class Rocket : Sprite2D
         var pose = new Pose2D(Center, Rotation, Scale);
 
         if (IsFlameVisible)
-            Flame.Visual?.Draw(renderer, pose, Color.White, Age, Flipped);
+            Flame.GetComposedVisual()?.Draw(renderer, pose, Color.White, Elapsed, Flipped);
 
-        Image.Visual?.Draw(renderer, pose, Tint, Age, Flipped);
+        Image.GetComposedVisual()?.Draw(renderer, pose, Tint, Elapsed, Flipped);
 
         // Shield image drawn at the bounding circle size, rotated with the heading.
         if (IsShieldVisible)
         {
             const float ShieldDuration = 0.15f;
-            var shieldAge = (float)(Age - (ShieldUntil - TimeSpan.FromSeconds(ShieldDuration))).TotalSeconds;
+            var shieldAge = (float)(Elapsed - (ShieldUntil - TimeSpan.FromSeconds(ShieldDuration))).TotalSeconds;
             var alpha = Math.Clamp(1f - shieldAge / ShieldDuration, 0f, 1f);
             var shieldRadius = HitShape.BoundingCircle.Radius;
             var shieldScale = (shieldRadius * ShieldDrawDiameterScale) / ShieldVisualSize;
             var shieldPose = new Pose2D(Center, Heading, shieldScale);
             var tint = new Color(255, 255, 255, (byte)(255 * alpha));
-            ShieldVisual.Draw(renderer, shieldPose, tint, Age, Flipped);
+            ShieldVisual.Draw(renderer, shieldPose, tint, Elapsed, Flipped);
         }
     }
 
@@ -579,7 +742,7 @@ sealed class Rocket : Sprite2D
     }
 }
 
-sealed class AsteroidSmasher : Behavior, IHitHandler2D
+sealed class AsteroidSmasher : Behavior, IHittable2D
 {
     private readonly ScoreLayer2D _scoreboard;
 
@@ -603,54 +766,46 @@ sealed class AsteroidSmasher : Behavior, IHitHandler2D
         _scoreboard = scoreboard;
     }
 
-    public override void Apply(in UpdateContext context) { }
-
-    public void OnHitSprite(Sprite2D self, Sprite2D other, in UpdateContext context)
+    public void OnHit(in Hit2D hit)
     {
+        if (this.Entity is not Rocket rocket || hit.Other is not Asteroid asteroid)
+            return;
+
         // Grace period: ignore freshly-spawned shards so they
         // can spread out before being hit again. Without this
         // the rocket sits inside the impact zone and devours
         // every shard on the very next frame.
-        if (other.Age < TimeSpan.FromMilliseconds(400))
-            return;
-
-        if (other is not Asteroid asteroid)
+        if (asteroid.Elapsed < TimeSpan.FromMilliseconds(400))
             return;
 
         // Shield flash on any collision (before deflect/stun/smash logic)
-        if (self is Rocket rocketShield)
-        {
-            rocketShield.TriggerShieldFlash();
-        }
+        rocket.TriggerShieldFlash();
 
         // Cooldown after a deflect so we don't re-trigger every
         // frame while the rocket is still overlapping this rock.
-        if (asteroid.Age < asteroid.HitCooldownUntil)
+        if (asteroid.Elapsed < asteroid.HitCooldownUntil)
             return;
 
         // Capture impact speed before applying momentum loss so the
         // smash-threshold check reflects how fast the player was
         // actually going at the moment of contact.
-        float impactSpeed = self is Rocket r ? r.Speed : 0f;
+        float impactSpeed = rocket.Speed;
 
         // Any hit costs momentum — scaled by the asteroid's mass so
         // the big rocks really pull you up short. Player has to lean
         // on the thrusters to recover.
-        if (self is Rocket hitRocket)
-        {
-            var loss = 50f * asteroid.Scale;
-            hitRocket.Speed = Math.Max(0f, hitRocket.Speed - loss);
-        }
+        var loss = 50f * asteroid.Scale;
+        rocket.Speed = Math.Max(0f, rocket.Speed - loss);
 
         // Stunned rocket can't smash — it caroms off instead, and
         // shoves the asteroid the other way. No score, no shards.
-        if (self is Rocket { IsStunned: true })
+        if (rocket.IsStunned)
         {
-            var delta = self.Center - asteroid.Center;
+            var delta = rocket.Center - asteroid.Center;
             var awayFromAsteroid = MathF.Atan2(delta.Y, delta.X) * 180f / MathF.PI + 90f;
-            self.Heading = (awayFromAsteroid + 360f) % 360f;
+            rocket.Heading = (awayFromAsteroid + 360f) % 360f;
             asteroid.Heading = (awayFromAsteroid + 180f) % 360f;
-            asteroid.HitCooldownUntil = asteroid.Age + TimeSpan.FromMilliseconds(400);
+            asteroid.HitCooldownUntil = asteroid.Elapsed + TimeSpan.FromMilliseconds(400);
             Audio.Play(Sounds.Boing, volume: .2f);
             return;
         }
@@ -662,19 +817,19 @@ sealed class AsteroidSmasher : Behavior, IHitHandler2D
         const float SmashSpeed = 500f;
         if (impactSpeed < SmashSpeed)
         {
-            var delta = self.Center - asteroid.Center;
+            var delta = rocket.Center - asteroid.Center;
             var awayFromAsteroid = MathF.Atan2(delta.Y, delta.X) * 180f / MathF.PI + 90f;
-            self.Heading = NudgeToward(self.Heading, awayFromAsteroid, fraction: 0.35f, jitterDeg: 5f, maxDeg: 20f);
+            rocket.Heading = NudgeToward(rocket.Heading, awayFromAsteroid, fraction: 0.35f, jitterDeg: 5f, maxDeg: 20f);
             asteroid.Heading = NudgeToward(asteroid.Heading, awayFromAsteroid + 180f, fraction: 0.5f, jitterDeg: 8f, maxDeg: 25f);
-            asteroid.HitCooldownUntil = asteroid.Age + TimeSpan.FromMilliseconds(400);
+            asteroid.HitCooldownUntil = asteroid.Elapsed + TimeSpan.FromMilliseconds(400);
             Audio.Play(Sounds.Hurt, volume: .1f);
             return;
         }
 
         // Mark the meteor for removal; the playfield reaps it
         // on its next update pass.
-        other.PlayField.RemoveSprite(other);
-        self.Heading = (self.Heading + Random.Shared.Next(-15, 15) + 360f) % 360f;
+        asteroid.PlayField.RemoveEntity(asteroid);
+        rocket.Heading = (rocket.Heading + Random.Shared.Next(-15, 15) + 360f) % 360f;
         Audio.Play(Sounds.Explosion, volume: .3f);
 
         // Score & popup for gold ("valuable minerals") asteroids.
@@ -686,11 +841,11 @@ sealed class AsteroidSmasher : Behavior, IHitHandler2D
             // Combo: chain consecutive gold smashes within the
             // window for an N× multiplier (capped). Each scoring
             // hit extends the window from itself.
-            if (self.Age < _comboExpiresAt)
+            if (rocket.Elapsed < _comboExpiresAt)
                 _comboCount++;
             else
                 _comboCount = 1;
-            _comboExpiresAt = self.Age + ComboWindow;
+            _comboExpiresAt = rocket.Elapsed + ComboWindow;
             int multiplier = Math.Min(_comboCount, ComboMaxMultiplier);
 
             _scoreboard.Add(points * multiplier, asteroid.Center);
@@ -712,8 +867,7 @@ sealed class AsteroidSmasher : Behavior, IHitHandler2D
         // current speed but spins freely, ignores the player's
         // controls, and bounces off rather than smashing asteroids
         // until the stun wears off.
-        if (asteroid.Kind == AsteriodKind.Radioactive
-            && self is Rocket rocketStun)
+        if (asteroid.Kind == AsteriodKind.Radioactive)
         {
             // Radioactive hit breaks any combo streak — no chaining
             // through a penalty.
@@ -721,7 +875,7 @@ sealed class AsteroidSmasher : Behavior, IHitHandler2D
             _comboExpiresAt = TimeSpan.Zero;
 
             var stunDuration = TimeSpan.FromSeconds(4 * asteroid.Scale);
-            rocketStun.Stun(stunDuration);
+            rocket.Stun(stunDuration);
             Audio.Play(_radioactiveAlarm, volume: .2f);
 
             // Bigger rocks hurt more; round to tens — same shape as
@@ -735,7 +889,7 @@ sealed class AsteroidSmasher : Behavior, IHitHandler2D
 
         // split the asteroid into shards
         asteroid.Smash();
-        asteroid.PlayField.RemoveSprite(asteroid);
+        asteroid.PlayField.RemoveEntity(asteroid);
     }
 
     private static float NudgeToward(float current, float target, float fraction, float jitterDeg, float maxDeg)
@@ -757,14 +911,16 @@ enum AsteriodKind
     Radioactive
 }
 
-sealed class Asteroid : Sprite2D
+sealed class Asteroid : Sprite2D, IUpdatable
 {
     public static readonly float GoldRarity = 0.25f; // 25% of asteroid shards are gold
     public static readonly float RadioactiveRarity = 0.1f; // 10% of asteroid shards are radioactive
 
     public AsteriodKind Kind { get; }
 
-    // While Age < HitCooldownUntil this asteroid ignores rocket
+    public TimeSpan Elapsed { get; private set; }
+
+    // While Elapsed < HitCooldownUntil this asteroid ignores rocket
     // contacts — used after a deflect so we don't keep colliding
     // every frame while the two are still overlapping.
     public TimeSpan HitCooldownUntil { get; set; }
@@ -786,11 +942,16 @@ sealed class Asteroid : Sprite2D
         else if (kind == AsteriodKind.Radioactive)
         {
             this.Tint = _radioactiveTint;
-            this.AddBehavior(PulseTint2D.FromBrightness(_radioactiveTint, amount: 0.5f, period: TimeSpan.FromSeconds(0.6)));
+            this.GetOrAddBehavior<PulseTint2D>().SetBrightness(_radioactiveTint, amount: 0.5f, period: TimeSpan.FromSeconds(0.6));
         }
 
-        this.AddBehavior(new Motion2D());
-        this.AddBehavior(new BounceInBounds2D());
+        this.GetOrAddBehavior<Motion2D>();
+        this.GetOrAddBehavior<BounceInBounds2D>();
+    }
+
+    public void Update(in EntityUpdateContext context)
+    {
+        Elapsed += context.ElapsedSinceLastUpdate;
     }
 
     public void Smash()
@@ -833,7 +994,7 @@ sealed class Asteroid : Sprite2D
                     RotationSpeed = shardSpin,
                 };  
 
-                playfield.AddSprite(shard);
+                playfield.AddEntity(shard);
             }           
         }
     }
@@ -859,10 +1020,8 @@ sealed class Asteroid : Sprite2D
     }
 }
 
-sealed class RocketController : Behavior
+sealed class RocketController : Behavior, IUpdatable
 {
-    private readonly FrameInput _input;
-
     // Turn feel tuning.
     private const float MaxTurnRateDegPerSec = 240f;
     private const float TurnAccelDegPerSec2 = 1200f;
@@ -872,16 +1031,11 @@ sealed class RocketController : Behavior
     // Signed turn rate in deg/s. Negative = left, positive = right.
     private float _turnRateDegPerSec;
 
-    public RocketController(FrameInput input)
-    {
-        _input = input;
-    } 
-
     private Sprite2D _rocket = null!;
 
     protected override void OnAttach(IEntity entity) => _rocket = (Sprite2D)entity;
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var rocket = _rocket;
 
@@ -896,8 +1050,12 @@ sealed class RocketController : Behavior
         if (dt <= 0f)
             return;
 
-        var leftDown = _input.IsDown(Key.Left);
-        var rightDown = _input.IsDown(Key.Right);
+        var input = context.Input;
+        if (input is null)
+            return;
+
+        var leftDown = input.IsDown(Key.Left);
+        var rightDown = input.IsDown(Key.Right);
 
         float targetTurnRate = 0f;
         if (leftDown && !rightDown)
@@ -910,22 +1068,22 @@ sealed class RocketController : Behavior
         _turnRateDegPerSec = MoveToward(_turnRateDegPerSec, targetTurnRate, maxStep);
 
         // Tap response: a short press injects an immediate turn kick.
-        if (_input.WasJustPressed(Key.Left))
+        if (input.WasJustPressed(Key.Left))
             _turnRateDegPerSec -= TapTurnKickDegPerSec;
-        if (_input.WasJustPressed(Key.Right))
+        if (input.WasJustPressed(Key.Right))
             _turnRateDegPerSec += TapTurnKickDegPerSec;
 
         _turnRateDegPerSec = Math.Clamp(_turnRateDegPerSec, -MaxTurnRateDegPerSec, MaxTurnRateDegPerSec);
         rocket.Heading = WrapDegrees(rocket.Heading + _turnRateDegPerSec * dt);
 
-        if (_input.WasJustPressed(Key.Up))
+        if (input.WasJustPressed(Key.Up))
         {
             rocket.Speed = Math.Clamp(rocket.Speed + 50f, 0f, 1000f);
             if (rocket is Rocket r)
                 r.ShowFlameFor(Sounds.RoarUp.Duration);
             Audio.Play(Sounds.RoarUp, volume: .25f);
         }
-        if (_input.WasJustPressed(Key.Down))
+        if (input.WasJustPressed(Key.Down))
         {
             rocket.Speed = Math.Clamp(rocket.Speed - 50f, 0f, 1000f);
             Audio.Play(Sounds.RoarDown, volume: .25f);
@@ -943,79 +1101,5 @@ sealed class RocketController : Behavior
     {
         deg %= 360f;
         return deg < 0f ? deg + 360f : deg;
-    }
-}
-
-/// <summary>
-/// Tiny helper that turns a HitShape's live primitives into Renderer2D
-/// line draws. Lives in the sample so the engine doesn't pull in a
-/// rendering dependency for collision debug.
-/// </summary>
-static class HitShapeDebug2D
-{
-    // Build an action that draws each primitive. Returned delegate is
-    // fresh each call but a debug overlay isn't on the hot path.
-    public static HitPrimitiveAction2D Draw(Renderer2D rd) => (in HitPrimitive2D p) =>
-    {
-        switch (p.Kind)
-        {
-            case HitKind2D.Circle:
-                DrawCircleOutline(rd, p.P0, p.R);
-                break;
-            case HitKind2D.Capsule:
-                DrawCapsuleOutline(rd, p.P0, p.P1, p.R);
-                break;
-        }
-    };
-
-    public static void DrawCircleOutline(Renderer2D rd, Vector2 center, float radius, int segments = 32)
-    {
-        Span<Vector2> pts = stackalloc Vector2[segments + 1];
-        var step = MathF.Tau / segments;
-        for (int i = 0; i <= segments; i++)
-        {
-            var a = i * step;
-            pts[i] = new Vector2(center.X + MathF.Cos(a) * radius, center.Y + MathF.Sin(a) * radius);
-        }
-        rd.DrawLines(pts);
-    }
-
-    public static void DrawCapsuleOutline(Renderer2D rd, Vector2 a, Vector2 b, float radius, int capSegments = 12)
-    {
-        var axis = b - a;
-        var len = axis.Length();
-        // Degenerate capsule: just a circle.
-        if (len <= float.Epsilon)
-        {
-            DrawCircleOutline(rd, a, radius, capSegments * 2);
-            return;
-        }
-        var d = axis / len;
-        var n = new Vector2(-d.Y, d.X) * radius;
-
-        // Outline: side1 (A+n → B+n), B-cap arc, side2 (B-n → A-n),
-        // A-cap arc, close. Drawn as one connected polyline.
-        var totalPts = 1 + 1 + (capSegments + 1) + 1 + (capSegments + 1);
-        Span<Vector2> pts = stackalloc Vector2[totalPts];
-        int k = 0;
-        pts[k++] = a + n;
-        pts[k++] = b + n;
-        // Cap at B: rotate +n around B by π in the +d half-plane.
-        var startB = MathF.Atan2(n.Y, n.X);
-        for (int i = 1; i <= capSegments + 1; i++)
-        {
-            var ang = startB - MathF.PI * i / capSegments;
-            pts[k++] = b + new Vector2(MathF.Cos(ang), MathF.Sin(ang)) * radius;
-        }
-        // Now at b - n; walk back to a - n.
-        pts[k++] = a - n;
-        // Cap at A: continue the rotation another π so we land back at a + n.
-        var startA = MathF.Atan2(-n.Y, -n.X);
-        for (int i = 1; i <= capSegments + 1; i++)
-        {
-            var ang = startA - MathF.PI * i / capSegments;
-            pts[k++] = a + new Vector2(MathF.Cos(ang), MathF.Sin(ang)) * radius;
-        }
-        rd.DrawLines(pts[..k]);
     }
 }

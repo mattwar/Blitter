@@ -1,11 +1,10 @@
 namespace Blitter.Blocks3D;
-using Bits;
 
 /// <summary>
 /// The 3D "world" layer, containing a set of sprites and barriers
 /// that interact with each other.
 /// </summary>
-public class PlayField3D : Layer3D, ISpriteHost3D
+public class PlayField3D : Layer3D, ISpriteHost3D, IContainer, IUpdatable
 {
     private readonly List<Sprite3D> _sprites = new();
     private readonly List<Barrier3D> _barriers = new();
@@ -44,10 +43,8 @@ public class PlayField3D : Layer3D, ISpriteHost3D
     /// </summary>
     public IReadOnlyList<Barrier3D> Barriers => _barriers;
 
-    /// <summary>
-    /// Total time since construction of the playfield.
-    /// </summary>
-    public TimeSpan Elapsed { get; private set; }
+    /// <inheritdoc/>
+    public IReadOnlyList<IEntity> Entities => [.. _sprites, .. _barriers];
 
     /// <summary>Adds a sprite to the playfield.</summary>
     public void AddSprite(Sprite3D sprite)
@@ -68,9 +65,8 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         else
             sprite.Host?.RemoveSprite(sprite);
 
-        // Parenting drives attachment (Entity.OnAttach wires behaviors).
-        sprite.Parent = this;
-        sprite._spawnedAt = Elapsed;
+        // Container assignment drives attachment (Entity.OnAttach wires behaviors).
+        sprite.Container = this;
 
         if (_updating)
         {
@@ -79,6 +75,22 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         else
         {
             _sprites.Add(sprite);
+        }
+    }
+
+    /// <inheritdoc/>
+    public void AddEntity(IEntity child)
+    {
+        switch (child)
+        {
+            case Sprite3D sprite:
+                AddSprite(sprite);
+                break;
+            case Barrier3D barrier:
+                AddBarrier(barrier);
+                break;
+            default:
+                throw new InvalidOperationException("PlayField3D can only contain Sprite3D and Barrier3D entities.");
         }
     }
 
@@ -114,14 +126,32 @@ public class PlayField3D : Layer3D, ISpriteHost3D
     private bool IsLive(Sprite3D sprite) => !_pendingRemoveSprites.Contains(sprite);
 
     /// <summary>
+    /// Removes <paramref name="child"/> from this playfield, dispatching to the
+    /// correct pool by runtime type so callers need not know the sprite/barrier
+    /// split. No-op for anything this playfield does not hold.
+    /// </summary>
+    public void RemoveEntity(IEntity child)
+    {
+        switch (child)
+        {
+            case Sprite3D sprite:
+                RemoveSprite(sprite);
+                break;
+            case Barrier3D barrier:
+                RemoveBarrier(barrier);
+                break;
+        }
+    }
+
+    /// <summary>
     /// Reports whether <paramref name="child"/> is a sprite or barrier this
     /// playfield contains, is removing this frame, or does not hold.
     /// </summary>
-    public override Containment GetContainment(IEntity child)
+    public Containment GetContainment(IEntity child)
     {
         if (child is Sprite3D sprite)
         {
-            if (!ReferenceEquals(sprite.Parent, this))
+            if (!ReferenceEquals(sprite.Container, this))
                 return Containment.NotContained;
             return _pendingRemoveSprites.Contains(sprite) ? Containment.Removing : Containment.Contained;
         }
@@ -176,8 +206,8 @@ public class PlayField3D : Layer3D, ISpriteHost3D
 
     private void Detach(Sprite3D sprite, bool retired)
     {
-        if (sprite.Parent == this)
-            sprite.Parent = null;
+        if (sprite.Container == this)
+            sprite.Container = null;
         if (retired)
             OnSpriteRetired(sprite);
     }
@@ -193,10 +223,8 @@ public class PlayField3D : Layer3D, ISpriteHost3D
     }
 
     /// <inheritdoc/>
-    public override void Update(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
-        Elapsed += context.ElapsedSinceLastUpdate;
-
         _updating = true;
         try
         {
@@ -210,26 +238,26 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         ApplyPendingChanges();
     }
 
-    private void RunOneStep(in UpdateContext spriteContext)
+    private void RunOneStep(in EntityUpdateContext spriteContext)
     {
         // Animated barriers tick before sprites so this frame's
         // sprite-vs-barrier pass sees the new geometry.
         for (int i = 0; i < _barriers.Count; i++)
-            _barriers[i].Update(spriteContext);
+            Updater.Default.Update(_barriers[i], in spriteContext);
 
         for (int i = 0; i < _sprites.Count; i++)
         {
             var sprite = _sprites[i];
             if (!IsLive(sprite))
                 continue;
-            sprite.Update(spriteContext);
+            Updater.Default.Update(sprite, in spriteContext);
         }
 
         // sprite-vs-sprite collision
         for (int i = 0; i < _sprites.Count; i++)
         {
             var a = _sprites[i];
-            if (!IsLive(a) || !a.CanBeHit)
+            if (!IsLive(a))
                 continue;
             var aShape = a.HitShape;
             if (aShape.BoundingSphere.Radius <= 0f)
@@ -241,7 +269,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
                     break;
 
                 var b = _sprites[j];
-                if (!IsLive(b) || !b.CanBeHit)
+                if (!IsLive(b))
                     continue;
                 var bShape = b.HitShape;
                 if (bShape.BoundingSphere.Radius <= 0f)
@@ -259,7 +287,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
         for (int i = 0; i < _sprites.Count; i++)
         {
             var sprite = _sprites[i];
-            if (!IsLive(sprite) || !sprite.CanBeHit)
+            if (!IsLive(sprite))
                 continue;
             var spriteShape = sprite.HitShape;
             if (spriteShape.BoundingSphere.IsEmpty)
@@ -309,7 +337,7 @@ public class PlayField3D : Layer3D, ISpriteHost3D
     }
 
     /// <inheritdoc/>
-    public override void Draw(Renderer3D renderer)
+    protected override void DrawContent(Renderer3D renderer)
     {
         for (int i = 0; i < _barriers.Count; i++)
             _barriers[i].Draw(renderer);

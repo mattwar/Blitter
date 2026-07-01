@@ -1,8 +1,16 @@
-﻿using System.Numerics;
+using System.Numerics;
 
-using Blitter.Bits;
 
 namespace Blitter.Blocks3D;
+
+/// <summary>
+/// Raised after a successful <see cref="BarrierBounce3D"/> bounce.
+/// </summary>
+/// <param name="Source">The behavior instance that raised the event.</param>
+/// <param name="Self">The bouncing sprite.</param>
+/// <param name="Barrier">The barrier that was bounced off.</param>
+/// <param name="Normal">Contact normal, pointing from the barrier toward the sprite.</param>
+public readonly record struct BarrierBounced3DEventArgs(BarrierBounce3D Source, Sprite3D Self, Barrier3D Barrier, Vector3 Normal);
 
 /// <summary>
 /// On contact with a barrier, snaps the sprite out of penetration along
@@ -12,9 +20,9 @@ namespace Blitter.Blocks3D;
 /// <see cref="Barrier3D.PhysicsMaterial"/>. Shape-agnostic: any
 /// <see cref="Barrier3D"/> that implements
 /// <see cref="Barrier3D.HitShape"/> participates. The 3D analog of
-/// <c>Blitter.Blocks2D.BarrierBounce2D</c>.
+/// <c>Blitter.Blocks2D.SurfaceBounce2D</c>.
 /// </summary>
-public sealed class BarrierBounce3D : Behavior, IHitHandler3D
+public sealed class BarrierBounce3D : Behavior, IHittable3D
 {
     /// <summary>Ball-side elastic coefficient. Multiplied with the barrier's <see cref="PhysicsMaterial.Restitution"/>. 1 = perfectly elastic, 0 = sticks.</summary>
     public float Restitution { get; set; } = 1f;
@@ -22,17 +30,12 @@ public sealed class BarrierBounce3D : Behavior, IHitHandler3D
     /// <summary>Ball-side tangent velocity retention. Multiplied with <c>(1 - barrier.PhysicsMaterial.Friction)</c>. 1 = frictionless ball, &lt; 1 = ball-side surface drag.</summary>
     public float TangentialDamping { get; set; } = 1f;
 
-    /// <summary>Called after a successful bounce. Args: sprite, barrier, contact normal.</summary>
-    public Action<Sprite3D, Barrier3D, Vector3>? OnBounce { get; set; }
+    /// <summary>Optional handler invoked after a successful bounce.</summary>
+    public IEventHandler<BarrierBounced3DEventArgs>? Bounced { get; set; }
 
-    public override void Apply(in UpdateContext context)
+    public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in EntityUpdateContext context)
     {
-        // no nothing - real work happens in OnHitBarrier.
-    }
-
-    public void OnHitBarrier(Sprite3D self, Barrier3D barrier, in UpdateContext context)
-    {
-        // Normal convention: TryGetContact returns normal from b → a;
+        // Normal convention: TryGetContact returns normal from b ? a;
         // here a = self.HitShape, b = barrier.HitShape, so `contact.Normal`
         // points from the barrier surface toward the sprite.
         if (!self.HitShape.TryGetContact(barrier.HitShape, out var contact))
@@ -65,6 +68,7 @@ public sealed class BarrierBounce3D : Behavior, IHitHandler3D
             self.Velocity = vBall;
         }
 
-        OnBounce?.Invoke(self, barrier, normal);
+        var args = new BarrierBounced3DEventArgs(this, self, barrier, normal);
+        Bounced?.OnEvent(in args);
     }
 }

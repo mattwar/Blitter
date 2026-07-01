@@ -2,17 +2,19 @@ namespace Blitter.Blocks2D.Tests;
 
 public class SceneTests
 {
-    private sealed class FakeLayer : Layer2D
+    private sealed class FakeLayer : Entity, IDrawable2D, IUpdatable, IUpdatability
     {
+        public bool Enabled { get; set; } = true;
+
         public int UpdateCount { get; private set; }
         public int RenderCount { get; private set; }
 
-        public override void Update(in UpdateContext context)
+        public void Update(in EntityUpdateContext context)
         {
             UpdateCount++;
         }
 
-        protected override void DrawContent(Renderer2D renderer)
+        public void Draw(Renderer2D renderer)
         {
             RenderCount++;
         }
@@ -23,9 +25,9 @@ public class SceneTests
     {
         var a = new FakeLayer();
         var b = new FakeLayer();
-        var scene = new Scene2D { Layers = [a, b] };
+        var scene = new Scene2D { Entities = [a, b] };
 
-        scene.Update(new UpdateContext());
+        Updater.Default.Update(scene, new EntityUpdateContext());
 
         Assert.Equal(1, a.UpdateCount);
         Assert.Equal(1, b.UpdateCount);
@@ -36,24 +38,35 @@ public class SceneTests
     {
         var a = new FakeLayer { Enabled = false };
         var b = new FakeLayer();
-        var scene = new Scene2D { Layers = [a, b] };
+        var scene = new Scene2D { Entities = [a, b] };
 
-        scene.Update(new UpdateContext());
+        Updater.Default.Update(scene, new EntityUpdateContext());
 
         Assert.Equal(0, a.UpdateCount);
         Assert.Equal(1, b.UpdateCount);
     }
 
+        [Fact]
+        public void Update_SkipsDisabledSubtree()
+        {
+            var child = new FakeLayer();
+            var root = new FakeContainer { Enabled = false, Entities = [child] };
+
+            Updater.Default.Update(root, new EntityUpdateContext());
+
+            Assert.Equal(0, child.UpdateCount);
+        }
+
     [Fact]
     public void Layers_AddAfterConstructionTicksTheLayer()
     {
         var initial = new FakeLayer();
-        var scene = new Scene2D { Layers = [initial] };
+        var scene = new Scene2D { Entities = [initial] };
 
         var added = new FakeLayer();
-        scene.AddLayer(added);
+        scene.AddEntity(added);
 
-        scene.Update(new UpdateContext());
+        Updater.Default.Update(scene, new EntityUpdateContext());
 
         Assert.Equal(1, initial.UpdateCount);
         Assert.Equal(1, added.UpdateCount);
@@ -64,12 +77,17 @@ public class SceneTests
     {
         var a = new FakeLayer();
         var b = new FakeLayer();
-        var scene = new Scene2D { Layers = [a, b] };
+        var scene = new Scene2D { Entities = [a, b] };
 
-        Assert.True(scene.RemoveLayer(a));
-        scene.Update(new UpdateContext());
+        scene.RemoveEntity(a);
+        Updater.Default.Update(scene, new EntityUpdateContext());
 
         Assert.Equal(0, a.UpdateCount);
         Assert.Equal(1, b.UpdateCount);
     }
+
+        private sealed class FakeContainer : Container, IUpdatability
+        {
+            public bool Enabled { get; init; } = true;
+        }
 }

@@ -1,12 +1,11 @@
 namespace Blitter.Blocks3D;
-using Bits;
  
 /// <summary>
 /// Makes the sprite bob up and down over time, like a floating coin or 
 /// hovering item. This is a simple way to add "life" to objects without 
 /// complex physics.
 /// </summary>
-public sealed class Float3D : Behavior
+public sealed class Float3D : Behavior, IUpdatable
 {
     /// <summary>
     /// The height of the oscillation in world units.
@@ -26,7 +25,7 @@ public sealed class Float3D : Behavior
         _transform = entity.GetOrAddTrait<Transform3D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var time = (float)context.ElapsedSinceLastUpdate.TotalSeconds;
         var newY = _transform.Position.Y + (MathF.Sin(time * Frequency) * Amplitude);

@@ -1,6 +1,5 @@
 using System.Numerics;
 
-using Blitter.Bits;
 
 namespace Blitter.Blocks3D;
 
@@ -9,7 +8,7 @@ namespace Blitter.Blocks3D;
 /// The entity's local -Z axis (its "forward") is aimed at the target, matching Blitter's camera convention. 
 /// A set-and-forget way to make turrets, enemies, signposts, or billboards track something without writing any rotation math.
 /// </summary>
-public sealed class LookAt3D : Behavior
+public abstract class LookAt3D : Behavior, IUpdatable
 {
     /// <summary>
     /// An entity to face. 
@@ -21,13 +20,6 @@ public sealed class LookAt3D : Behavior
     /// <see cref="Target"/> is not set.
     /// </summary>
     public Vector3? TargetPoint { get; set; }
-
-    /// <summary>
-    /// A callback that returns the world-space point to face, or
-    /// <c>null</c> to skip turning this frame. Used when neither
-    /// <see cref="Target"/> nor <see cref="TargetPoint"/> apply.
-    /// </summary>
-    public Func<Vector3?>? TargetSelector { get; set; }
 
     /// <summary>
     /// Direction the sprite treats as "up" while turning. Defaults to
@@ -57,7 +49,13 @@ public sealed class LookAt3D : Behavior
         _transform = entity.GetOrAddTrait<Transform3D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    /// <summary>
+    /// Returns a dynamically selected target point, or <c>null</c> to skip turning when
+    /// neither <see cref="Target"/> nor <see cref="TargetPoint"/> is set.
+    /// </summary>
+    protected abstract Vector3? SelectTarget();
+
+    public void Update(in EntityUpdateContext context)
     {
         if (ResolveTarget() is not { } point)
             return;
@@ -104,7 +102,7 @@ public sealed class LookAt3D : Behavior
     }
 
     // Picks the active target point following the documented priority:
-    // a live TargetSprite, then TargetPoint, then TargetSelector.
+    // a live TargetSprite, then TargetPoint, then subclass selection.
     private Vector3? ResolveTarget()
     {
         if (Target is {} entity)
@@ -113,6 +111,6 @@ public sealed class LookAt3D : Behavior
         if (TargetPoint is { } point)
             return point;
 
-        return TargetSelector?.Invoke();
+        return SelectTarget();
     }
 }

@@ -26,6 +26,8 @@ using Blitter.Bits;
 using Blitter.Blocks;
 using Blitter.Blocks2D;
 
+using SkiaSharp;
+
 const int W = 960;
 const int H = 720;
 
@@ -93,12 +95,13 @@ var scoreboard = new ScoreLayer2D
 var playField = new PlayField2D { WorldBounds = new Rect(0, 0, W, H) };
 
 // Outer walls: top + two sides. Bottom is open (drain).
-playField.AddBarriers(new Barrier2D[]
+foreach (var barrier in new Barrier2D[]
 {
     new LineBarrier2D(new Vector2(WallInset, WallInset),       new Vector2(W - WallInset, WallInset)),       // top
     new LineBarrier2D(new Vector2(WallInset, H),               new Vector2(WallInset, WallInset)),           // left (wound so normal points right)
     new LineBarrier2D(new Vector2(W - WallInset, WallInset),   new Vector2(W - WallInset, H)),               // right
-});
+})
+    playField.AddEntity(barrier);
 
 // Bricks: rows colored top-to-bottom, more points the higher you reach.
 var bricks = new List<Brick>();
@@ -119,7 +122,7 @@ for (int r = 0; r < BrickRows; r++)
             Popups = popups,
         };
         bricks.Add(brick);
-        playField.AddBarrier(brick);
+        playField.AddEntity(brick);
     }
 }
 
@@ -133,7 +136,7 @@ var paddle = new Paddle(PaddleHalfW, PaddleHalfH)
     XMin = WallInset + PaddleHalfW,
     XMax = W - WallInset - PaddleHalfW,
 };
-playField.AddBarrier(paddle);
+playField.AddEntity(paddle);
 
 // Ball with a real hit radius. Visual is procedural so we can keep
 // the file self-contained.
@@ -143,53 +146,27 @@ var ball = new BreakoutBall(BallRadius)
     Behaviors =
     [
         new Motion2D(),
-        new BarrierBounce2D
+        new SurfaceBounce2D
         {
             Restitution = 1f,
             TangentialDamping = 1f,
-            OnBounce = (s, _, _) => Audio.Play(Sounds.Bounce, 0.35f),
+            Bounced = new PlayBounceSound(),
         },
         new SpeedClamp2D { Min = 240f, Max = BallMaxSpeed },
     ],
 };
-playField.AddSprite(ball);
+playField.AddEntity(ball);
 
 // HUD layer: lives, banner text.
 var controller = new BreakoutController(window.Input, window.Renderer, ball, paddle, bricks,
     drainY: DrainY,
     launchSpeed: BallLaunchSpeed);
 
-var hud = new CustomLayer2D
+var hud = new BreakoutHud(controller, hudFont, bannerFont, W, H);
+
+var scene = new Container
 {
-    OnRender = rd =>
-    {
-        using var _ = rd.PushState();
-        rd.Camera = null;
-
-        var livesText = $"LIVES {controller.Lives}";
-        var livesSize = hudFont.Measure(livesText);
-        hudFont.DrawText(rd, livesText, new Color(220, 230, 255),
-            W - livesSize.X - 20f, 16f);
-
-        if (controller.Banner is { } banner)
-        {
-            var size = bannerFont.Measure(banner);
-            bannerFont.DrawText(rd, banner, new Color(255, 240, 200),
-                (W - size.X) * 0.5f, H * 0.42f);
-
-            var hint = controller.HasWon || controller.IsGameOver
-                ? "SPACE  new game"
-                : "SPACE  launch ball";
-            var hintSize = hudFont.Measure(hint);
-            hudFont.DrawText(rd, hint, new Color(180, 200, 230),
-                (W - hintSize.X) * 0.5f, H * 0.42f + size.Y + 12f);
-        }
-    },
-};
-
-var scene = new Scene2D
-{
-    Layers  = [ playField, popups, scoreboard, hud ],
+    Entities  = [ playField, popups, scoreboard, hud ],
     Behaviors = [ controller ],
 };
 
@@ -205,7 +182,45 @@ static Vector2 BallRestPosition(Paddle paddle) =>
 
 // ---- sprites, barriers, behaviors -------------------------------------
 
-// The ball: a small white disc with a real collision radius.
+// Plays the bounce SFX whenever the ball bounces off a surface.
+sealed class PlayBounceSound : IEventHandler<SurfaceBounced2DEventArgs>
+{
+    public void OnEvent(in SurfaceBounced2DEventArgs e) => Audio.Play(Sounds.Bounce, 0.35f);
+}
+
+// HUD overlay: lives counter and the win/lose banner with key hint.
+sealed class BreakoutHud(BreakoutController controller, Font hudFont, Font bannerFont, int w, int h) : Entity, IDrawable2D
+{
+    public void Draw(Renderer2D rd)
+    {
+        using var _ = rd.PushState();
+        rd.Camera = null;
+
+        var livesText = $"LIVES {controller.Lives}";
+        var livesSize = hudFont.Measure(livesText);
+        hudFont.DrawText(rd, livesText, new Color(220, 230, 255),
+            w - livesSize.X - 20f, 16f);
+
+        if (controller.Banner is { } banner)
+        {
+            var size = bannerFont.Measure(banner);
+            bannerFont.DrawText(rd, banner, new Color(255, 240, 200),
+                (w - size.X) * 0.5f, h * 0.42f);
+
+            var hint = controller.HasWon || controller.IsGameOver
+                ? "SPACE  new game"
+                : "SPACE  launch ball";
+            var hintSize = hudFont.Measure(hint);
+            hudFont.DrawText(rd, hint, new Color(180, 200, 230),
+                (w - hintSize.X) * 0.5f, h * 0.42f + size.Y + 12f);
+        }
+    }
+}
+
+// The ball: a small shaded disc. Its image supplies both the look and
+// the (circular) collision shape, so there's no Draw override and no
+// explicit CollisionShape2D — the collider derives the hit circle from
+// the visual, scaled by the sprite's Transform.
 sealed class BreakoutBall : Sprite2D
 {
     public float Radius { get; }
@@ -213,21 +228,46 @@ sealed class BreakoutBall : Sprite2D
     public BreakoutBall(float radius)
     {
         Radius = radius;
-        CanBeHit = true;
+
+        var image = MakeBall(32);
+        Image = new ImageSource { Texture = image, Hit = HitShapeHint.Circle };
+        Scale = (radius * 2f) / image.Width;
     }
 
-    public override PosedHitShape2D HitShape =>
-        new(new CircleHitShape2D(Vector2.Zero, Radius), new Pose2D(Center, 0f, 1f));
-
-    public override void Draw(Renderer2D renderer)
+    // A white, anti-aliased ball with a soft top-left highlight.
+    private static Bitmap MakeBall(int size)
     {
-        renderer.DrawDisc(Center, Radius, new Color(245, 248, 255));
+        var image = Bitmap.Create(size, size);
+        image.DrawCanvas(canvas =>
+        {
+            canvas.Clear(SKColors.Transparent);
+
+            var c = size / 2f;
+            var r = size / 2f - 1f;
+            using var paint = new SKPaint
+            {
+                IsAntialias = true,
+                Shader = SKShader.CreateRadialGradient(
+                    center: new SKPoint(c - r * 0.3f, c - r * 0.3f),
+                    radius: r * 1.4f,
+                    colors:
+                    [
+                        new SKColor(255, 255, 255),
+                        new SKColor(228, 234, 246),
+                        new SKColor(170, 182, 205),
+                    ],
+                    colorPos: [0f, 0.55f, 1f],
+                    mode: SKShaderTileMode.Clamp),
+            };
+            canvas.DrawCircle(c, c, r, paint);
+        });
+        return image;
     }
 }
 
 // Optional ball-side behavior that clamps Speed each tick.
 // Keeps the ball lively even when bricks/paddle introduce damping.
-sealed class SpeedClamp2D : Behavior
+sealed class SpeedClamp2D : Behavior, IUpdatable
 {
     public float Min { get; set; }
     public float Max { get; set; }
@@ -236,7 +276,7 @@ sealed class SpeedClamp2D : Behavior
 
     protected override void OnAttach(IEntity entity) => _target = (Sprite2D)entity;
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var target = _target;
         if (target.Speed > 0f && target.Speed < Min)
@@ -251,7 +291,7 @@ sealed class SpeedClamp2D : Behavior
 // classic "the spot on the paddle controls the bounce" trick).
 sealed class Paddle : Barrier2D
 {
-    public Vector2 Center { get; set; }
+    public Vector2 Center { get => Transform.Position; set => Transform.Position = value; }
     public float HalfWidth { get; }
     public float HalfHeight { get; }
 
@@ -269,9 +309,21 @@ sealed class Paddle : Barrier2D
     {
         HalfWidth = halfWidth;
         HalfHeight = halfHeight;
+        this.GetOrAddTrait<CollisionShape2D>().Shape = new CapsuleHitShape2D(
+            new Vector2(-HalfWidth, 0f),
+            new Vector2(HalfWidth, 0f),
+            HalfHeight);
+        GetOrAddBehavior<HitResponse>();
     }
 
-    public void MoveTo(float x, in UpdateContext context)
+    private sealed class HitResponse : Behavior, IHittable2D
+    {
+        private Paddle _host = null!;
+        protected override void OnAttach(IEntity entity) => _host = (Paddle)entity;
+        void IHittable2D.OnHit(in Hit2D hit) => _host.OnHit(_host, hit.Other);
+    }
+
+    public void MoveTo(float x, in EntityUpdateContext context)
     {
         var clamped = Math.Clamp(x, XMin, XMax);
         _previousCenter = Center;
@@ -281,16 +333,9 @@ sealed class Paddle : Barrier2D
         VelocityX = dt > 0f ? (Center.X - _previousCenter.X) / dt : 0f;
     }
 
-    public override PosedHitShape2D HitShape =>
-        new(new CapsuleHitShape2D(
-                new Vector2(-HalfWidth, 0f),
-                new Vector2( HalfWidth, 0f),
-                HalfHeight),
-            new Pose2D(Center, 0f, 1f));
-
-    public override void OnHitSprite(Sprite2D hitter, in UpdateContext context)
+    private void OnHit(IEntity self, IEntity other)
     {
-        if (hitter is not BreakoutBall ball)
+        if (other is not BreakoutBall ball)
             return;
 
         // Only act when the ball is heading downward. Avoids
@@ -343,7 +388,7 @@ sealed class Paddle : Barrier2D
 // pop, spawns a "+points" popup, and removes itself from the playfield.
 sealed class Brick : Barrier2D
 {
-    public Vector2 Center { get; }
+    public Vector2 Center => Transform.Position;
     public float HalfWidth { get; }
     public float HalfHeight { get; }
     public Color Color { get; }
@@ -357,28 +402,34 @@ sealed class Brick : Barrier2D
     {
         if (IsAlive) return;
         IsAlive = true;
-        playField.AddBarrier(this);
+        this.GetOrAddTrait<CollisionShape2D>().Shape =
+            new BoxHitShape2D(Vector2.Zero, new Vector2(HalfWidth, HalfHeight));
+        playField.AddEntity(this);
     }
 
     public Brick(Vector2 center, float width, float height, Color color, long points)
     {
-        Center = center;
+        Transform.Position = center;
         HalfWidth = width * 0.5f;
         HalfHeight = height * 0.5f;
         Color = color;
         Points = points;
+        this.GetOrAddTrait<CollisionShape2D>().Shape =
+            new BoxHitShape2D(Vector2.Zero, new Vector2(HalfWidth, HalfHeight));
+        GetOrAddBehavior<HitResponse>();
     }
 
-    public override PosedHitShape2D HitShape =>
-        IsAlive
-            ? new(new BoxHitShape2D(Vector2.Zero, new Vector2(HalfWidth, HalfHeight)),
-                  new Pose2D(Center, 0f, 1f))
-            : new(HitShape2D.None, Pose2D.Identity);
+    private sealed class HitResponse : Behavior, IHittable2D
+    {
+        private Brick _host = null!;
+        protected override void OnAttach(IEntity entity) => _host = (Brick)entity;
+        void IHittable2D.OnHit(in Hit2D hit) => _host.OnHit(_host, hit.Other);
+    }
 
-    public override void OnHitSprite(Sprite2D hitter, in UpdateContext context)
+    private void OnHit(IEntity self, IEntity other)
     {
         if (!IsAlive) return;
-        if (hitter is not BreakoutBall ball) return;
+        if (other is not BreakoutBall ball) return;
 
         // Determine which face the ball came in through, using its
         // current center relative to the brick. Reflect just that axis.
@@ -418,9 +469,13 @@ sealed class Brick : Barrier2D
         Audio.Play(Sounds.Coin, 0.35f);
 
         IsAlive = false;
+        // Drop our collision geometry so the same-frame sprite-direction
+        // dispatch (the ball's SurfaceBounce2D) sees no contact and can't
+        // bounce off a brick we just cleared.
+        this.GetOrAddTrait<CollisionShape2D>().Shape = HitShape2D.None;
         // Remove on next safe boundary so the collision pass doesn't
         // see this barrier again this frame.
-        ball.PlayField.RemoveBarrier(this);
+        ball.PlayField.RemoveEntity(this);
     }
 
     public override void Draw(Renderer2D renderer)
@@ -461,7 +516,7 @@ sealed class Brick : Barrier2D
 
 // Scene-wide game loop: input, paddle motion, launch flow, lives,
 // drain detection, win/lose state, level reset.
-sealed class BreakoutController : Behavior
+sealed class BreakoutController : Behavior, IUpdatable
 {
     private readonly FrameInput _input;
     private readonly Renderer2D _renderer;
@@ -500,10 +555,8 @@ sealed class BreakoutController : Behavior
         _launchSpeed = launchSpeed;
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
-        var scene = (Scene2D)this.Entity;
-
         // --- Paddle: mouse delta drives the target; arrows nudge it.
         // RelativeMouseMode hides the cursor and pins it, so absolute
         // MousePosition is useless here. We accumulate MouseDelta and
@@ -597,7 +650,8 @@ sealed class BreakoutController : Behavior
         _ball.Speed = 0f;
         _ball.Center = new Vector2(
             _paddle.Center.X,
-            _paddle.Center.Y - _paddle.HalfHeight - _ball.Radius - 2f);
+            _paddle.Center.Y - _paddle.HalfHeight - _ball.Radius - 2f
+            );
     }
 
     private void LaunchBall()
@@ -608,7 +662,7 @@ sealed class BreakoutController : Behavior
         float deg = ((float)_rng.NextDouble() * 2f - 1f) * 35f;
         float rad = deg * MathF.PI / 180f;
         var v = new Vector2(MathF.Sin(rad), -MathF.Cos(rad)) * _launchSpeed;
-        (_ball.Speed, _ball.Heading) = Sprite2D.GetSpeedAndHeading(v);
+        _ball.Velocity.Vector = v;
         Audio.Play(Sounds.Select, 0.5f);
     }
 

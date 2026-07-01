@@ -1,6 +1,5 @@
 using System.Numerics;
 
-using Blitter.Bits;
 
 namespace Blitter.Blocks3D;
 
@@ -9,7 +8,7 @@ namespace Blitter.Blocks3D;
 /// Its collection of behaviors defines its logic: movement, collision
 /// response, and so on. The 3D analog of <c>Blitter.Blocks2D.Sprite2D</c>.
 /// </summary>
-public class Sprite3D : Entity, IDrawable3D
+public class Sprite3D : Entity, IDrawable3D, IVisibility
 {
     private Transform3D? _transform = null;
     private Velocity3D? _velocity = null;
@@ -54,13 +53,6 @@ public class Sprite3D : Entity, IDrawable3D
     public Color Tint { get; set; } = Color.White;
 
     /// <summary>
-    /// Whether this sprite participates in the playfield's hit-detection pass.
-    /// Set to <c>false</c> for purely decorative sprites that should move
-    /// and render but never trigger collision callbacks.
-    /// </summary>
-    public bool CanBeHit { get; set; } = true;
-
-    /// <summary>
     /// Whether <see cref="Draw"/> renders the <see cref="Visual"/>.
     /// Set to <c>false</c> to keep the visual purely as a collision
     /// proxy (e.g. an invisible first-person body shape) — the hit
@@ -71,17 +63,7 @@ public class Sprite3D : Entity, IDrawable3D
     /// <summary>
     /// The host this sprite belongs to.
     /// </summary>
-    public ISpriteHost3D? Host => this.Parent as ISpriteHost3D;
-
-    // Time the sprite was added to its current host; stamped by the host
-    // when it adopts the sprite (see PlayField3D.AddSprite).
-    internal TimeSpan _spawnedAt;
-
-    /// <summary>How long this sprite has been a member of its current <see cref="Host"/>.</summary>
-    public TimeSpan Age =>
-        this.Host is { } p
-            ? p.Elapsed - _spawnedAt
-            : TimeSpan.Zero;
+    public ISpriteHost3D? Host => this.Container as ISpriteHost3D;
 
     /// <summary>
     /// The sprite's world-space collision shape: the current
@@ -107,17 +89,7 @@ public class Sprite3D : Entity, IDrawable3D
     {
         _transform = this.GetOrAddTrait<Transform3D>();
         _velocity = this.GetOrAddTrait<Velocity3D>();
-        _spawnedAt = TimeSpan.Zero;
         base.OnAttach(entity);
-    }
-
-    /// <summary>Apply every behavior in order.</summary>
-    public override void Update(in UpdateContext context)
-    {
-        foreach (var behavior in this.Behaviors)
-        {
-            behavior.Apply(in context);
-        }
     }
 
     /// <summary>Render the sprite at its current transform.</summary>
@@ -125,6 +97,6 @@ public class Sprite3D : Entity, IDrawable3D
     {
         if (!this.Visible)
             return;
-        this.Visual?.Draw(renderer, Transform.Pose, this.Tint, this.Age);
+        this.Visual?.Draw(renderer, Transform.Pose, this.Tint, TimeSpan.Zero);
     }
 }

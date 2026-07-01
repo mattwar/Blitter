@@ -165,29 +165,45 @@ public sealed class ImageSource
     /// </summary>
     public bool HasStates => _states is { Count: > 0 };
 
-    // The materialised visual, locked in on first read of Visual (or set
-    // explicitly). Null until then.
-    private Visual2D? _visual;
+    // An explicit author-assigned visual that overrides materialisation, kept
+    // separate from the computed cache so assignment and caching never clobber
+    // one another.
+    private Visual2D? _assignedVisual;
+
+    // The materialised visual, computed and cached on first GetComposedVisual() call.
+    private Visual2D? _cachedVisual;
 
     /// <summary>
-    /// The drawable <see cref="Visual2D"/> this source describes. On first read
-    /// it is materialised from the other properties via <see cref="ToVisual2D"/>
-    /// and locked in, so subsequent changes to the descriptor are not reflected.
-    /// Assigning a visual explicitly overrides materialisation. An empty source
-    /// (no <see cref="FilePath"/> and no states) yields <c>null</c>, so an
-    /// unconfigured slot simply draws nothing.
+    /// An explicitly assigned visual that overrides materialisation. <c>null</c>
+    /// unless set. This property exposes only the override; to read the
+    /// drawable result — the assigned visual or, failing that, one composed from
+    /// the descriptor — call <see cref="GetComposedVisual"/>.
     /// </summary>
     public Visual2D? Visual
     {
-        get
-        {
-            if (_visual is not null)
-                return _visual;
-            if (FilePath is null && Texture is null && !HasStates)
-                return null;
-            return _visual = ToVisual2D();
-        }
-        set => _visual = value;
+        get => _assignedVisual;
+        set => _assignedVisual = value;
+    }
+
+    /// <summary>
+    /// The drawable visual this source describes: the explicitly assigned
+    /// <see cref="Visual"/> when set, otherwise one materialised from the
+    /// descriptor via <see cref="ToVisual2D"/> and cached for reuse. An empty
+    /// source (no <see cref="FilePath"/>, <see cref="Texture"/>, or states)
+    /// yields <c>null</c>, so an unconfigured slot simply draws nothing. The
+    /// cached result is locked in on first call, so subsequent changes to the
+    /// descriptor are not reflected; assign a fresh <see cref="ImageSource"/> to
+    /// swap the look.
+    /// </summary>
+    public Visual2D? GetComposedVisual()
+    {
+        if (_assignedVisual is not null)
+            return _assignedVisual;
+        if (_cachedVisual is not null)
+            return _cachedVisual;
+        if (FilePath is null && Texture is null && !HasStates)
+            return null;
+        return _cachedVisual = ToVisual2D();
     }
 
     /// <summary>
@@ -283,7 +299,7 @@ public sealed class ImageSource
     {
         if (HasStates)
             throw new InvalidOperationException(
-                $"This {nameof(ImageSource)} has states; read {nameof(Visual)} instead.");
+                $"This {nameof(ImageSource)} has states; call {nameof(GetComposedVisual)}() instead.");
         if (Texture is not null)
         {
             if (FilePath is not null || Tile is not null || Index is not null)

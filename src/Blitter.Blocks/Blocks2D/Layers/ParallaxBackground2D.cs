@@ -1,16 +1,15 @@
 using System.Collections;
 using System.Numerics;
 
-using Blitter.Bits;
 
 namespace Blitter.Blocks2D;
 
 /// <summary>
-/// A single <see cref="Layer2D"/> that contains a colleciton of stacked plates
+/// A single drawable entity that contains a collection of stacked plates
 /// each with a different parallax factor, so they scroll at different rates to create
 /// a sense of depth.
 /// </summary>
-public sealed class ParallaxBackground2D : Layer2D
+public sealed class ParallaxBackground2D : Entity, IDrawable2D
 {
     /// <summary>
     /// The individual plates including images and parallax factors.
@@ -24,7 +23,7 @@ public sealed class ParallaxBackground2D : Layer2D
     public float BottomY { get; set; }
 
     /// <inheritdoc/>
-    protected override void DrawContent(Renderer2D renderer)
+    public void Draw(Renderer2D renderer)
     {
         var main = renderer.Camera;
         foreach (var plate in Plates)

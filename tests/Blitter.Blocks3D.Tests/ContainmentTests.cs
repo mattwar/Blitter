@@ -1,12 +1,21 @@
 using System.Numerics;
 
-using Blitter.Bits;
-
 namespace Blitter.Tests;
 
 public class ContainmentTests
 {
-    private static UpdateContext Ctx() => new()
+    private sealed class EmptyContainer : Entity, IContainer
+    {
+        private readonly List<IEntity> _entities = new();
+
+        public IReadOnlyList<IEntity> Entities => _entities;
+        public void AddEntity(IEntity child) { }
+        public void RemoveEntity(IEntity child) { }
+
+        public void Adopt(IEntity child) => _entities.Add(child);
+    }
+
+    private static EntityUpdateContext Ctx() => new()
     {
         ElapsedSinceStart = TimeSpan.Zero,
         ElapsedSinceLastUpdate = TimeSpan.FromSeconds(0.016),
@@ -62,30 +71,34 @@ public class ContainmentTests
     public void Scene_Layer_IsContained()
     {
         var field = new PlayField3D();
-        var scene = new Scene3D { Layers = [field] };
+        var scene = new Scene3D { Entities = [field] };
 
         Assert.Equal(Containment.Contained, scene.GetContainment(field));
     }
 
     [Fact]
-    public void Entity_Default_IsNotContained()
+    public void Container_Default_ReportsListMembership()
     {
-        var parent = new Sprite3D();
+        IContainer container = new EmptyContainer();
         var child = new Sprite3D();
+        var other = new Sprite3D();
 
-        Assert.Equal(Containment.NotContained, parent.GetContainment(child));
+        ((EmptyContainer)container).Adopt(child);
+
+        Assert.Equal(Containment.Contained, container.GetContainment(child));
+        Assert.Equal(Containment.NotContained, container.GetContainment(other));
     }
 
     // Removes its own sprite from the field during update and records the
     // containment state observed immediately after the kill request.
-    private sealed class SelfRemove : Behavior
+    private sealed class SelfRemove : Behavior, IUpdatable
     {
         public Containment Observed { get; private set; }
 
-        public override void Apply(in UpdateContext context)
+        public void Update(in EntityUpdateContext context)
         {
             var sprite = (Sprite3D)Entity;
-            var field = (PlayField3D)sprite.Parent!;
+            var field = (PlayField3D)sprite.Container!;
             field.RemoveSprite(sprite);
             Observed = field.GetContainment(sprite);
         }

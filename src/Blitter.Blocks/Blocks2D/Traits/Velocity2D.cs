@@ -1,7 +1,6 @@
 using System.Numerics;
 
 namespace Blitter.Blocks2D;
-using Blitter.Bits;
 
 /// <summary>
 /// Rate-of-change of an entity's placement: linear motion expressed in the

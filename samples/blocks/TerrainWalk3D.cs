@@ -115,22 +115,11 @@ var player = new Sprite3D
 
 playField.AddSprite(player);
 
-var hud = new CustomLayer3D
-{
-    OnRender = rd =>
-    {
-        DebugDraw.DrawText("WASD walk   SHIFT sprint   SPACE jump   Mouse look   ESC quit",
-            18f, 16f);
-        DebugDraw.DrawText(
-            $"pos ({player.Position.X,6:0.0}, {player.Position.Y,6:0.0}, {player.Position.Z,6:0.0})    " +
-            $"v ({player.Velocity.X,6:0.0}, {player.Velocity.Y,6:0.0}, {player.Velocity.Z,6:0.0})",
-            18f, 48f);
-    },
-};
+var hud = new TerrainHud3D(player);
 
 var scene = new Scene3D
 {
-    Layers = [ playField, hud ]
+    Entities = [ playField, hud ]
 };
 
 await scene.RunAsync(window);
@@ -198,6 +187,20 @@ static Mesh<LitVertex3D> BuildTerrainMesh(
 }
 
 // ---- types ------------------------------------------------------------
+
+// HUD overlay: controls hint plus the player's position and velocity.
+sealed class TerrainHud3D(Sprite3D player) : Layer3D
+{
+    protected override void DrawContent(Renderer3D rd)
+    {
+        DebugDraw.DrawText("WASD walk   SHIFT sprint   SPACE jump   Mouse look   ESC quit",
+            18f, 16f);
+        DebugDraw.DrawText(
+            $"pos ({player.Position.X,6:0.0}, {player.Position.Y,6:0.0}, {player.Position.Z,6:0.0})    " +
+            $"v ({player.Velocity.X,6:0.0}, {player.Velocity.Y,6:0.0}, {player.Velocity.Z,6:0.0})",
+            18f, 48f);
+    }
+}
 
 // Thin wrapper around MeshBarrier3D that also draws the source mesh as
 // a lit visual. Collision goes through the cached MeshHitShape3D the

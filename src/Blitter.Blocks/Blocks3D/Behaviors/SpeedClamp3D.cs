@@ -1,11 +1,9 @@
-using Blitter.Bits;
-
 namespace Blitter.Blocks3D;
 
 /// <summary>
 /// Clamps an entity's <see cref="Velocity3D"/> magnitude into the <c>[Min, Max]</c> range each frame, preserving direction. 
 /// </summary>
-public sealed class SpeedClamp3D : Behavior
+public sealed class SpeedClamp3D : Behavior, IUpdatable
 {
     /// <summary>Lower speed bound. A moving sprite below this is pushed back up to it.</summary>
     public float Min { get; set; }
@@ -20,7 +18,7 @@ public sealed class SpeedClamp3D : Behavior
         _velocity = entity.GetOrAddTrait<Velocity3D>();
     }
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
         var v = _velocity.Velocity;
         var speedSq = v.LengthSquared();

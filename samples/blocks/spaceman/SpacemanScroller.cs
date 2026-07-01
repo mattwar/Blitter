@@ -47,11 +47,13 @@ var window = new Window2D
 // the scene to run 
 var scene = new Scene2D
 {
-    Layers =
+    Behaviors =
     [
-        // camera layer responsible for giving the scene/renderer a camera.
-        new CameraLayer2D(),
-
+        // applies the scene camera before child entities draw.
+        new AttachedCamera2D(),
+    ],
+    Entities =
+    [
         // The background with parallax plates.
         new ParallaxBackground2D
         {
@@ -73,12 +75,11 @@ var scene = new Scene2D
             GroundY = GroundY 
         },
 
-        // The playfield contains any sprites
+        // The playfield contains the walking, jumping spaceman.
         new PlayField2D
         {
-            Sprites =
+            Entities =
             [
-                // the walking, jumping spacemen
                 new Spaceman
                 {
                     Image =
@@ -135,7 +136,7 @@ public class Spaceman : Sprite2D
     protected override void OnAttach(IEntity entity)
     {
         base.OnAttach(entity);
-        var standSize = ((ITextureRegion)((AnimatedVisual2D)Image.Visual!).Catalog["idle-right"].Frames[0].Texture).Region;
+        var standSize = ((ITextureRegion)((AnimatedVisual2D)Image.GetComposedVisual()!).Catalog["idle-right"].Frames[0].Texture).Region;
         FeetOffsetY = standSize.Height * 0.5f * Scale;
         ShadowWidth = standSize.Width * 0.9f * Scale;
         Center = new Vector2(0f, GroundY - FeetOffsetY);
@@ -146,7 +147,7 @@ public class Spaceman : Sprite2D
 /// The spaceman movement controller.
 /// This handles all the spaceman's motion and gravity.
 /// </summary>
-public class SpacemanController : Behavior
+public class SpacemanController : Behavior, IUpdatable
 {
     private readonly FrameInput input;
 
@@ -164,7 +165,7 @@ public class SpacemanController : Behavior
         this.input = input;
     }
 
-    public override void Apply(in UpdateContext ctx)
+    public void Update(in EntityUpdateContext ctx)
     {
         var self = (Sprite2D)this.Entity;
         if (self is not Spaceman spaceman) 
@@ -207,7 +208,7 @@ public class SpacemanController : Behavior
             ? "jump"
             : (move != 0f ? "walk" : "idle");
 
-        self.Image.Visual!.State = motion + "-" + spaceman.Facing;
+        self.Image.GetComposedVisual()!.State = motion + "-" + spaceman.Facing;
     }
 }
 
@@ -215,7 +216,7 @@ public class SpacemanController : Behavior
 /// The shadow layer for the spaceman.
 /// Draws a drop-shadow below the spaceman.
 /// </summary>
-public class SpacemanShadowLayer : Layer2D
+public class SpacemanShadowLayer : Entity, IDrawable2D, IUpdatable
 {
     private Spaceman _spaceman = null!;
 
@@ -225,12 +226,14 @@ public class SpacemanShadowLayer : Layer2D
     protected override void OnAttach(IEntity entity)
     {
         base.OnAttach(entity);
-        _spaceman = Scene.GetLayer<PlayField2D>().GetSprite<Spaceman>();
+        _spaceman = (Container ?? throw new InvalidOperationException("Shadow is not attached to a container."))
+            .GetEntity<PlayField2D>()
+            .GetEntity<Spaceman>();
     }
 
-    public override void Update(in UpdateContext context) { }
+    public void Update(in EntityUpdateContext context) { }
 
-    protected override void DrawContent(Renderer2D rd)
+    public void Draw(Renderer2D rd)
     {
         float airFraction = Math.Min(1f, -_spaceman.JumpOffsetY / 120f);
         float shadowScale = 1f - 0.55f * airFraction;

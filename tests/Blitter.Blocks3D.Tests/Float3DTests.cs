@@ -4,7 +4,7 @@ namespace Blitter.Tests;
 
 public class Float3DTests
 {
-    private static UpdateContext Ctx(double dt) => new()
+    private static EntityUpdateContext Ctx(double dt) => new()
     {
         ElapsedSinceStart = TimeSpan.FromSeconds(dt),
         ElapsedSinceLastUpdate = TimeSpan.FromSeconds(dt),
@@ -21,7 +21,7 @@ public class Float3DTests
             Behaviors = [ bob ]
         };
 
-        bob.Apply(Ctx(0.5));
+        bob.Update(Ctx(0.5));
 
         var expected = 10f + MathF.Sin(0.5f) * 2f;
         Assert.Equal(expected, sprite.Position.Y, 5);
@@ -37,7 +37,7 @@ public class Float3DTests
             Behaviors = [ bob ]
         };
 
-        bob.Apply(Ctx(0.25));
+        bob.Update(Ctx(0.25));
 
         Assert.Equal(3f, sprite.Position.X);
         Assert.Equal(7f, sprite.Position.Z);
@@ -53,7 +53,7 @@ public class Float3DTests
             Behaviors = [ bob ]
         };
 
-        bob.Apply(Ctx(0));
+        bob.Update(Ctx(0));
 
         // sin(0) == 0, so no offset.
         Assert.Equal(5f, sprite.Position.Y, 5);
@@ -68,8 +68,8 @@ public class Float3DTests
         var spriteSmall = new Sprite3D { Position = Vector3.Zero, Behaviors = [ floatSmall ] };
         var spriteLarge = new Sprite3D { Position = Vector3.Zero, Behaviors = [ floatLarge ] };
 
-        floatSmall.Apply(Ctx(0.5));
-        floatLarge.Apply(Ctx(0.5));
+        floatSmall.Update(Ctx(0.5));
+        floatLarge.Update(Ctx(0.5));
 
         Assert.Equal(spriteSmall.Position.Y * 3f, spriteLarge.Position.Y, 5);
     }

@@ -4,7 +4,7 @@ namespace Blitter.Tests;
 
 public class BarrierBounce3DTests
 {
-    private static readonly UpdateContext Ctx = new()
+    private static readonly EntityUpdateContext Ctx = new()
     {
         ElapsedSinceStart = TimeSpan.FromSeconds(0.1),
         ElapsedSinceLastUpdate = TimeSpan.FromSeconds(0.1),
@@ -93,16 +93,13 @@ public class BarrierBounce3DTests
     public void OnBounceCallback_FiresWithContactNormal()
     {
         var (ball, barrier) = OverlappingPair(new Vector3(-5f, 0f, 0f));
-        Vector3? seenNormal = null;
-        var bounce = new BarrierBounce3D
-        {
-            OnBounce = (_, _, normal) => seenNormal = normal,
-        };
+        var recorder = new EventRecorder<BarrierBounced3DEventArgs>();
+        var bounce = new BarrierBounce3D { Bounced = recorder };
 
         bounce.OnHitBarrier(ball, barrier, Ctx);
 
-        Assert.NotNull(seenNormal);
-        Assert.Equal(1f, seenNormal!.Value.X, 4);
+        Assert.Equal(1, recorder.Count);
+        Assert.Equal(1f, recorder.Last.Normal.X, 4);
     }
 
     [Fact]
@@ -122,5 +119,16 @@ public class BarrierBounce3DTests
         // Untouched.
         Assert.Equal(new Vector3(-5f, 0f, 0f), ball.Velocity);
         Assert.Equal(new Vector3(10f, 0f, 0f), ball.Position);
+    }
+}
+
+file sealed class EventRecorder<T> : IEventHandler<T>
+{
+    public int Count { get; private set; }
+    public T Last { get; private set; } = default!;
+    public void OnEvent(in T args)
+    {
+        Count++;
+        Last = args;
     }
 }

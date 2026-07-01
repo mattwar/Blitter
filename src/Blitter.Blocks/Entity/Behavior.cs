@@ -25,9 +25,4 @@ public abstract class Behavior
     {
         // default does nothing 
     }
-
-    /// <summary>
-    /// Apply this behavior to its entity for one tick.
-    /// </summary>
-    public abstract void Apply(in UpdateContext context);
 }

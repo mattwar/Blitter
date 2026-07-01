@@ -1,16 +1,11 @@
 using System.Numerics;
 
 namespace Blitter.Blocks3D;
-using Bits;
 
 /// <summary>
 /// A static, non-sprite obstacle in a <see cref="PlayField3D"/>.
-/// Participates in the collision pass: when a sprite's
-/// <see cref="Sprite3D.HitSphere"/> overlaps the barrier's shape, the
-/// playfield dispatches <see cref="Sprite3D.OnHitBarrier"/>.
-/// Unlike sprites, barriers do not collide with other barriers.
 /// </summary>
-public abstract class Barrier3D : Entity, IDrawable3D
+public abstract class Barrier3D : Entity, IDrawable3D, IUpdatable
 {
     /// <summary>
     /// Optional visual
@@ -49,7 +44,7 @@ public abstract class Barrier3D : Entity, IDrawable3D
     /// <summary>
     /// Called by <see cref="PlayField3D"/> once per frame.
     /// </summary>
-    public override void Update(in UpdateContext context) { }
+    public virtual void Update(in EntityUpdateContext context) { }
 
     /// <summary>
     /// Render this barrier. Default draws <see cref="Visual"/> at the
@@ -74,7 +69,7 @@ public abstract class Barrier3D : Entity, IDrawable3D
     }
 
     /// <summary>Called when a sprite collides with this barrier.</summary>
-    public virtual void OnHitSprite(Sprite3D hitter, in UpdateContext context) { }
+    public virtual void OnHitSprite(Sprite3D hitter, in EntityUpdateContext context) { }
 
     /// <summary>
     /// Physical characteristics of this barrier.

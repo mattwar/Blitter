@@ -85,14 +85,15 @@ const float WallInset = 16f;
 const float CenterGapOffset = 111f;
 
 // side walls
-playField.AddBarriers(
-[
+foreach (var barrier in new Barrier2D[]
+{
     new Wall(new Vector2(WallInset, WallInset), new Vector2(WallInset, 820f)), // left
     new Wall(new Vector2(W - WallInset, WallInset), new Vector2(W - WallInset, 820f)), // right
     new Wall(new Vector2(WallInset, WallInset), new Vector2(W - WallInset, WallInset)), // top
     new Wall(new Vector2(WallInset, 820f), new Vector2(W / 2f - CenterGapOffset, 860f)), // bottom left
     new Wall(new Vector2(W - WallInset, 820f), new Vector2(W / 2f + CenterGapOffset, 860f)), // bottom right
-]);
+})
+    playField.AddEntity(barrier);
 
 // Resolve loose asset files next to this source file.
 Application.Current.SetCallerAssetFolder();
@@ -102,18 +103,19 @@ var flipperSound = Sound.Load("flipper.wav");
 var slingshotSound = Sound.Load("slingshot.wav");
 
 // circular bumpers
-playField.AddBarriers(
-[
+foreach (var barrier in new Barrier2D[]
+{
     new Bumper(180f, 280f, 44f) { Tint=new Color(255, 90, 120), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.40f },
     new Bumper(420f, 230f, 44f) { Tint=new Color(90, 200, 255), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.40f },
     new Bumper(300f, 410f, 50f) { Tint=new Color(140, 255, 140), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.50f },
     new Bumper(140f, 580f, 22f) { Tint=new Color(255, 200, 90), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.22f },
     new Bumper(580f, 580f, 22f) { Tint=new Color(255, 200, 90), HitSound=bumperSound, Scoreboard=scoreboard, Shaker=shaker, ShakeTrauma=0.22f },
-]);
+})
+    playField.AddEntity(barrier);
 
 // slingshots: line barriers that bounce on one-side only
-playField.AddBarriers(
-[
+foreach (var barrier in new Barrier2D[]
+{
     // left
     new Slingshot(
         new Vector2(WallInset + 8f, 620f), 
@@ -128,7 +130,8 @@ playField.AddBarriers(
     { 
         HitSound = slingshotSound 
     }
-]);
+})
+    playField.AddEntity(barrier);
 
 // Flippers
 var flipperLeft = new Flipper
@@ -153,7 +156,8 @@ var flipperRight = new Flipper
     SnapDegPerSec = 1900f,
 };
 
-playField.AddBarriers([flipperLeft, flipperRight]);
+playField.AddEntity(flipperLeft);
+playField.AddEntity(flipperRight);
 
 // The "ball"
 var ball = new Pinball
@@ -165,7 +169,7 @@ var ball = new Pinball
     [
         new Gravity2D { Acceleration = new Vector2(0f, 1400f), MaxFallSpeed = 1600f },
         new Motion2D(),
-        new BarrierBounce2D
+        new SurfaceBounce2D
         {
             Restitution = 0.82f,
             TangentialDamping = 0.985f,
@@ -174,45 +178,22 @@ var ball = new Pinball
     ]
 };
 
-playField.AddSprite(ball);
+playField.AddEntity(ball);
 
 // Scene-wide pinball game controls.
 var gameController = new PinballGameController(window.Input, ball, flipperLeft, flipperRight, plungerSpawn, DrainY);
 
 // The drain isn't an actual barrier
 // it is drawn as its own 'background' layer
-var drainBand = new CustomLayer2D
-{
-    OnRender = rd =>
-    {
-        rd.DrawColor = new Color(70, 20, 30);
-        rd.DrawFillRect(new Rect(WallInset, DrainY, W - 2f * WallInset, H - DrainY));
-    },
-};
+var drainBand = new DrainBandLayer(WallInset, DrainY, W, H);
 
 // The HUD with score and other text
-var hud = new CustomLayer2D
-{
-    OnRender = rd =>
-    {
-        using var _ = rd.PushState();
-        rd.Camera = null;
-
-        var status = gameController.BallInPlay
-            ? $"BALL {gameController.BallNumber}"
-            : "SPACE TO DROP";
-        scoreFont.DrawText(rd, status, Color.White, 20f, 64f);
-
-        // Subtle hint line for the keys.
-        rd.DrawColor = new Color(180, 200, 230);
-        rd.DrawDebugText(20, H - 28, "Shift flippers   <- -> nudge   Space drop   Esc quit", scale: 1.5f);
-    },
-};
+var hud = new PinballHud(gameController, scoreFont, H);
 
 // The scene puts it all togther.
 var scene = new Scene2D
 {
-    Layers = 
+    Entities = 
     [ 
         drainBand, 
         playField, 
@@ -315,6 +296,35 @@ static Bitmap MakeChromeBall(int size)
     return image;
 }
 
+// Background layer for the drain band beneath the playfield.
+sealed class DrainBandLayer(float wallInset, float drainY, int w, int h) : Entity, IDrawable2D
+{
+    public void Draw(Renderer2D rd)
+    {
+        rd.DrawColor = new Color(70, 20, 30);
+        rd.DrawFillRect(new Rect(wallInset, drainY, w - 2f * wallInset, h - drainY));
+    }
+}
+
+// HUD overlay: ball status text and the key hint line.
+sealed class PinballHud(PinballGameController gameController, Font scoreFont, int h) : Entity, IDrawable2D
+{
+    public void Draw(Renderer2D rd)
+    {
+        using var _ = rd.PushState();
+        rd.Camera = null;
+
+        var status = gameController.BallInPlay
+            ? $"BALL {gameController.BallNumber}"
+            : "SPACE TO DROP";
+        scoreFont.DrawText(rd, status, Color.White, 20f, 64f);
+
+        // Subtle hint line for the keys.
+        rd.DrawColor = new Color(180, 200, 230);
+        rd.DrawDebugText(20, h - 28, "Shift flippers   <- -> nudge   Space drop   Esc quit", scale: 1.5f);
+    }
+}
+
 // the pinball
 sealed class Pinball : Sprite2D
 {
@@ -348,6 +358,7 @@ sealed class Bumper : CircleBarrier2D
         : base(x, y, radius)
     {
         PhysicsMaterial = new PhysicsMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 320f);
+        GetOrAddBehavior<HitResponse>();
     }
 
     public override void Draw(Renderer2D renderer)
@@ -355,8 +366,17 @@ sealed class Bumper : CircleBarrier2D
         renderer.DrawDisc(Center, Radius, Tint);
     }
 
-    public override void OnHitSprite(Sprite2D hitter, in UpdateContext context)
+    private sealed class HitResponse : Behavior, IHittable2D
     {
+        private Bumper _host = null!;
+        protected override void OnAttach(IEntity entity) => _host = (Bumper)entity;
+        void IHittable2D.OnHit(in Hit2D hit) => _host.OnHit(_host, hit.Other);
+    }
+
+    private void OnHit(IEntity self, IEntity other)
+    {
+        if (other is not Sprite2D hitter) return;
+
         if (this.Scoreboard != null)
         {
             this.Scoreboard.PositivePopupColor = this.Tint;
@@ -386,6 +406,7 @@ sealed class Slingshot : LineBarrier2D
     {
         OneSided = true;
         PhysicsMaterial = new PhysicsMaterial(Restitution: 0.95f, Friction: 0.05f, KickSpeed: 180f);
+        GetOrAddBehavior<HitResponse>();
     }
 
     public override void Draw(Renderer2D renderer)
@@ -393,8 +414,17 @@ sealed class Slingshot : LineBarrier2D
         renderer.DrawThickLine(Start, End, new Color(255, 150, 80), 5f);
     }
 
-    public override void OnHitSprite(Sprite2D hitter, in UpdateContext context)
+    private sealed class HitResponse : Behavior, IHittable2D
     {
+        private Slingshot _host = null!;
+        protected override void OnAttach(IEntity entity) => _host = (Slingshot)entity;
+        void IHittable2D.OnHit(in Hit2D hit) => _host.OnHit(_host, hit.Other);
+    }
+
+    private void OnHit(IEntity self, IEntity other)
+    {
+        if (other is not Sprite2D hitter) return;
+
         if (this.HitSound is {} hs)
         {
             Audio.Play(hs, 0.7f);
@@ -418,7 +448,7 @@ sealed class Flipper : SwingArmBarrier2D
 {
     public Sound? HitSound { get; set;}
 
-    protected override void OnPressed(in UpdateContext context)
+    protected override void OnPressed(in EntityUpdateContext context)
     {
         if (this.HitSound is {} sound)
             Audio.Play(sound, 0.5f);
@@ -435,7 +465,7 @@ sealed class Flipper : SwingArmBarrier2D
 }
 
 // Coordinates pinball gameplay controls and ball lifecycle at scene scope.
-sealed class PinballGameController : Behavior
+sealed class PinballGameController : Behavior, IUpdatable
 {
     private readonly FrameInput _input;
     private readonly Pinball _ball;
@@ -474,10 +504,8 @@ sealed class PinballGameController : Behavior
 
     private readonly Random _rng = new();
 
-    public override void Apply(in UpdateContext context)
+    public void Update(in EntityUpdateContext context)
     {
-        var scene = (Scene2D)this.Entity;
-
         // Flippers: each frame, drive Pressed off the shift keys.
         // The barriers handle slewing and surface velocity.
         _flipperLeft.Pressed = _input.IsDown(Key.LShift);

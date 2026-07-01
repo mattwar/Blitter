@@ -354,7 +354,7 @@ public class ImageSourceTests : IDisposable
         var source = new ImageSource { Texture = tex };
 
         Assert.Same(tex, source.ToTexture());
-        var visual = Assert.IsType<TextureVisual2D>(source.Visual);
+        var visual = Assert.IsType<TextureVisual2D>(source.GetComposedVisual());
         Assert.Same(tex, visual.Texture);
     }
 

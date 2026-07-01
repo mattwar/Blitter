@@ -4,7 +4,7 @@ namespace Blitter.Tests;
 
 public class Spin3DTests
 {
-    private static UpdateContext Ctx(double dt) => new()
+    private static EntityUpdateContext Ctx(double dt) => new()
     {
         ElapsedSinceStart = TimeSpan.FromSeconds(dt),
         ElapsedSinceLastUpdate = TimeSpan.FromSeconds(dt),
@@ -16,7 +16,7 @@ public class Spin3DTests
         var spin = new Spin3D { RotationSpeed = MathF.PI }; // half turn per second
         var sprite = new Sprite3D { Behaviors = [ spin ] };
 
-        spin.Apply(Ctx(1.0));
+        spin.Update(Ctx(1.0));
 
         // Forward -Z rotated half a turn about Y lands on +Z.
         var forward = Vector3.Transform(-Vector3.UnitZ, sprite.Orientation);
@@ -30,7 +30,7 @@ public class Spin3DTests
         var spin = new Spin3D { RotationSpeed = 1.23f };
         var sprite = new Sprite3D { Behaviors = [ spin ] };
 
-        spin.Apply(Ctx(0.7));
+        spin.Update(Ctx(0.7));
 
         // Spinning about Y leaves the up axis unmoved.
         var up = Vector3.Transform(Vector3.UnitY, sprite.Orientation);
@@ -45,7 +45,7 @@ public class Spin3DTests
         var spin = new Spin3D { RotationSpeed = 0f };
         var sprite = new Sprite3D { Behaviors = [ spin ] };
 
-        spin.Apply(Ctx(1.0));
+        spin.Update(Ctx(1.0));
 
         Assert.Equal(Quaternion.Identity, sprite.Orientation);
     }
@@ -56,7 +56,7 @@ public class Spin3DTests
         var spin = new Spin3D { RotationSpeed = 5f };
         var sprite = new Sprite3D { Behaviors = [ spin ] };
 
-        spin.Apply(Ctx(0));
+        spin.Update(Ctx(0));
 
         Assert.Equal(Quaternion.Identity, sprite.Orientation);
     }
@@ -66,12 +66,12 @@ public class Spin3DTests
     {
         var oneSpin = new Spin3D { RotationSpeed = 1f };
         var oneStep = new Sprite3D { Behaviors = [ oneSpin ] };
-        oneSpin.Apply(Ctx(0.5));
+        oneSpin.Update(Ctx(0.5));
 
         var spin = new Spin3D { RotationSpeed = 1f };
         var twoSteps = new Sprite3D { Behaviors = [ spin ] };
-        spin.Apply(Ctx(0.25));
-        spin.Apply(Ctx(0.25));
+        spin.Update(Ctx(0.25));
+        spin.Update(Ctx(0.25));
 
         // Two quarter-second steps equal one half-second step.
         var a = Vector3.Transform(-Vector3.UnitZ, oneStep.Orientation);
